@@ -1,0 +1,38 @@
+/* CSS Variables (defaults, overridden by theme system) */
+:root {
+  --color-bg: #151515;
+  --color-panel: #1F1F1F;
+  --color-field: #2A2A2A;
+  --color-fg: #EAEAEA;
+  --color-field-fg: #F0F0F0;
+  --color-accent: #FF9800;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: Inter, 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove number input spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  appearance: textfield;
+}
