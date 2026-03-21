@@ -3,6 +3,7 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
+  min-height: 100dvh;
   background: var(--color-bg);
   color: var(--color-fg);
   font-family: Inter, 'Segoe UI', system-ui, sans-serif;
@@ -117,7 +118,7 @@
 .viewer-area {
   flex: 1;
   position: relative;
-  min-height: 0;
+  min-height: 120px;
 }
 
 .viewer-3d {
@@ -606,6 +607,17 @@ kbd {
    ══════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
+  .app {
+    height: auto;
+    min-height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .app-body {
+    min-height: 0;
+  }
+
   .mobile-menu-btn {
     display: block;
   }
@@ -669,18 +681,25 @@ kbd {
 
   .viewer-area {
     flex: 1;
-    min-height: 200px;
+    min-height: 0;
   }
 
   /* Toolbar wraps on mobile */
   .toolbar {
-    padding: 6px 8px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
     gap: 6px;
     flex-wrap: wrap;
+    justify-content: center;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
   }
 
   .toolbar-group {
+    display: flex;
     gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   .btn {
