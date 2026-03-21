@@ -677,11 +677,13 @@ kbd {
   .main-content {
     flex: 1;
     min-height: 0;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 
   .viewer-area {
-    flex: 1;
     min-height: 0;
+    overflow: hidden;
   }
 
   /* Toolbar wraps on mobile */
@@ -690,6 +692,7 @@ kbd {
     gap: 6px;
     flex-wrap: wrap;
     justify-content: center;
+    align-content: center;
   }
 
   .toolbar-group {
