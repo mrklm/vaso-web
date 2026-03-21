@@ -153,8 +153,21 @@ export function VaseViewer3D() {
         style={{ background: "var(--color-bg)" }}
         shadows
       >
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[5, 8, 5]} intensity={1.2} castShadow shadow-mapSize={1024} />
+        <ambientLight intensity={0.25} />
+        <directionalLight
+          position={[100, 200, 100]}
+          intensity={1.6}
+          castShadow
+          shadow-bias={-0.0005}
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+          shadow-camera-near={10}
+          shadow-camera-far={500}
+          shadow-camera-left={-200}
+          shadow-camera-right={200}
+          shadow-camera-top={200}
+          shadow-camera-bottom={-200}
+        />
         <directionalLight position={[-3, 4, -2]} intensity={0.3} />
         <pointLight position={[0, 200, 0]} intensity={0.3} />
         <hemisphereLight args={["#b1e1ff", "#b97a20", 0.3]} />
@@ -168,6 +181,15 @@ export function VaseViewer3D() {
             flatShading={flatShading}
           />
         )}
+
+        <mesh
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, -params.heightMm / 2 - 0.01, 0]}
+          receiveShadow
+        >
+          <planeGeometry args={[600, 600]} />
+          <shadowMaterial opacity={0.5} />
+        </mesh>
 
         {/* <ContactShadows position={[0, -0.01, 0]} opacity={0.4} scale={300} blur={2} far={200} /> */}
 
