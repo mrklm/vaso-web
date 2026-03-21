@@ -7,6 +7,12 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.2] - 2026-03-21
+
+### 🎨 Modifié
+- Amélioration IG: les boutons du bas ne disparaissent plus au redimenssionnement
+
+
 ## [1.0.1] - 2026-03-21
 
 ### 🎨 Modifié

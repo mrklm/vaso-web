@@ -66,7 +66,7 @@ function App() {
 
       <header className="app-header">
         <h1>Vaso</h1>
-        <span className="version">Web Edition</span>
+        <span className="version">Web Edition v{__APP_VERSION__}</span>
         <button className="mobile-menu-btn" onClick={() => setPanelOpen(!panelOpen)} aria-label="Menu">
           {panelOpen ? "\u2715" : "\u2630"}
         </button>
