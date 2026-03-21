@@ -5,30 +5,34 @@ import { THEMES } from "../../themes";
 import { PRESETS } from "../../data/presets";
 
 export function SettingsPanel() {
-  const {
-    theme,
-    setTheme,
-    showGrid,
-    setShowGrid,
-    vaseColor,
-    setVaseColor,
-    wireframe,
-    setWireframe,
-    flatShading,
-    setFlatShading,
-    autoRotate,
-    setAutoRotate,
-    showClipping,
-    setShowClipping,
-    clippingHeight,
-    setClippingHeight,
-    printerProfiles,
-    activePrinterProfile,
-    setActivePrinterProfile,
-    addPrinterProfile,
-    updatePrinterProfile,
-    deletePrinterProfile,
-  } = useUIStore();
+const {
+  theme,
+  setTheme,
+  showGrid,
+  setShowGrid,
+  vaseColor,
+  setVaseColor,
+  wireframe,
+  setWireframe,
+  flatShading,
+  setFlatShading,
+  autoRotate,
+  setAutoRotate,
+  showClipping,
+  setShowClipping,
+  clippingHeight,
+  setClippingHeight,
+  rotationMode,
+  setRotationMode,
+  rotationSpeed,
+  setRotationSpeed,
+  printerProfiles,
+  activePrinterProfile,
+  setActivePrinterProfile,
+  addPrinterProfile,
+  updatePrinterProfile,
+  deletePrinterProfile,
+} = useUIStore();
 
   const setParams = useVaseStore((s) => s.setParams);
   const activeProfile = printerProfiles.find((p) => p.name === activePrinterProfile) ?? printerProfiles[0];
@@ -122,6 +126,13 @@ export function SettingsPanel() {
 
       <div className="separator" />
       <h3>Vue 3D</h3>
+      <div className="select-input">
+        <label>Rotation : caméra / vase</label>
+        <select value={rotationMode} onChange={(e) => setRotationMode(e.target.value as "camera" | "vase")}>
+          <option value="camera">caméra</option>
+          <option value="vase">vase</option>
+        </select>
+      </div>
 
       <div className="checkbox-row">
         <label>
@@ -129,6 +140,19 @@ export function SettingsPanel() {
           Grille
         </label>
       </div>
+      {rotationMode === "vase" && (
+        <div className="slider-row">
+          <label>Vitesse rotation : {rotationSpeed.toFixed(2)}</label>
+          <input
+            type="range"
+            min={0}
+            max={3}
+            step={0.1}
+            value={rotationSpeed}
+            onChange={(e) => setRotationSpeed(Number(e.target.value))}
+          />
+        </div>
+      )}
       <div className="checkbox-row">
         <label>
           <input type="checkbox" checked={wireframe} onChange={(e) => setWireframe(e.target.checked)} />

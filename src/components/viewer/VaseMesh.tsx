@@ -1,4 +1,5 @@
 import { useRef, useEffect } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { MeshData } from "../../engine/types";
 
@@ -8,11 +9,29 @@ interface VaseMeshProps {
   color: string;
   wireframe: boolean;
   flatShading: boolean;
+  rotationMode: "camera" | "vase";
+  rotationSpeed: number;
 }
 
-export function VaseMesh({ meshData, shading, color, wireframe, flatShading }: VaseMeshProps) {
+export function VaseMesh({
+  meshData,
+  shading,
+  color,
+  wireframe,
+  flatShading,
+  rotationMode,
+  rotationSpeed,
+}: VaseMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry>(null);
+
+  useFrame((_, delta) => {
+    if (!meshRef.current) return;
+
+    if (rotationMode === "vase") {
+      meshRef.current.rotation.z += delta * 0.8 * rotationSpeed;
+    }
+  });
 
   useEffect(() => {
     if (!geometryRef.current) return;

@@ -19,6 +19,8 @@ interface UIState {
   flatShading: boolean;
   autoRotate: boolean;
   showClipping: boolean;
+  rotationMode: "camera" | "vase";
+  rotationSpeed: number;
   clippingHeight: number; // 0-100 percent
 
   // Printer profiles
@@ -35,6 +37,8 @@ interface UIState {
   setFlatShading: (v: boolean) => void;
   setAutoRotate: (v: boolean) => void;
   setShowClipping: (v: boolean) => void;
+  setRotationMode: (mode: "camera" | "vase") => void;
+  setRotationSpeed: (v: number) => void;
   setClippingHeight: (v: number) => void;
 
   // Printer profile actions
@@ -101,6 +105,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   flatShading: false,
   autoRotate: true,
   showClipping: false,
+  rotationMode: "camera",
+  rotationSpeed: 0.5,
   clippingHeight: 50,
 
   printerProfiles: initialPrinter.profiles,
@@ -124,6 +130,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   setFlatShading: (v) => set({ flatShading: v }),
   setAutoRotate: (v) => set({ autoRotate: v }),
   setShowClipping: (v) => set({ showClipping: v }),
+  setRotationMode: (mode) => set({ rotationMode: mode }),
+  setRotationSpeed: (v) => set({ rotationSpeed: v }),
   setClippingHeight: (v) => set({ clippingHeight: v }),
 
   setActivePrinterProfile: (name) => {

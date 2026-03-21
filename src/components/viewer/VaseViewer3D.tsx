@@ -76,9 +76,11 @@ function ClippingPlane({ heightPercent, maxHeight }: { heightPercent: number; ma
 function Autoplay({
   controlsRef,
   paramsKey,
+  rotationMode,
 }: {
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
   paramsKey: string;
+  rotationMode: "camera" | "vase";
 }) {
   const autoRotate = useUIStore((s) => s.autoRotate);
   const setAutoRotate = useUIStore((s) => s.setAutoRotate);
@@ -105,15 +107,15 @@ function Autoplay({
 
   // Restart rotation when params change (new vase generated)
   useEffect(() => {
-    setAutoRotate(true);
+    setAutoRotate(rotationMode === "camera");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paramsKey]);
+  }, [paramsKey, rotationMode]);
 
   useFrame(() => {
-    if (controlsRef.current) {
-      controlsRef.current.autoRotate = autoRotate;
-      controlsRef.current.autoRotateSpeed = 1.5;
-    }
+    if (!controlsRef.current) return;
+
+    controlsRef.current.autoRotate = rotationMode === "camera" && autoRotate;
+    controlsRef.current.autoRotateSpeed = 1.5;
   });
 
   return null;
@@ -129,6 +131,8 @@ export function VaseViewer3D() {
   const flatShading = useUIStore((s) => s.flatShading);
   const showClipping = useUIStore((s) => s.showClipping);
   const clippingHeight = useUIStore((s) => s.clippingHeight);
+  const rotationMode = useUIStore((s) => s.rotationMode);
+  const rotationSpeed = useUIStore((s) => s.rotationSpeed);
   const meshData = useVaseMesh(params);
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const lastTapRef = useRef(0);
@@ -179,6 +183,8 @@ export function VaseViewer3D() {
             color={vaseColor}
             wireframe={wireframe}
             flatShading={flatShading}
+            rotationMode={rotationMode}
+            rotationSpeed={rotationSpeed}
           />
         )}
 
@@ -201,7 +207,7 @@ export function VaseViewer3D() {
           maxDistance={500}
         />
         <KeyboardControls controlsRef={controlsRef} />
-        <Autoplay controlsRef={controlsRef} paramsKey={paramsKey} />
+        <Autoplay controlsRef={controlsRef} paramsKey={paramsKey} rotationMode={rotationMode} />
 
         {showClipping && <ClippingPlane heightPercent={clippingHeight} maxHeight={params.heightMm} />}
         {showGrid && (
