@@ -153,7 +153,7 @@ export function VaseViewer3D() {
   return (
     <div className="viewer-3d" onTouchEnd={handleDoubleTap}>
       <Canvas
-        camera={{ position: [150, 120, 150], fov: 45, near: 0.1, far: 2000 }}
+        camera={{ position: [220, 160, 220], fov: 45, near: 0.1, far: 2000 }}
         style={{ background: "var(--color-bg)" }}
         shadows
       >
