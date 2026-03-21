@@ -169,7 +169,7 @@ export function VaseViewer3D() {
           />
         )}
 
-        <ContactShadows position={[0, -0.01, 0]} opacity={0.4} scale={300} blur={2} far={200} />
+        {/* <ContactShadows position={[0, -0.01, 0]} opacity={0.4} scale={300} blur={2} far={200} /> */}
 
         <OrbitControls
           ref={controlsRef}
@@ -184,13 +184,13 @@ export function VaseViewer3D() {
         {showClipping && <ClippingPlane heightPercent={clippingHeight} maxHeight={params.heightMm} />}
         {showGrid && (
           <gridHelper
-            args={[300, 30, "#444444", "#333333"]}
+            args={[300, 30, "#333333", "#333333"]}
             position={[0, -params.heightMm / 2, 0]}
           />
         )}
 
         <EffectComposer>
-          <SSAO radius={0.05} intensity={25} luminanceInfluence={0.5} />
+          <SSAO radius={0.03} intensity={5} luminanceInfluence={0.3} />
           <ToneMapping mode={ToneMappingMode.AGX} />
         </EffectComposer>
       </Canvas>

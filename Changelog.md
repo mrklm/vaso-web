@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.5] - 2026-03-21
+
+### 🎨 Modifié
+- Résidu de la grille du milieu
+
 ## [1.0.4] - 2026-03-21
 
 ### 🎨 Modifié
