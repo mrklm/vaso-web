@@ -7,6 +7,16 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.4] - 2026-03-21
+
+### 🎨 Modifié
+- Probleme de bloc noir en version mobile résolu 
+
+## [1.0.3] - 2026-03-21
+
+### 🎨 Modifié
+- Probleme de bloc noir en version mobile
+
 ## [1.0.2] - 2026-03-21
 
 ### 🎨 Modifié
