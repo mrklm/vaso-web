@@ -19,7 +19,7 @@ Aucune installation requise — fonctionne directement dans le navigateur.
 ## 👁️ Aperçu
 
 ![Vue principale](screenshots/vaso_web_1.png)  
-![Génération](screenshots/vaso_web_2.png)  
+![Profils](screenshots/vaso_web_2.png)  
 ![Options](screenshots/vaso_web_3.png)
 
 ---
