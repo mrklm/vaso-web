@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useVaseStore } from "../../store/vase-store";
 import { useUIStore } from "../../store/ui-store";
 import { NumberInput } from "../ui/NumberInput";
@@ -14,6 +15,22 @@ export function GeneralParams() {
   const store = useVaseStore();
   const { shading, setShading, renderMode, setRenderMode } = useUIStore();
   const p = store.params;
+  const [seedInput, setSeedInput] = useState(String(store.seed));
+
+  useEffect(() => {
+    setSeedInput(String(store.seed));
+  }, [store.seed]);
+
+  const commitSeed = () => {
+    const v = parseInt(seedInput, 10);
+    if (isNaN(v)) {
+      setSeedInput(String(store.seed));
+      return;
+    }
+    const clamped = Math.max(0, Math.min(999999, v));
+    setSeedInput(String(clamped));
+    store.setSeed(clamped);
+  };  
 
   return (
     <div className="panel general-params">
@@ -74,15 +91,28 @@ export function GeneralParams() {
       <div className="separator" />
       <h3>Aléatoire</h3>
 
-      <NumberInput
-        label="Seed"
-        value={store.seed}
-        onChange={store.setSeed}
-        min={0}
-        max={999999}
-        step={1}
-        integer
-      />
+      <div className="slider-input">
+        <div className="slider-input-header">
+          <label>Seed</label>
+          <input
+            type="number"
+            className="slider-input-number"
+            value={seedInput}
+            min={0}
+            max={999999}
+            step={1}
+            onChange={(e) => setSeedInput(e.target.value)}
+            onBlur={commitSeed}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitSeed();
+                e.currentTarget.blur();
+              }
+            }}
+          />
+        </div>
+      </div>
       <Select
         label="Style"
         value={store.randomStyle}
