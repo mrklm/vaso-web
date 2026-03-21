@@ -69,10 +69,10 @@ export function Toolbar() {
         </button>
       </div>
       <div className="toolbar-group">
-        <button className="btn btn-secondary" onClick={randomize} title="Espace">
+        <button className="btn btn-primary" onClick={randomize} title="Espace">
           Aléatoire
         </button>
-        <button className="btn btn-primary" onClick={handleExport}>
+        <button className="btn btn-secondary" onClick={handleExport}>
           Exporter STL
         </button>
       </div>

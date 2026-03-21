@@ -182,7 +182,12 @@ export function VaseViewer3D() {
         <Autoplay controlsRef={controlsRef} paramsKey={paramsKey} />
 
         {showClipping && <ClippingPlane heightPercent={clippingHeight} maxHeight={params.heightMm} />}
-        {showGrid && <gridHelper args={[300, 30, "#444444", "#333333"]} rotation={[0, 0, 0]} />}
+        {showGrid && (
+          <gridHelper
+            args={[300, 30, "#444444", "#333333"]}
+            position={[0, -params.heightMm / 2, 0]}
+          />
+        )}
 
         <EffectComposer>
           <SSAO radius={0.05} intensity={25} luminanceInfluence={0.5} />
