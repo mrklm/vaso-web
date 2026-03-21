@@ -1,73 +1,124 @@
-# React + TypeScript + Vite
+# Vaso Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Vaso Web** est un générateur de vases polygonaux accessible directement dans le navigateur.
 
-Currently, two official plugins are available:
+Il permet de créer des vases à partir de profils polygonaux interpolés verticalement, de générer un maillage 3D, puis d’exporter le modèle au format **STL** pour l’impression 3D.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Version web du projet **Vaso** (application Python Tkinter).
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🌐 Accès en ligne
 
-## Expanding the ESLint configuration
+👉 https://mrklm.github.io/vaso-web/
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Aucune installation requise — fonctionne directement dans le navigateur.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 👁️ Aperçu
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+![Vue principale](screenshots/vaso_web_1.png)  
+![Génération](screenshots/vaso_web_2.png)  
+![Options](screenshots/vaso_web_3.png)
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+# ✨ Fonctionnalités
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- définition de **2 à 10 profils polygonaux**
+- réglage pour chaque profil :
+  - diamètre
+  - nombre de côtés
+  - rotation
+  - position verticale
+- interpolation entre profils
+- génération d’un **maillage 3D**
+- export en **STL**
+- textures paramétriques
+- génération **aléatoire contrôlée**
+- aperçu **temps réel**
+- interface web moderne (**React**)
+
+---
+
+# 🎲 Génération aléatoire
+
+Vaso Web permet de générer automatiquement des formes variées.
+
+Paramètres disponibles :
+
+- **style de génération**
+- **niveau de complexité**
+  - sobre
+  - moyen
+  - complexe
+- **texture**
+- **zoom de texture**
+
+La génération utilise une **seed** permettant de reproduire une forme identique.
+
+---
+
+# 🧱 Architecture du projet
+
+
+vaso-web
+├─ src/
+│ ├─ components/
+│ ├─ generator/
+│ ├─ model/
+│ └─ exporter/
+├─ public/
+├─ screenshots/
+├─ index.html
+├─ package.json
+├─ vite.config.ts
+├─ README.md
+
+
+---
+
+# 🧪 Installation (développement)
+
+## 1. Cloner le projet
+
+```bash
+git clone https://github.com/mrklm/vaso-web.git
+cd vaso-web
+2. Installer les dépendances
+npm install
+3. Lancer en mode développement
+npm run dev
+
+Puis ouvrir :
+
+http://localhost:5173
+4. Build production
+npm run build
+
+Génère :
+
+dist/
+🔄 Déploiement
+
+Le site est automatiquement déployé via GitHub Actions sur GitHub Pages.
+
+Chaque push sur main déclenche :
+
+build du projet
+publication de dist/
+mise à jour du site en ligne
+🧠 Technologies utilisées
+React
+Vite
+JavaScript / TypeScript
+Three.js / WebGL (si utilisé)
+🔗 Lien avec la version Python
+🐍 Vaso (desktop)
+https://github.com/mrklm/vaso
+🌐 Vaso Web (ce projet)
+version navigateur, sans installation
+📜 Licence
+
+Projet open source.
