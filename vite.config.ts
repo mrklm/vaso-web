@@ -7,5 +7,5 @@ const isElectron = process.env.ELECTRON === '1'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: isElectron ? './' : '/vaso/',
+  base: isElectron ? './' : '/vaso-web/',
 })
