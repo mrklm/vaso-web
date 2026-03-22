@@ -30,7 +30,8 @@ export function GeneralParams() {
     const clamped = Math.max(0, Math.min(999999, v));
     setSeedInput(String(clamped));
     store.setSeed(clamped);
-  };  
+    store.applySeed();
+  };
 
   return (
     <div className="panel general-params">

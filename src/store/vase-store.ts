@@ -39,6 +39,7 @@ interface VaseState {
   setForceTexture: (v: boolean) => void;
   setParams: (params: VaseParameters) => void;
   randomize: () => void;
+  applySeed: () => void;
 }
 
 // Seedable PRNG (simple mulberry32)
@@ -319,6 +320,19 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
   setForceComplexity: (v) => set({ forceComplexity: v }),
   setForceTexture: (v) => set({ forceTexture: v }),
   setParams: (params) => set({ params }),
+
+  applySeed: () => {
+    const state = get();
+    const params = randomizeParams(
+      state.seed,
+      state.randomStyle,
+      state.complexity,
+      state.forceComplexity,
+      state.forceTexture,
+      state.params,
+    );
+    set({ params });
+  },
 
   randomize: () => {
     const state = get();
