@@ -69,7 +69,7 @@ export function Toolbar() {
       const captureDate = new Date();
       const seedLabel = `${Math.abs(Math.trunc(seed)).toString().padStart(6, "0")}`;
       const footerLines = [
-        `Vaso v${APP_VERSION} - N° de seed: ${seedLabel} - ` +
+        `Vaso v${APP_VERSION} - n° de seed: ${seedLabel} - ` +
           `capture d'écran du ${formatDisplayDate(captureDate)} à ${formatDisplayTime(captureDate)}`,
         SCREENSHOT_INFO_URL,
       ];

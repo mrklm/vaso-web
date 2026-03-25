@@ -11,7 +11,6 @@ interface PrinterProfile {
 interface UIState {
   theme: Theme;
   activeTab: "general" | "options" | "help";
-  renderMode: "normal" | "enhanced";
   shading: number; // 0-100
   showGrid: boolean;
   vaseColor: string;
@@ -29,7 +28,6 @@ interface UIState {
 
   setTheme: (theme: Theme) => void;
   setActiveTab: (tab: UIState["activeTab"]) => void;
-  setRenderMode: (mode: UIState["renderMode"]) => void;
   setShading: (v: number) => void;
   setShowGrid: (v: boolean) => void;
   setVaseColor: (c: string) => void;
@@ -97,7 +95,6 @@ const initialPrinter = loadPrinterProfiles();
 export const useUIStore = create<UIState>((set, get) => ({
   theme: initialTheme,
   activeTab: "general",
-  renderMode: "normal",
   shading: 70,
   showGrid: true,
   vaseColor: "#c4956a",
@@ -122,7 +119,6 @@ export const useUIStore = create<UIState>((set, get) => ({
     set({ theme });
   },
   setActiveTab: (tab) => set({ activeTab: tab }),
-  setRenderMode: (mode) => set({ renderMode: mode }),
   setShading: (v) => set({ shading: v }),
   setShowGrid: (v) => set({ showGrid: v }),
   setVaseColor: (c) => set({ vaseColor: c }),

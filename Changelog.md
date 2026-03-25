@@ -7,17 +7,22 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.12] - 2026-03-25
+
+### 🎨 Modifié
+
+ - Supression du mode de rendu 3D "Enhanced" qui était pertinent en Python
+ - n° de seed et plus N° de seed sur le bandeau capture d'écran
 
 ## [1.0.11] - 2026-03-25
+
 ### 🎨 Modifié
  - Texte titre + version + seed visible dans le rendu 3D
 
 ## [1.0.10] - 2026-03-25
-### 🎨 Modifié
- - Séctions rétablies dans le menu option
 
 ### 🎨 Modifié
-- Le menu option sur mobile se ferme lorsqu'on appuie sur X
+ - Séctions rétablies dans le menu option
 
 ## [1.0.9] - 2026-03-25
 

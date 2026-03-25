@@ -13,7 +13,7 @@ import {
 
 export function GeneralParams() {
   const store = useVaseStore();
-  const { shading, setShading, renderMode, setRenderMode } = useUIStore();
+  const { shading, setShading } = useUIStore();
   const p = store.params;
   const [seedInput, setSeedInput] = useState(String(store.seed));
 
@@ -197,13 +197,6 @@ export function GeneralParams() {
 
       <div className="separator" />
       <h3>Rendu 3D</h3>
-
-      <Select
-        label="Mode rendu"
-        value={renderMode}
-        options={["normal", "enhanced"] as const}
-        onChange={setRenderMode}
-      />
 
       <div className="slider-row">
         <label>Ombrage: {shading}%</label>
