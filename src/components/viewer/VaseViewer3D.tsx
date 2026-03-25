@@ -123,6 +123,7 @@ function Autoplay({
 
 export function VaseViewer3D() {
   const params = useVaseStore((s) => s.params);
+  const seed = useVaseStore((s) => s.seed);
   const randomize = useVaseStore((s) => s.randomize);
   const shading = useUIStore((s) => s.shading);
   const showGrid = useUIStore((s) => s.showGrid);
@@ -133,7 +134,7 @@ export function VaseViewer3D() {
   const clippingHeight = useUIStore((s) => s.clippingHeight);
   const rotationMode = useUIStore((s) => s.rotationMode);
   const rotationSpeed = useUIStore((s) => s.rotationSpeed);
-  const meshData = useVaseMesh(params);
+  const meshData = useVaseMesh(params, seed);
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const lastTapRef = useRef(0);
   const paramsKey = JSON.stringify(params);

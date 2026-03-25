@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  generateVaseMesh,
-  generateOuterProfilePoints,
-  generateTopOuterContour,
-} from "./mesh-builder";
+import { generateVaseMesh, generateOuterProfilePoints, generateTopOuterContour } from "./mesh-builder";
+import { countBoundaryEdges, countConnectedMeshComponents } from "./mesh-cleanup";
 import { defaultVaseParameters, createProfile } from "./types";
 
 describe("generateVaseMesh", () => {
@@ -72,6 +69,18 @@ describe("generateVaseMesh", () => {
     ];
     const mesh = generateVaseMesh(params);
     expect(mesh.vertices.length).toBeGreaterThan(0);
+  });
+
+  it("generates a single closed component for a closed-bottom vase", () => {
+    const params = defaultVaseParameters();
+    params.radialSamples = 32;
+    params.verticalSamples = 16;
+    params.closeBottom = true;
+
+    const mesh = generateVaseMesh(params);
+
+    expect(countConnectedMeshComponents(mesh)).toBe(1);
+    expect(countBoundaryEdges(mesh)).toBe(0);
   });
 });
 

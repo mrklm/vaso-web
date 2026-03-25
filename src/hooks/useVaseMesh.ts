@@ -6,10 +6,11 @@ import { generateVaseMesh } from "../engine/mesh-builder";
  * Hook that generates mesh data from vase parameters.
  * Uses reduced resolution for preview performance.
  */
-export function useVaseMesh(params: VaseParameters): MeshData | null {
+export function useVaseMesh(params: VaseParameters, seed: number): MeshData | null {
   return useMemo(() => {
+    void seed;
     try {
-      // Use reduced resolution for preview
+      // Keep preview fast: engraving is applied only for STL export.
       const previewParams: VaseParameters = {
         ...params,
         radialSamples: Math.min(params.radialSamples, 72),

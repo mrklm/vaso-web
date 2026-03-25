@@ -1,4 +1,5 @@
 import type { VaseParameters, MeshData } from "./types";
+import { appendPipelineTrace, dumpPipelineTrace, getPipelineTrace, resetPipelineTrace } from "./pipeline-trace";
 import { validateParams } from "./validation";
 import { buildProfileContour, interpolateContours } from "./geometry";
 import { applyTexture } from "./textures";
@@ -7,6 +8,10 @@ import {
   limitContourStepFromPrevious,
   computeInnerContour,
 } from "./constraints";
+import { getMeshDifferenceDiagnostics, logMeshDiagnostics } from "./mesh-cleanup";
+
+const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
+const ENGRAVING_PIPELINE_MARKER = `Vaso Engraving ${APP_VERSION}`;
 
 function linspace(start: number, end: number, count: number): Float64Array {
   const result = new Float64Array(count);
@@ -75,6 +80,12 @@ function generateSupportSafeOuterContours(
  * Generate the full vase mesh. Returns vertices (Float32Array, xyz flat) and indices (Uint32Array).
  */
 export function generateVaseMesh(params: VaseParameters): MeshData {
+  return generateVaseMeshInternal(params);
+}
+
+function generateVaseMeshInternal(
+  params: VaseParameters,
+): MeshData {
   validateParams(params);
 
   const ringSize = params.radialSamples;
@@ -155,7 +166,6 @@ export function generateVaseMesh(params: VaseParameters): MeshData {
 
   // Bottom cap
   if (params.closeBottom) {
-    // Outer bottom cap
     const outerBottom = outerRingStarts[0];
     const outerCenter = verts.length / 3;
     verts.push(0, 0, 0);
@@ -180,6 +190,45 @@ export function generateVaseMesh(params: VaseParameters): MeshData {
     vertices: new Float32Array(verts),
     indices: new Uint32Array(faces),
   };
+}
+
+export async function generateVaseMeshWithEngraving(
+  params: VaseParameters,
+  seed: number,
+): Promise<MeshData> {
+  validateParams(params);
+  resetPipelineTrace();
+
+  try {
+    const { engraveBaseText } = await import("./engraving");
+    const zOuter = linspace(0, params.heightMm, params.verticalSamples);
+    const outerContours = generateSupportSafeOuterContours(params, zOuter);
+    const mesh = generateVaseMeshInternal(params);
+    logMeshDiagnostics("[mesh-builder] base mesh", mesh);
+    appendPipelineTrace(
+      `[mesh-builder] base mesh:v=${mesh.vertices.length / 3},t=${mesh.indices.length / 3}`,
+    );
+    const engravedMesh = await engraveBaseText(mesh, params, outerContours[0], seed);
+    const difference = getMeshDifferenceDiagnostics(mesh, engravedMesh);
+    appendPipelineTrace(
+      `[mesh-builder] final compare vs base:identical=${difference.identical ? 1 : 0},sharedT=${difference.sharedTriangles},removedT=${difference.removedTriangles},addedT=${difference.addedTriangles},sharedRatio=${difference.sharedTriangleRatio.toFixed(4)}`,
+    );
+    if (difference.identical || (difference.addedTriangles === 0 && difference.removedTriangles === 0)) {
+      dumpPipelineTrace(ENGRAVING_PIPELINE_MARKER);
+      throw new Error(
+        `Engraving pipeline produced a mesh identical to the base mesh. trace=${getPipelineTrace()}`,
+      );
+    }
+    return engravedMesh;
+  } catch (error) {
+    appendPipelineTrace(
+      `[mesh-builder] engraving error=${error instanceof Error ? error.message : String(error)}`,
+    );
+    dumpPipelineTrace(ENGRAVING_PIPELINE_MARKER);
+    throw error instanceof Error
+      ? error
+      : new Error(`Engraving pipeline failed. trace=${getPipelineTrace()}`);
+  }
 }
 
 /**

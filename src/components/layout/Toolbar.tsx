@@ -2,19 +2,20 @@ import toast from "react-hot-toast";
 import { useVaseStore } from "../../store/vase-store";
 import { useUIStore } from "../../store/ui-store";
 import { exportSTL } from "../../engine/exporter";
-import { generateVaseMesh } from "../../engine/mesh-builder";
+import { generateVaseMeshWithEngraving } from "../../engine/mesh-builder";
 import { getShareUrl } from "../../hooks/useUrlShare";
 
 export function Toolbar() {
   const randomize = useVaseStore((s) => s.randomize);
   const params = useVaseStore((s) => s.params);
+  const seed = useVaseStore((s) => s.seed);
   const autoRotate = useUIStore((s) => s.autoRotate);
   const setAutoRotate = useUIStore((s) => s.setAutoRotate);
   const { undo, redo, pastStates, futureStates } = useVaseStore.temporal.getState();
 
   const handleExport = async () => {
     try {
-      const mesh = generateVaseMesh(params);
+      const mesh = await generateVaseMeshWithEngraving(params, seed);
       const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
       await exportSTL(mesh, `vaso_export_${timestamp}.stl`);
       toast.success("STL exporté !");

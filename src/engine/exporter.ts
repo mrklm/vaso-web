@@ -1,10 +1,37 @@
+import {
+  logMeshDiagnostics,
+  removeDegenerateTriangles,
+} from "./mesh-cleanup";
+import { appendPipelineTrace, dumpPipelineTrace, getPipelineTrace } from "./pipeline-trace";
 import type { MeshData } from "./types";
+
+const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
+const STL_PIPELINE_MARKER = `Vaso STL ${APP_VERSION} bf-r13`;
+const STL_EXPORT_DEGENERATE_AREA_EPSILON_MM2 = 1e-12;
 
 /**
  * Build a binary STL ArrayBuffer from mesh data.
  */
 export function buildSTLBuffer(mesh: MeshData): ArrayBuffer {
-  const numTriangles = mesh.indices.length / 3;
+  const cleanedMesh = removeDegenerateTriangles(mesh, STL_EXPORT_DEGENERATE_AREA_EPSILON_MM2);
+  const diagnostics = logMeshDiagnostics(`[${STL_PIPELINE_MARKER}] just before STL export`, cleanedMesh);
+  appendPipelineTrace(
+    `[export] final:v=${diagnostics.vertexCount},t=${diagnostics.triangleCount},c=${diagnostics.components},nm=${diagnostics.nonManifoldEdges},be=${diagnostics.boundaryEdges},bl=${diagnostics.boundaryLoops},wt=${diagnostics.watertight ? 1 : 0}`,
+  );
+  dumpPipelineTrace(STL_PIPELINE_MARKER);
+  const {
+    components: connectedComponents,
+    nonManifoldEdges,
+    boundaryEdges,
+    boundaryLoops,
+    watertight,
+    triangleCount: numTriangles,
+  } = diagnostics;
+  if (boundaryEdges > 0) {
+    throw new Error(
+      `[${STL_PIPELINE_MARKER}] Invalid STL export: components=${connectedComponents} nonManifold=${nonManifoldEdges} boundaryEdges=${boundaryEdges} boundaryLoops=${boundaryLoops} watertight=${watertight} trace=${getPipelineTrace()}`,
+    );
+  }
 
   // STL binary format: 80-byte header + 4-byte triangle count + 50 bytes per triangle
   const bufferSize = 80 + 4 + numTriangles * 50;
@@ -12,7 +39,7 @@ export function buildSTLBuffer(mesh: MeshData): ArrayBuffer {
   const view = new DataView(buffer);
 
   // Header (80 bytes, can be anything)
-  const header = "Vaso Web Export - STL Binary";
+  const header = `${STL_PIPELINE_MARKER} be=${boundaryEdges} bl=${boundaryLoops} wt=${watertight ? 1 : 0}`;
   for (let i = 0; i < Math.min(header.length, 80); i++) {
     view.setUint8(i, header.charCodeAt(i));
   }
@@ -21,8 +48,8 @@ export function buildSTLBuffer(mesh: MeshData): ArrayBuffer {
   view.setUint32(80, numTriangles, true);
 
   let offset = 84;
-  const v = mesh.vertices;
-  const idx = mesh.indices;
+  const v = cleanedMesh.vertices;
+  const idx = cleanedMesh.indices;
 
   for (let t = 0; t < numTriangles; t++) {
     const i0 = idx[t * 3],
@@ -101,6 +128,7 @@ export function buildSTLBuffer(mesh: MeshData): ArrayBuffer {
  * Export STL: uses native save dialog in Electron, browser download otherwise.
  */
 export async function exportSTL(mesh: MeshData, filename = "vaso_export.stl"): Promise<void> {
+  console.info(`[${STL_PIPELINE_MARKER}] Exporting ${filename}`);
   const buffer = buildSTLBuffer(mesh);
 
   // Electron: native save dialog
