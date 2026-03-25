@@ -641,11 +641,11 @@ kbd {
   .sidebar-wrapper {
     display: block;
     position: fixed;
-    top: 0;
+    top: 42px;
     left: 0;
     width: 85vw;
     max-width: 340px;
-    height: 100vh;
+    height: calc(100vh - 42px);
     z-index: 100;
     transform: translateX(-100%);
     transition: transform 0.25s ease;

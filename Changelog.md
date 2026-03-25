@@ -8,6 +8,12 @@ et ce projet suit un versioning de type **SemVer**.
 ---
 
 
+## [1.0.10] - 2026-03-25
+ - Séctions rétablies dans le menu option
+
+### 🎨 Modifié
+- Le menu option sur mobile se ferme lorsqu'on appuie sur X
+
 ## [1.0.9] - 2026-03-25
 
 ### 🎨 Modifié
