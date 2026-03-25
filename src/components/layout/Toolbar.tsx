@@ -3,6 +3,7 @@ import { useVaseStore } from "../../store/vase-store";
 import { useUIStore } from "../../store/ui-store";
 import { exportSTL } from "../../engine/exporter";
 import { generateVaseMeshWithEngraving } from "../../engine/mesh-builder";
+import { validateParamsAgainstBuildVolume } from "../../engine/printer-volume";
 import { getShareUrl } from "../../hooks/useUrlShare";
 
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
@@ -39,10 +40,17 @@ export function Toolbar() {
   const seed = useVaseStore((s) => s.seed);
   const autoRotate = useUIStore((s) => s.autoRotate);
   const setAutoRotate = useUIStore((s) => s.setAutoRotate);
+  const printerProfiles = useUIStore((s) => s.printerProfiles);
+  const activePrinterProfile = useUIStore((s) => s.activePrinterProfile);
+  const enforcePrinterVolume = useUIStore((s) => s.enforcePrinterVolume);
   const { undo, redo, pastStates, futureStates } = useVaseStore.temporal.getState();
 
   const handleExport = async () => {
     try {
+      const activePrinter = printerProfiles.find((profile) => profile.name === activePrinterProfile) ?? printerProfiles[0];
+      if (enforcePrinterVolume && activePrinter) {
+        validateParamsAgainstBuildVolume(params, activePrinter);
+      }
       const mesh = await generateVaseMeshWithEngraving(params, seed);
       const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
       await exportSTL(mesh, `vaso_export_${timestamp}.stl`);

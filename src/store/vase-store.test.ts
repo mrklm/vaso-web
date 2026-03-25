@@ -1,8 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useVaseStore } from "./vase-store";
+import { useUIStore } from "./ui-store";
 
 describe("vaseStore", () => {
   beforeEach(() => {
+    useUIStore.setState({
+      ...useUIStore.getInitialState(),
+      printerProfiles: [{ name: "Test Printer", width: 220, depth: 220, height: 180 }],
+      activePrinterProfile: "Test Printer",
+      enforcePrinterVolume: true,
+    });
     useVaseStore.setState({
       ...useVaseStore.getInitialState(),
     });
@@ -18,7 +25,7 @@ describe("vaseStore", () => {
 
   it("setHeight updates heightMm", () => {
     useVaseStore.getState().setHeight(200);
-    expect(useVaseStore.getState().params.heightMm).toBe(200);
+    expect(useVaseStore.getState().params.heightMm).toBe(180);
   });
 
   it("setProfileCount adds profiles", () => {
@@ -36,8 +43,8 @@ describe("vaseStore", () => {
   });
 
   it("updateProfile modifies a specific profile", () => {
-    useVaseStore.getState().updateProfile(0, { diameter: 120 });
-    expect(useVaseStore.getState().params.profiles[0].diameter).toBe(120);
+    useVaseStore.getState().updateProfile(0, { diameter: 260 });
+    expect(useVaseStore.getState().params.profiles[0].diameter).toBe(220);
   });
 
   it("randomize changes parameters", () => {
@@ -58,5 +65,13 @@ describe("vaseStore", () => {
   it("setTextureMode updates texture mode", () => {
     useVaseStore.getState().setTextureMode("Double texture");
     expect(useVaseStore.getState().params.textureMode).toBe("Double texture");
+  });
+
+  it("does not clamp when printer volume enforcement is disabled", () => {
+    useUIStore.setState({ enforcePrinterVolume: false });
+    useVaseStore.getState().setHeight(300);
+    useVaseStore.getState().updateProfile(0, { diameter: 260 });
+    expect(useVaseStore.getState().params.heightMm).toBe(300);
+    expect(useVaseStore.getState().params.profiles[0].diameter).toBe(260);
   });
 });

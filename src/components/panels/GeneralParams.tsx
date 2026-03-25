@@ -14,8 +14,11 @@ import {
 export function GeneralParams() {
   const store = useVaseStore();
   const { shading, setShading } = useUIStore();
+  const { printerProfiles, activePrinterProfile, enforcePrinterVolume } = useUIStore();
   const p = store.params;
   const [seedInput, setSeedInput] = useState(String(store.seed));
+  const activePrinter = printerProfiles.find((profile) => profile.name === activePrinterProfile) ?? printerProfiles[0];
+  const maxPrintableHeight = enforcePrinterVolume ? (activePrinter?.height ?? 500) : 500;
 
   useEffect(() => {
     setSeedInput(String(store.seed));
@@ -42,7 +45,7 @@ export function GeneralParams() {
         value={p.heightMm}
         onChange={store.setHeight}
         min={10}
-        max={500}
+        max={maxPrintableHeight}
         step={5}
       />
       <NumberInput

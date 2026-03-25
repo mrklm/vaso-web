@@ -1,4 +1,5 @@
 import { useVaseStore } from "../../store/vase-store";
+import { useUIStore } from "../../store/ui-store";
 
 interface ProfileSliderProps {
   label: string;
@@ -54,6 +55,11 @@ function ProfileSlider({
 export function ProfileEditor() {
   const profiles = useVaseStore((s) => s.params.profiles);
   const updateProfile = useVaseStore((s) => s.updateProfile);
+  const { printerProfiles, activePrinterProfile, enforcePrinterVolume } = useUIStore();
+  const activePrinter = printerProfiles.find((profile) => profile.name === activePrinterProfile) ?? printerProfiles[0];
+  const maxPrintableDiameter = enforcePrinterVolume
+    ? Math.min(activePrinter?.width ?? 300, activePrinter?.depth ?? 300)
+    : 300;
 
   return (
     <div className="panel profile-editor">
@@ -74,7 +80,7 @@ export function ProfileEditor() {
             value={Math.round(profile.diameter)}
             onChange={(v) => updateProfile(i, { diameter: v })}
             min={5}
-            max={300}
+            max={maxPrintableDiameter}
           />
           <ProfileSlider
             label="Côtés"

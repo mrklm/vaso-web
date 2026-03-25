@@ -7,6 +7,14 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.13] - 2026-03-25
+
+### 🎨 Modifié
+ - Le programme tiens maintenant compte de l'imprimante 3D selectionnée
+
+### 🎨 Ajouté
+ - Ajout de plusieurs imprimante 3D dans les presets
+
 ## [1.0.12] - 2026-03-25
 
 ### 🎨 Modifié

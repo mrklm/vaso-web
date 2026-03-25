@@ -25,6 +25,7 @@ interface UIState {
   // Printer profiles
   printerProfiles: PrinterProfile[];
   activePrinterProfile: string;
+  enforcePrinterVolume: boolean;
 
   setTheme: (theme: Theme) => void;
   setActiveTab: (tab: UIState["activeTab"]) => void;
@@ -40,6 +41,7 @@ interface UIState {
   setClippingHeight: (v: number) => void;
 
   // Printer profile actions
+  setEnforcePrinterVolume: (enabled: boolean) => void;
   setActivePrinterProfile: (name: string) => void;
   addPrinterProfile: (profile: PrinterProfile) => void;
   updatePrinterProfile: (name: string, profile: PrinterProfile) => void;
@@ -47,27 +49,46 @@ interface UIState {
 }
 
 const DEFAULT_PRINTER_PROFILES: PrinterProfile[] = [
-  { name: "Ender 5", width: 220, depth: 220, height: 300 },
-  { name: "Bambu A1 Mini", width: 180, depth: 180, height: 180 },
-  { name: "Prusa MK4", width: 250, depth: 210, height: 220 },
+  { name: "Alfawise U30", width: 220, depth: 220, height: 250 },
+  { name: "Ender 5 Pro", width: 220, depth: 220, height: 300 },
+  { name: "Bambu Lab A1 Mini", width: 180, depth: 180, height: 180 },
+  { name: "Bambu Lab A1", width: 256, depth: 256, height: 256 },
+  { name: "Bambu Lab P1S", width: 256, depth: 256, height: 256 },
+  { name: "Prusa MINI+", width: 180, depth: 180, height: 180 },
+  { name: "Prusa MK4S", width: 250, depth: 210, height: 220 },
+  { name: "Prusa CORE One", width: 250, depth: 220, height: 270 },
+  { name: "Creality Ender-3 V3 SE", width: 220, depth: 220, height: 250 },
+  { name: "Creality Ender-3 V3 KE", width: 220, depth: 220, height: 240 },
+  { name: "Creality K1C", width: 220, depth: 220, height: 250 },
+  { name: "ELEGOO Neptune 4 Pro", width: 225, depth: 225, height: 265 },
 ];
 
-function loadPrinterProfiles(): { profiles: PrinterProfile[]; active: string } {
+function loadPrinterProfiles(): { profiles: PrinterProfile[]; active: string; enforce: boolean } {
   try {
     const saved = localStorage.getItem("vaso-printer-profiles");
     if (saved) {
       const data = JSON.parse(saved);
-      if (data.profiles?.length > 0) return data;
+      if (data.profiles?.length > 0) {
+        return {
+          profiles: data.profiles,
+          active: data.active ?? data.profiles[0].name,
+          enforce: data.enforce === true,
+        };
+      }
     }
   } catch {
     /* ignore */
   }
-  return { profiles: DEFAULT_PRINTER_PROFILES, active: DEFAULT_PRINTER_PROFILES[0].name };
+  return {
+    profiles: DEFAULT_PRINTER_PROFILES,
+    active: DEFAULT_PRINTER_PROFILES[0].name,
+    enforce: false,
+  };
 }
 
-function savePrinterProfiles(profiles: PrinterProfile[], active: string) {
+function savePrinterProfiles(profiles: PrinterProfile[], active: string, enforce: boolean) {
   try {
-    localStorage.setItem("vaso-printer-profiles", JSON.stringify({ profiles, active }));
+    localStorage.setItem("vaso-printer-profiles", JSON.stringify({ profiles, active, enforce }));
   } catch {
     /* ignore */
   }
@@ -108,6 +129,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   printerProfiles: initialPrinter.profiles,
   activePrinterProfile: initialPrinter.active,
+  enforcePrinterVolume: initialPrinter.enforce,
 
   setTheme: (theme) => {
     applyThemeToCSS(theme);
@@ -130,25 +152,29 @@ export const useUIStore = create<UIState>((set, get) => ({
   setRotationSpeed: (v) => set({ rotationSpeed: v }),
   setClippingHeight: (v) => set({ clippingHeight: v }),
 
+  setEnforcePrinterVolume: (enabled) => {
+    set({ enforcePrinterVolume: enabled });
+    savePrinterProfiles(get().printerProfiles, get().activePrinterProfile, enabled);
+  },
   setActivePrinterProfile: (name) => {
     set({ activePrinterProfile: name });
-    savePrinterProfiles(get().printerProfiles, name);
+    savePrinterProfiles(get().printerProfiles, name, get().enforcePrinterVolume);
   },
   addPrinterProfile: (profile) => {
     const profiles = [...get().printerProfiles, profile];
     set({ printerProfiles: profiles, activePrinterProfile: profile.name });
-    savePrinterProfiles(profiles, profile.name);
+    savePrinterProfiles(profiles, profile.name, get().enforcePrinterVolume);
   },
   updatePrinterProfile: (name, profile) => {
     const profiles = get().printerProfiles.map((p) => (p.name === name ? profile : p));
     set({ printerProfiles: profiles });
-    savePrinterProfiles(profiles, get().activePrinterProfile);
+    savePrinterProfiles(profiles, get().activePrinterProfile, get().enforcePrinterVolume);
   },
   deletePrinterProfile: (name) => {
     const profiles = get().printerProfiles.filter((p) => p.name !== name);
     if (profiles.length === 0) return;
     const active = get().activePrinterProfile === name ? profiles[0].name : get().activePrinterProfile;
     set({ printerProfiles: profiles, activePrinterProfile: active });
-    savePrinterProfiles(profiles, active);
+    savePrinterProfiles(profiles, active, get().enforcePrinterVolume);
   },
 }));

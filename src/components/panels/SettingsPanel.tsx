@@ -3,6 +3,7 @@ import { useUIStore } from "../../store/ui-store";
 import { useVaseStore } from "../../store/vase-store";
 import { THEMES } from "../../themes";
 import { PRESETS } from "../../data/presets";
+import { clampParamsToBuildVolume } from "../../engine/printer-volume";
 
 export function SettingsPanel() {
 const {
@@ -28,6 +29,8 @@ const {
   setRotationSpeed,
   printerProfiles,
   activePrinterProfile,
+  enforcePrinterVolume,
+  setEnforcePrinterVolume,
   setActivePrinterProfile,
   addPrinterProfile,
   updatePrinterProfile,
@@ -48,26 +51,37 @@ const {
       setEditWidth(String(p.width));
       setEditDepth(String(p.depth));
       setEditHeight(String(p.height));
+      if (enforcePrinterVolume) {
+        setParams(clampParamsToBuildVolume(useVaseStore.getState().params, p));
+      }
     }
   };
 
   const handleSave = () => {
     if (!activeProfile) return;
-    updatePrinterProfile(activeProfile.name, {
+    const updatedProfile = {
       name: activeProfile.name,
       width: parseFloat(editWidth) || 220,
       depth: parseFloat(editDepth) || 220,
       height: parseFloat(editHeight) || 250,
-    });
+    };
+    updatePrinterProfile(activeProfile.name, updatedProfile);
+    if (enforcePrinterVolume) {
+      setParams(clampParamsToBuildVolume(useVaseStore.getState().params, updatedProfile));
+    }
   };
 
   const handleNew = () => {
     const name = prompt("Nom du nouveau profil :");
     if (!name || name.trim() === "") return;
-    addPrinterProfile({ name: name.trim(), width: 220, depth: 220, height: 250 });
+    const profile = { name: name.trim(), width: 220, depth: 220, height: 250 };
+    addPrinterProfile(profile);
     setEditWidth("220");
     setEditDepth("220");
     setEditHeight("250");
+    if (enforcePrinterVolume) {
+      setParams(clampParamsToBuildVolume(useVaseStore.getState().params, profile));
+    }
   };
 
   const handleDelete = () => {
@@ -79,6 +93,16 @@ const {
       setEditWidth(String(remaining.width));
       setEditDepth(String(remaining.depth));
       setEditHeight(String(remaining.height));
+      if (enforcePrinterVolume) {
+        setParams(clampParamsToBuildVolume(useVaseStore.getState().params, remaining));
+      }
+    }
+  };
+
+  const handleTogglePrinterVolume = (enabled: boolean) => {
+    setEnforcePrinterVolume(enabled);
+    if (enabled && activeProfile) {
+      setParams(clampParamsToBuildVolume(useVaseStore.getState().params, activeProfile));
     }
   };
 
@@ -191,9 +215,18 @@ const {
       )}
 
       <div className="separator" />
-      <h3>Volume imprimante</h3>
+      <h3>
+        <label className="section-toggle-label">
+          <input
+            type="checkbox"
+            checked={enforcePrinterVolume}
+            onChange={(e) => handleTogglePrinterVolume(e.target.checked)}
+          />
+          Volume imprimante
+        </label>
+      </h3>
 
-      <div className="select-input">
+      <div className="select-input" style={{ opacity: enforcePrinterVolume ? 1 : 0.65 }}>
         <label>Profil actif</label>
         <select value={activePrinterProfile} onChange={(e) => handleProfileChange(e.target.value)}>
           {printerProfiles.map((p) => (
@@ -204,7 +237,7 @@ const {
         </select>
       </div>
 
-      <div className="printer-dims">
+      <div className="printer-dims" style={{ opacity: enforcePrinterVolume ? 1 : 0.65 }}>
         <div className="number-input-inline">
           <label>Largeur max (mm)</label>
           <input type="number" value={editWidth} onChange={(e) => setEditWidth(e.target.value)} onBlur={handleSave} />
@@ -219,7 +252,7 @@ const {
         </div>
       </div>
 
-      <div className="printer-actions">
+      <div className="printer-actions" style={{ opacity: enforcePrinterVolume ? 1 : 0.65 }}>
         <button className="btn-small" onClick={handleNew}>
           Nouveau
         </button>

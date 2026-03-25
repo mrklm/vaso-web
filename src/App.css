@@ -222,6 +222,13 @@
   letter-spacing: 0.5px;
 }
 
+.section-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
 .separator {
   height: 1px;
   background: color-mix(in srgb, var(--color-fg) 12%, transparent);
