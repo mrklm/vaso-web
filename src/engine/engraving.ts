@@ -8,21 +8,10 @@ import { formatEngravingLines } from "./engraving-text";
 import {
   countBoundaryEdges,
   countBoundaryLoopsAtZ,
-  describeEdgeConnectedMeshComponents,
-  describeNonSimplePlanarBoundaryComponentsAtZ,
   describePlanarBoundaryComponentsAtZ,
-  describeBoundaryEdgeAnomaliesAtZ,
-  extractSimplePlanarBoundaryLoopsAtZ,
   getMeshDifferenceDiagnostics,
   logMeshDiagnostics,
-  removeAnomalousPatchBoundaryTrianglesAtZ,
   removeDegenerateTriangles,
-  removeTrianglesOnPlaneMatchingBase,
-  removeSmallEdgeConnectedComponents,
-  retainLargestConnectedMeshComponent,
-  sealPlanarBoundaryLoopAtZ,
-  sealResidualPlanarBoundaryComponentsAtZ,
-  sealSimplePlanarBoundaryComponentsAtZ,
 } from "./mesh-cleanup";
 
 const ROBOTO_FONT_URL = "/fonts/Roboto.json";
@@ -33,11 +22,8 @@ const MIN_REMAINING_BOTTOM_MM = 1.2;
 const ENGRAVING_SURFACE_OVERLAP_MM = 0.02;
 const GEOMETRY_WELD_TOLERANCE_MM = 1e-3;
 const PLANAR_PATCH_TOLERANCE_MM = 1e-4;
-const BOTTOM_FINISH_WELD_TOLERANCE_MM = 2e-4;
 const BOTTOM_FINISH_PLANE_TOLERANCE_MM = 5e-4;
 const ADDITIVE_TEXT_DEGENERATE_AREA_EPSILON_MM2 = 1e-12;
-const DETACHED_FRAGMENT_MAX_TRIANGLES = 64;
-const DETACHED_FRAGMENT_MAX_Z_MM = TARGET_ENGRAVING_DEPTH_MM + 0.05;
 const RAW_LINE_SIZES = [8.6, 7.1] as const;
 const TEXT_WIDTH_FACTOR = 0.58;
 const TEXT_HEIGHT_FACTOR = 0.45;
@@ -63,38 +49,6 @@ function traceBoundaryComponents(label: string, mesh: MeshData, tolerance = BOTT
     .join(";");
   appendPipelineTrace(`${label}:${components || "none"}`);
   console.info(`${label}: ${components || "none"}`);
-}
-
-function traceNonSimpleBoundaryComponents(
-  label: string,
-  mesh: MeshData,
-  tolerance = BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-): void {
-  const description = describeNonSimplePlanarBoundaryComponentsAtZ(mesh, 0, tolerance) || "none";
-  appendPipelineTrace(`${label}:${description}`);
-  console.info(`${label}: ${description}`);
-}
-
-function traceBoundaryEdgeAnomalies(
-  label: string,
-  mesh: MeshData,
-  patchTriangleStartIndex: number,
-  tolerance = BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-): void {
-  const description = describeBoundaryEdgeAnomaliesAtZ(mesh, 0, tolerance, patchTriangleStartIndex) || "none";
-  appendPipelineTrace(`${label}:${description}`);
-  console.info(`${label}: ${description}`);
-}
-
-function traceEdgeConnectedComponents(label: string, mesh: MeshData, tolerance = BOTTOM_FINISH_PLANE_TOLERANCE_MM): void {
-  const description = describeEdgeConnectedMeshComponents(mesh, tolerance)
-    .map(
-      (component, index) =>
-        `${index + 1}[t=${component.triangleCount},v=${component.vertexCount},bbox=${component.minX.toFixed(1)},${component.minY.toFixed(1)},${component.minZ.toFixed(1)}:${component.maxX.toFixed(1)},${component.maxY.toFixed(1)},${component.maxZ.toFixed(1)}]`,
-    )
-    .join(";");
-  appendPipelineTrace(`${label}:${description || "none"}`);
-  console.info(`${label}: ${description || "none"}`);
 }
 
 function traceMesh(label: string, mesh: MeshData, tolerance = BOTTOM_FINISH_PLANE_TOLERANCE_MM): void {
@@ -294,211 +248,6 @@ function combineMeshDataParts(parts: MeshData[]): MeshData {
   };
 }
 
-function rebuildBottomPlanarPatch(
-  mesh: MeshData,
-  comparisonMesh: MeshData,
-  referenceBottomMesh: MeshData,
-  _font: Font,
-  _bottomOuterContour: Float64Array,
-  _seed: number,
-  timeline?: ComparisonStage[],
-): MeshData {
-  let finishedMesh = removeDegenerateTriangles(
-    removeTrianglesOnPlaneMatchingBase(mesh, referenceBottomMesh, 0, BOTTOM_FINISH_PLANE_TOLERANCE_MM),
-  );
-  const trimmedAfterPlaneRemoval = removeSmallEdgeConnectedComponents(
-    finishedMesh,
-    DETACHED_FRAGMENT_MAX_TRIANGLES,
-    DETACHED_FRAGMENT_MAX_Z_MM,
-    BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-  );
-  if (trimmedAfterPlaneRemoval.indices.length !== finishedMesh.indices.length) {
-    finishedMesh = trimmedAfterPlaneRemoval;
-    traceMesh("[engraving] after dropping detached fragments", finishedMesh);
-    traceMeshComparison("[engraving] compare after dropping detached fragments vs base", comparisonMesh, finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-  }
-  traceMesh("[engraving] after removeTrianglesOnPlane", finishedMesh);
-  traceMeshComparison("[engraving] compare after removeTrianglesOnPlane vs base", comparisonMesh, finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-  traceBoundaryComponents("[engraving] loops after removeTrianglesOnPlane", finishedMesh);
-  const extractedLoops = extractSimplePlanarBoundaryLoopsAtZ(finishedMesh, 0, BOTTOM_FINISH_PLANE_TOLERANCE_MM);
-  if (extractedLoops.length === 1) {
-    const deterministicPatch = buildDeterministicTextAwareBottomPatch(
-      finishedMesh,
-      _font,
-      _bottomOuterContour,
-      _seed,
-    );
-    if (deterministicPatch) {
-      const deterministicComponents = describeEdgeConnectedMeshComponents(
-        deterministicPatch,
-        BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-      );
-      if (deterministicComponents.length === 1) {
-        finishedMesh = deterministicPatch;
-        traceMesh("[engraving] after deterministic text-aware patch", finishedMesh);
-        traceMeshComparison("[engraving] compare after deterministic text-aware patch vs base", comparisonMesh, finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-      } else {
-        appendPipelineTrace(
-          `[engraving] skipped deterministic text-aware patch: components=${deterministicComponents.length},largest=${deterministicComponents[0]?.triangleCount ?? 0},second=${deterministicComponents[1]?.triangleCount ?? 0}`,
-        );
-      }
-    }
-  }
-  let previousBoundaryEdges = countBoundaryEdges(finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM);
-
-  for (let pass = 0; pass < 8 && previousBoundaryEdges > 0; pass++) {
-    const patchTriangleStartIndex = finishedMesh.indices.length / 3;
-    traceEdgeConnectedComponents(`[engraving] components before planar seal pass ${pass + 1}`, finishedMesh);
-    const sealedCandidate = removeDegenerateTriangles(
-      sealPlanarBoundaryLoopAtZ(
-        finishedMesh,
-        0,
-        BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-        { preserveMicroHoles: true },
-      ),
-    );
-    const nextBoundaryEdges = countBoundaryEdges(sealedCandidate, BOTTOM_FINISH_PLANE_TOLERANCE_MM);
-    if (nextBoundaryEdges >= previousBoundaryEdges) break;
-    finishedMesh = sealedCandidate;
-    previousBoundaryEdges = nextBoundaryEdges;
-    traceMesh(`[engraving] after planar seal pass ${pass + 1}`, finishedMesh);
-    traceMeshComparison(`[engraving] compare after planar seal pass ${pass + 1} vs base`, comparisonMesh, finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-    traceEdgeConnectedComponents(`[engraving] components after planar seal pass ${pass + 1}`, finishedMesh);
-    if (pass === 0) {
-      traceBoundaryComponents("[engraving] loops after planar seal pass 1", finishedMesh);
-      traceNonSimpleBoundaryComponents("[engraving] non-simple after planar seal pass 1", finishedMesh);
-      traceBoundaryEdgeAnomalies("[engraving] anomalous boundary edges after planar seal pass 1", finishedMesh, patchTriangleStartIndex);
-      const anomalyCleanedCandidate = removeDegenerateTriangles(
-        removeAnomalousPatchBoundaryTrianglesAtZ(
-          finishedMesh,
-          0,
-          BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-          patchTriangleStartIndex,
-        ),
-      );
-      const anomalyBoundaryEdges = countBoundaryEdges(anomalyCleanedCandidate, BOTTOM_FINISH_PLANE_TOLERANCE_MM);
-      if (anomalyBoundaryEdges < previousBoundaryEdges) {
-        finishedMesh = anomalyCleanedCandidate;
-        previousBoundaryEdges = anomalyBoundaryEdges;
-        traceMesh("[engraving] after anomalous patch cleanup", finishedMesh);
-        traceMeshComparison("[engraving] compare after anomalous patch cleanup vs base", comparisonMesh, finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-        traceBoundaryComponents("[engraving] loops after anomalous patch cleanup", finishedMesh);
-      }
-    }
-  }
-
-  const weldedGeometry = mergeVertices(
-    meshDataToGeometry(finishedMesh),
-    BOTTOM_FINISH_WELD_TOLERANCE_MM,
-  );
-  weldedGeometry.computeVertexNormals();
-  const weldedMesh = geometryToMeshData(weldedGeometry);
-  weldedGeometry.dispose();
-  appendPipelineTrace(
-    `[engraving] bottom weld mergedVertices=${finishedMesh.vertices.length / 3 - weldedMesh.vertices.length / 3}`,
-  );
-
-  finishedMesh = removeDegenerateTriangles(weldedMesh);
-  const trimmedAfterBottomWeld = removeSmallEdgeConnectedComponents(
-    finishedMesh,
-    DETACHED_FRAGMENT_MAX_TRIANGLES,
-    DETACHED_FRAGMENT_MAX_Z_MM,
-    BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-  );
-  if (trimmedAfterBottomWeld.indices.length !== finishedMesh.indices.length) {
-    finishedMesh = trimmedAfterBottomWeld;
-    traceMesh("[engraving] after dropping detached fragments post-weld", finishedMesh);
-    traceMeshComparison("[engraving] compare after dropping detached fragments post-weld vs base", comparisonMesh, finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-  }
-  traceMesh("[engraving] after bottom weld", finishedMesh);
-  traceMeshComparison("[engraving] compare after bottom weld vs base", comparisonMesh, finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-  traceEdgeConnectedComponents("[engraving] components after bottom weld", finishedMesh);
-  previousBoundaryEdges = countBoundaryEdges(finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM);
-
-  for (let pass = 0; pass < 2 && previousBoundaryEdges > 0; pass++) {
-    const sealedCandidate = removeDegenerateTriangles(
-      sealPlanarBoundaryLoopAtZ(
-        finishedMesh,
-        0,
-        BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-        { preserveMicroHoles: true },
-      ),
-    );
-    const nextBoundaryEdges = countBoundaryEdges(sealedCandidate, BOTTOM_FINISH_PLANE_TOLERANCE_MM);
-    if (nextBoundaryEdges >= previousBoundaryEdges) break;
-    finishedMesh = sealedCandidate;
-    previousBoundaryEdges = nextBoundaryEdges;
-    traceMesh(`[engraving] after post-weld planar seal ${pass + 1}`, finishedMesh);
-    traceMeshComparison(`[engraving] compare after post-weld planar seal ${pass + 1} vs base`, comparisonMesh, finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-  }
-
-  if (previousBoundaryEdges > 0) {
-    const residualCandidate = removeDegenerateTriangles(
-      sealSimplePlanarBoundaryComponentsAtZ(
-        finishedMesh,
-        0,
-        BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-      ),
-    );
-    const residualBoundaryEdges = countBoundaryEdges(residualCandidate, BOTTOM_FINISH_PLANE_TOLERANCE_MM);
-    if (residualBoundaryEdges < previousBoundaryEdges) {
-      finishedMesh = residualCandidate;
-      previousBoundaryEdges = residualBoundaryEdges;
-      traceMesh("[engraving] after residual simple seal", finishedMesh);
-      traceMeshComparison("[engraving] compare after residual simple seal vs base", comparisonMesh, finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-    }
-  }
-
-  if (previousBoundaryEdges > 0) {
-    const reweldedGeometry = mergeVertices(
-      meshDataToGeometry(finishedMesh),
-      BOTTOM_FINISH_WELD_TOLERANCE_MM,
-    );
-    const reweldedMesh = removeDegenerateTriangles(geometryToMeshData(reweldedGeometry));
-    reweldedGeometry.dispose();
-
-    const reweldedCandidate = removeDegenerateTriangles(
-      sealSimplePlanarBoundaryComponentsAtZ(
-        reweldedMesh,
-        0,
-        BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-      ),
-    );
-    const reweldedBoundaryEdges = countBoundaryEdges(reweldedCandidate, BOTTOM_FINISH_PLANE_TOLERANCE_MM);
-    if (reweldedBoundaryEdges < previousBoundaryEdges) {
-      finishedMesh = reweldedCandidate;
-      previousBoundaryEdges = reweldedBoundaryEdges;
-      traceMesh("[engraving] after rewelded residual seal", finishedMesh);
-      traceMeshComparison("[engraving] compare after rewelded residual seal vs base", comparisonMesh, finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-    }
-  }
-
-  if (previousBoundaryEdges > 0) {
-    const deterministicCandidate = removeDegenerateTriangles(
-      sealResidualPlanarBoundaryComponentsAtZ(
-        finishedMesh,
-        0,
-        BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-      ),
-    );
-    const deterministicBoundaryEdges = countBoundaryEdges(
-      deterministicCandidate,
-      BOTTOM_FINISH_PLANE_TOLERANCE_MM,
-    );
-    if (deterministicBoundaryEdges < previousBoundaryEdges) {
-      finishedMesh = deterministicCandidate;
-      previousBoundaryEdges = deterministicBoundaryEdges;
-      traceMesh("[engraving] after deterministic residual seal", finishedMesh);
-      traceMeshComparison("[engraving] compare after deterministic residual seal vs base", comparisonMesh, finishedMesh, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-    }
-  }
-
-  const finalBottom = retainLargestConnectedMeshComponent(finishedMesh);
-  traceMesh("[engraving] final bottom-closed mesh", finalBottom);
-  traceMeshComparison("[engraving] compare final bottom-closed mesh vs base", comparisonMesh, finalBottom, BOTTOM_FINISH_PLANE_TOLERANCE_MM, timeline);
-  return finalBottom;
-}
-
 function subdivideBottomCapTriangles(
   meshData: MeshData,
   zValue = 0,
@@ -549,32 +298,6 @@ function subdivideBottomCapTriangles(
     vertices: new Float32Array(nextVertices),
     indices: new Uint32Array(nextIndices),
   };
-}
-
-function flipGeometryWinding(geometry: THREE.BufferGeometry): void {
-  const index = geometry.getIndex();
-  if (index) {
-    const array = index.array as Uint16Array | Uint32Array;
-    for (let i = 0; i < array.length; i += 3) {
-      const b = array[i + 1];
-      array[i + 1] = array[i + 2];
-      array[i + 2] = b;
-    }
-    index.needsUpdate = true;
-    return;
-  }
-
-  const position = geometry.getAttribute("position");
-  if (!position) return;
-
-  for (let i = 0; i < position.count; i += 3) {
-    for (let axis = 0; axis < position.itemSize; axis++) {
-      const value = position.getComponent(i + 1, axis);
-      position.setComponent(i + 1, axis, position.getComponent(i + 2, axis));
-      position.setComponent(i + 2, axis, value);
-    }
-  }
-  position.needsUpdate = true;
 }
 
 function buildAdditiveTextGeometry(
@@ -636,135 +359,6 @@ function buildAdditiveTextGeometry(
   weldedText.computeVertexNormals();
   weldedText.computeBoundingBox();
   return weldedText;
-}
-
-function orient2DContour(contour: THREE.Vector2[], clockwise: boolean): THREE.Vector2[] {
-  const area = THREE.ShapeUtils.area(contour);
-  if ((clockwise && area > 0) || (!clockwise && area < 0)) {
-    return [...contour].reverse();
-  }
-  return contour;
-}
-
-function buildTextPatchContours(
-  font: Font,
-  bottomOuterContour: Float64Array,
-  seed: number,
-): { cutouts: THREE.Vector2[][]; islands: THREE.Vector2[][] } | null {
-  const fitRadius = computeContourMinRadius(bottomOuterContour) - FIT_MARGIN_MM;
-  if (fitRadius <= 8) return null;
-
-  const lines = formatEngravingLines(seed);
-  const lineOffsets = [FONT_LINE_HEIGHT * 0.5, -FONT_LINE_HEIGHT * 0.5];
-  const rawOuterContours: THREE.Vector2[][] = [];
-  const rawIslandContours: THREE.Vector2[][] = [];
-
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    const shapes = font.generateShapes(lines[lineIndex], RAW_LINE_SIZES[lineIndex]);
-    const extracted = shapes.map((shape) => shape.extractPoints(TEXT_CURVE_SEGMENTS));
-    const outerPoints = extracted.flatMap((entry) => entry.shape);
-    if (outerPoints.length === 0) continue;
-
-    let minX = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
-    for (const point of outerPoints) {
-      minX = Math.min(minX, point.x);
-      maxX = Math.max(maxX, point.x);
-    }
-    const lineCenterX = (minX + maxX) * 0.5;
-    const translatedOuterContours = extracted.map((entry) =>
-      entry.shape.map((point) => new THREE.Vector2(point.x - lineCenterX, point.y + lineOffsets[lineIndex])),
-    );
-    const translatedIslandContours = extracted.flatMap((entry) =>
-      entry.holes.map((hole) => hole.map((point) => new THREE.Vector2(point.x - lineCenterX, point.y + lineOffsets[lineIndex]))),
-    );
-    rawOuterContours.push(...translatedOuterContours);
-    rawIslandContours.push(...translatedIslandContours);
-  }
-
-  const allPoints = [...rawOuterContours.flat(), ...rawIslandContours.flat()];
-  if (allPoints.length === 0) return null;
-
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of allPoints) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  const centerX = (minX + maxX) * 0.5;
-  const centerY = (minY + maxY) * 0.5;
-  const width = maxX - minX;
-  const height = maxY - minY;
-  const xyScale = Math.min((fitRadius * TEXT_WIDTH_FACTOR) / width, (fitRadius * TEXT_HEIGHT_FACTOR) / height);
-
-  const normalize = (contour: THREE.Vector2[]) =>
-    contour.map((point) => new THREE.Vector2(-(point.x - centerX) * xyScale, (point.y - centerY) * xyScale));
-
-  return {
-    cutouts: rawOuterContours.map(normalize),
-    islands: rawIslandContours.map(normalize),
-  };
-}
-
-function buildDeterministicTextAwareBottomPatch(
-  mesh: MeshData,
-  font: Font,
-  bottomOuterContour: Float64Array,
-  seed: number,
-): MeshData | null {
-  const loops = extractSimplePlanarBoundaryLoopsAtZ(mesh, 0, BOTTOM_FINISH_PLANE_TOLERANCE_MM);
-  const outerLoop = loops.find((loop) => loop.area > 0);
-  if (!outerLoop) return null;
-
-  const textContours = buildTextPatchContours(font, bottomOuterContour, seed);
-  if (!textContours || textContours.cutouts.length === 0) return null;
-
-  const outerContour = outerLoop.contour;
-  const outerVertices = outerLoop.loop;
-  const cutouts = textContours.cutouts.map((contour) => orient2DContour(contour, true));
-  const islands = textContours.islands.map((contour) => orient2DContour(contour, false));
-  const triangles = THREE.ShapeUtils.triangulateShape(orient2DContour(outerContour, false), cutouts);
-  if (triangles.length === 0) return null;
-
-  const nextVertices = Array.from(mesh.vertices);
-  const nextIndices = Array.from(mesh.indices);
-  const patchVertexIndices = [...outerVertices];
-  for (const contour of cutouts) {
-    for (const point of contour) {
-      patchVertexIndices.push(nextVertices.length / 3);
-      nextVertices.push(point.x, point.y, 0);
-    }
-  }
-
-  for (const [ia, ib, ic] of triangles) {
-    nextIndices.push(patchVertexIndices[ic], patchVertexIndices[ib], patchVertexIndices[ia]);
-  }
-
-  for (const island of islands) {
-    const islandTriangles = THREE.ShapeUtils.triangulateShape(island, []);
-    if (islandTriangles.length === 0) continue;
-    const islandVertexIndices: number[] = [];
-    for (const point of island) {
-      islandVertexIndices.push(nextVertices.length / 3);
-      nextVertices.push(point.x, point.y, 0);
-    }
-    for (const [ia, ib, ic] of islandTriangles) {
-      nextIndices.push(islandVertexIndices[ic], islandVertexIndices[ib], islandVertexIndices[ia]);
-    }
-  }
-
-  appendPipelineTrace(
-    `[engraving] deterministic text-aware patch cutouts=${cutouts.length},islands=${islands.length},outerVertices=${outerVertices.length},triangles=${triangles.length}`,
-  );
-
-  return removeDegenerateTriangles({
-    vertices: new Float32Array(nextVertices),
-    indices: new Uint32Array(nextIndices),
-  });
 }
 
 export async function engraveBaseText(
