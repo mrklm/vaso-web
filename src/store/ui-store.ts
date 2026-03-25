@@ -21,6 +21,7 @@ interface UIState {
   rotationMode: "camera" | "vase";
   rotationSpeed: number;
   clippingHeight: number; // 0-100 percent
+  unlockAdvancedStlParams: boolean;
 
   // Printer profiles
   printerProfiles: PrinterProfile[];
@@ -39,6 +40,7 @@ interface UIState {
   setRotationMode: (mode: "camera" | "vase") => void;
   setRotationSpeed: (v: number) => void;
   setClippingHeight: (v: number) => void;
+  setUnlockAdvancedStlParams: (enabled: boolean) => void;
 
   // Printer profile actions
   setEnforcePrinterVolume: (enabled: boolean) => void;
@@ -108,10 +110,20 @@ function loadSavedTheme(): Theme {
   return THEMES[0]; // Default: Midnight Garage
 }
 
+function loadSavedAdvancedStlUnlock(): boolean {
+  try {
+    return localStorage.getItem("vaso-advanced-stl-unlocked") === "true";
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 const initialTheme = loadSavedTheme();
 applyThemeToCSS(initialTheme);
 
 const initialPrinter = loadPrinterProfiles();
+const initialAdvancedStlUnlock = loadSavedAdvancedStlUnlock();
 
 export const useUIStore = create<UIState>((set, get) => ({
   theme: initialTheme,
@@ -126,6 +138,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   rotationMode: "camera",
   rotationSpeed: 0.5,
   clippingHeight: 50,
+  unlockAdvancedStlParams: initialAdvancedStlUnlock,
 
   printerProfiles: initialPrinter.profiles,
   activePrinterProfile: initialPrinter.active,
@@ -151,6 +164,14 @@ export const useUIStore = create<UIState>((set, get) => ({
   setRotationMode: (mode) => set({ rotationMode: mode }),
   setRotationSpeed: (v) => set({ rotationSpeed: v }),
   setClippingHeight: (v) => set({ clippingHeight: v }),
+  setUnlockAdvancedStlParams: (enabled) => {
+    try {
+      localStorage.setItem("vaso-advanced-stl-unlocked", String(enabled));
+    } catch {
+      /* ignore */
+    }
+    set({ unlockAdvancedStlParams: enabled });
+  },
 
   setEnforcePrinterVolume: (enabled) => {
     set({ enforcePrinterVolume: enabled });

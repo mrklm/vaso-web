@@ -8,6 +8,7 @@ interface NumberInputProps {
   max?: number;
   step?: number;
   integer?: boolean;
+  disabled?: boolean;
 }
 
 export function NumberInput({
@@ -18,6 +19,7 @@ export function NumberInput({
   max = 100,
   step = 1,
   integer = false,
+  disabled = false,
 }: NumberInputProps) {
   const [local, setLocal] = useState(String(value));
 
@@ -71,6 +73,7 @@ export function NumberInput({
           min={min}
           max={max}
           step={step}
+          disabled={disabled}
         />
       </div>
       <input
@@ -81,6 +84,7 @@ export function NumberInput({
         min={min}
         max={max}
         step={step}
+        disabled={disabled}
       />
     </div>
   );

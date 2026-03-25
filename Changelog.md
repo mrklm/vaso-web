@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.14] - 2026-03-25
+
+### 🎨 Modifié
+ - Deplacement des paramètres avancés de STL de paramètres généraux à options
+
 ## [1.0.13] - 2026-03-25
 
 ### 🎨 Modifié

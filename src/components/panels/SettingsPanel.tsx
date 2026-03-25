@@ -4,6 +4,8 @@ import { useVaseStore } from "../../store/vase-store";
 import { THEMES } from "../../themes";
 import { PRESETS } from "../../data/presets";
 import { clampParamsToBuildVolume } from "../../engine/printer-volume";
+import { defaultVaseParameters } from "../../engine/types";
+import { NumberInput } from "../ui/NumberInput";
 
 export function SettingsPanel() {
 const {
@@ -23,6 +25,8 @@ const {
   setShowClipping,
   clippingHeight,
   setClippingHeight,
+  unlockAdvancedStlParams,
+  setUnlockAdvancedStlParams,
   rotationMode,
   setRotationMode,
   rotationSpeed,
@@ -38,7 +42,13 @@ const {
 } = useUIStore();
 
   const setParams = useVaseStore((s) => s.setParams);
+  const params = useVaseStore((s) => s.params);
+  const setWallThickness = useVaseStore((s) => s.setWallThickness);
+  const setBottomThickness = useVaseStore((s) => s.setBottomThickness);
+  const setRadialSamples = useVaseStore((s) => s.setRadialSamples);
+  const setVerticalSamples = useVaseStore((s) => s.setVerticalSamples);
   const activeProfile = printerProfiles.find((p) => p.name === activePrinterProfile) ?? printerProfiles[0];
+  const defaultParams = defaultVaseParameters();
 
   const [editWidth, setEditWidth] = useState(String(activeProfile?.width ?? 220));
   const [editDepth, setEditDepth] = useState(String(activeProfile?.depth ?? 220));
@@ -104,6 +114,16 @@ const {
     if (enabled && activeProfile) {
       setParams(clampParamsToBuildVolume(useVaseStore.getState().params, activeProfile));
     }
+  };
+
+  const handleResetAdvancedStlDefaults = () => {
+    setParams({
+      ...useVaseStore.getState().params,
+      wallThicknessMm: defaultParams.wallThicknessMm,
+      bottomThicknessMm: defaultParams.bottomThicknessMm,
+      radialSamples: defaultParams.radialSamples,
+      verticalSamples: defaultParams.verticalSamples,
+    });
   };
 
   return (
@@ -258,6 +278,65 @@ const {
         </button>
         <button className="btn-small btn-danger" onClick={handleDelete} disabled={printerProfiles.length <= 1}>
           Supprimer
+        </button>
+      </div>
+
+      <div className="separator" />
+      <h3>
+        <label className="section-toggle-label">
+          <input
+            type="checkbox"
+            checked={unlockAdvancedStlParams}
+            onChange={(e) => setUnlockAdvancedStlParams(e.target.checked)}
+          />
+          Paramètres avancés du STL
+        </label>
+      </h3>
+
+      <div className="advanced-stl-panel" style={{ opacity: unlockAdvancedStlParams ? 1 : 0.65 }}>
+        <NumberInput
+          label="Épaisseur coque (mm)"
+          value={params.wallThicknessMm}
+          onChange={setWallThickness}
+          min={0.4}
+          max={10}
+          step={0.2}
+          disabled={!unlockAdvancedStlParams}
+        />
+        <NumberInput
+          label="Épaisseur fond (mm)"
+          value={params.bottomThicknessMm}
+          onChange={setBottomThickness}
+          min={0}
+          max={20}
+          step={0.5}
+          disabled={!unlockAdvancedStlParams}
+        />
+        <NumberInput
+          label="Résolution circulaire"
+          value={params.radialSamples}
+          onChange={setRadialSamples}
+          min={8}
+          max={200}
+          step={4}
+          integer
+          disabled={!unlockAdvancedStlParams}
+        />
+        <NumberInput
+          label="Résolution verticale"
+          value={params.verticalSamples}
+          onChange={setVerticalSamples}
+          min={2}
+          max={300}
+          step={4}
+          integer
+          disabled={!unlockAdvancedStlParams}
+        />
+      </div>
+
+      <div className="printer-actions">
+        <button className="btn-small" onClick={handleResetAdvancedStlDefaults}>
+          Valeurs par défaut
         </button>
       </div>
 

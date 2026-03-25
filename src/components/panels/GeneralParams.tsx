@@ -49,40 +49,6 @@ export function GeneralParams() {
         step={5}
       />
       <NumberInput
-        label="Épaisseur coque (mm)"
-        value={p.wallThicknessMm}
-        onChange={store.setWallThickness}
-        min={0.4}
-        max={10}
-        step={0.2}
-      />
-      <NumberInput
-        label="Épaisseur fond (mm)"
-        value={p.bottomThicknessMm}
-        onChange={store.setBottomThickness}
-        min={0}
-        max={20}
-        step={0.5}
-      />
-      <NumberInput
-        label="Résolution circulaire"
-        value={p.radialSamples}
-        onChange={store.setRadialSamples}
-        min={8}
-        max={200}
-        step={4}
-        integer
-      />
-      <NumberInput
-        label="Résolution verticale"
-        value={p.verticalSamples}
-        onChange={store.setVerticalSamples}
-        min={2}
-        max={300}
-        step={4}
-        integer
-      />
-      <NumberInput
         label="Nombre de profils"
         value={p.profiles.length}
         onChange={store.setProfileCount}
