@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.15] - 2026-03-25
+
+### 🎨 Ajouté
+ - Bouton réinitialiser Vaso dans options 
+
 ## [1.0.14] - 2026-03-25
 
 ### 🎨 Modifié

@@ -42,6 +42,7 @@ const {
 } = useUIStore();
 
   const setParams = useVaseStore((s) => s.setParams);
+  const resetVasoSettings = useUIStore((s) => s.resetVasoSettings);
   const params = useVaseStore((s) => s.params);
   const setWallThickness = useVaseStore((s) => s.setWallThickness);
   const setBottomThickness = useVaseStore((s) => s.setBottomThickness);
@@ -124,6 +125,18 @@ const {
       radialSamples: defaultParams.radialSamples,
       verticalSamples: defaultParams.verticalSamples,
     });
+  };
+
+  const handleResetVaso = () => {
+    if (!confirm("Réinitialiser Vaso ? Cela effacera les profils d'imprimante, le thème et les préférences locales.")) {
+      return;
+    }
+    resetVasoSettings();
+    useVaseStore.setState({
+      ...useVaseStore.getInitialState(),
+      seed: Math.floor(Math.random() * 999999),
+    });
+    window.location.reload();
   };
 
   return (
@@ -377,6 +390,13 @@ const {
           <li>Zoom : molette</li>
           <li>Pan : clic droit + drag</li>
         </ul>
+      </div>
+
+      <div className="separator" />
+      <div className="printer-actions">
+        <button className="btn-small btn-danger" onClick={handleResetVaso}>
+          Réinitialiser Vaso
+        </button>
       </div>
     </div>
   );

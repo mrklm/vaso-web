@@ -48,6 +48,7 @@ interface UIState {
   addPrinterProfile: (profile: PrinterProfile) => void;
   updatePrinterProfile: (name: string, profile: PrinterProfile) => void;
   deletePrinterProfile: (name: string) => void;
+  resetVasoSettings: () => void;
 }
 
 const DEFAULT_PRINTER_PROFILES: PrinterProfile[] = [
@@ -197,5 +198,33 @@ export const useUIStore = create<UIState>((set, get) => ({
     const active = get().activePrinterProfile === name ? profiles[0].name : get().activePrinterProfile;
     set({ printerProfiles: profiles, activePrinterProfile: active });
     savePrinterProfiles(profiles, active, get().enforcePrinterVolume);
+  },
+  resetVasoSettings: () => {
+    try {
+      localStorage.removeItem("vaso-printer-profiles");
+      localStorage.removeItem("vaso-theme");
+      localStorage.removeItem("vaso-advanced-stl-unlocked");
+    } catch {
+      /* ignore */
+    }
+    applyThemeToCSS(THEMES[0]);
+    set({
+      theme: THEMES[0],
+      activeTab: "general",
+      shading: 70,
+      showGrid: true,
+      vaseColor: "#c4956a",
+      wireframe: false,
+      flatShading: false,
+      autoRotate: true,
+      showClipping: false,
+      rotationMode: "camera",
+      rotationSpeed: 0.5,
+      clippingHeight: 50,
+      unlockAdvancedStlParams: false,
+      printerProfiles: DEFAULT_PRINTER_PROFILES,
+      activePrinterProfile: DEFAULT_PRINTER_PROFILES[0].name,
+      enforcePrinterVolume: false,
+    });
   },
 }));
