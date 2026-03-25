@@ -156,6 +156,7 @@ export function VaseViewer3D() {
       <Canvas
         camera={{ position: [220, 160, 220], fov: 45, near: 0.1, far: 2000 }}
         style={{ background: "var(--color-bg)" }}
+        gl={{ preserveDrawingBuffer: true }}
         shadows
       >
         <ambientLight intensity={0.25} />

@@ -7,8 +7,15 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.7] - 2026-03-25
 
-## [1.0.6] - 2026-03-21
+### 🎨 Modifié
+- Capture d'écran fonctionnelle + titre capture 
+
+### 🎨 Ajouté
+- Bandeau info sur la capture d'écran 
+
+## [1.0.6] - 2026-03-25
 
 ### 🎨 Ajouté
 - Nom du programme + version + N°de seed imprimé dans le vase
