@@ -10,7 +10,6 @@ export function useVaseMesh(params: VaseParameters, seed: number): MeshData | nu
   return useMemo(() => {
     void seed;
     try {
-      // Keep preview fast: engraving is applied only for STL export.
       const previewParams: VaseParameters = {
         ...params,
         radialSamples: Math.min(params.radialSamples, 72),

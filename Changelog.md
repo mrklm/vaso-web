@@ -8,7 +8,12 @@ et ce projet suit un versioning de type **SemVer**.
 ---
 
 
+## [1.0.11] - 2026-03-25
+### 🎨 Modifié
+ - Texte titre + version + seed visible dans le rendu 3D
+
 ## [1.0.10] - 2026-03-25
+### 🎨 Modifié
  - Séctions rétablies dans le menu option
 
 ### 🎨 Modifié

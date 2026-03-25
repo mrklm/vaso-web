@@ -40,7 +40,6 @@ export function VaseMesh({
     geo.setAttribute("position", new THREE.Float32BufferAttribute(meshData.vertices, 3));
     geo.setIndex(new THREE.Uint32BufferAttribute(meshData.indices, 1));
     geo.computeVertexNormals();
-    geo.computeBoundingSphere();
 
     // Center the mesh
     geo.computeBoundingBox();
@@ -49,6 +48,8 @@ export function VaseMesh({
       geo.boundingBox.getCenter(center);
       geo.translate(-center.x, -center.y, -center.z);
     }
+    geo.computeBoundingBox();
+    geo.computeBoundingSphere();
   }, [meshData]);
 
   const roughness = 1 - (shading / 100) * 0.7;

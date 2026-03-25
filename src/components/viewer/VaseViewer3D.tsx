@@ -9,8 +9,103 @@ import { VaseMesh } from "./VaseMesh";
 import { useVaseStore } from "../../store/vase-store";
 import { useUIStore } from "../../store/ui-store";
 import { useVaseMesh } from "../../hooks/useVaseMesh";
+import { buildProfileContour } from "../../engine/geometry";
+import { formatEngravingLines } from "../../engine/engraving-text";
+import type { VaseParameters } from "../../engine/types";
 
 const ROTATE_SPEED = 0.05;
+const PREVIEW_TEXT_FIT_MARGIN_MM = 4;
+const PREVIEW_TEXT_WIDTH_FACTOR = 1.45;
+const PREVIEW_TEXT_HEIGHT_FACTOR = 0.44;
+const PREVIEW_TEXT_CANVAS_WIDTH = 1536;
+const PREVIEW_TEXT_CANVAS_HEIGHT = 512;
+const PREVIEW_TEXT_Y_OFFSET = 0.08;
+
+function computePreviewBottomFitRadius(params: VaseParameters): number {
+  const bottomProfiles = [...params.profiles]
+    .filter((profile) => profile.zRatio === 0)
+    .sort((a, b) => a.zRatio - b.zRatio);
+  const bottomProfile = bottomProfiles[0] ?? [...params.profiles].sort((a, b) => a.zRatio - b.zRatio)[0];
+  if (!bottomProfile) return 0;
+
+  const contour = buildProfileContour(bottomProfile, Math.min(params.radialSamples, 64));
+  let minRadius = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < contour.length / 2; i++) {
+    const x = contour[i * 2];
+    const y = contour[i * 2 + 1];
+    minRadius = Math.min(minRadius, Math.hypot(x, y));
+  }
+  return Math.max(0, minRadius - PREVIEW_TEXT_FIT_MARGIN_MM);
+}
+
+function PreviewEngravingOverlay({ params, seed }: { params: VaseParameters; seed: number }) {
+  const lines = useMemo(() => formatEngravingLines(seed), [seed]);
+  const fitRadius = useMemo(() => computePreviewBottomFitRadius(params), [params]);
+
+  const texture = useMemo(() => {
+    if (!params.closeBottom || fitRadius <= 8) return null;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = PREVIEW_TEXT_CANVAS_WIDTH;
+    canvas.height = PREVIEW_TEXT_CANVAS_HEIGHT;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.lineJoin = "round";
+    context.strokeStyle = "rgba(210,210,210,0.45)";
+    context.fillStyle = "rgba(28,28,28,0.45)";
+
+    const centerX = canvas.width / 2;
+    const line1Y = canvas.height * 0.39;
+    const line2Y = canvas.height * 0.69;
+
+    context.font = "700 108px Arial";
+    context.lineWidth = 10;
+    context.strokeText(lines[0], centerX, line1Y);
+    context.fillText(lines[0], centerX, line1Y);
+
+    context.font = "700 96px Arial";
+    context.lineWidth = 8;
+    context.strokeText(lines[1], centerX, line2Y);
+    context.fillText(lines[1], centerX, line2Y);
+
+    const nextTexture = new THREE.CanvasTexture(canvas);
+    nextTexture.colorSpace = THREE.SRGBColorSpace;
+    nextTexture.needsUpdate = true;
+    return nextTexture;
+  }, [fitRadius, lines, params.closeBottom]);
+
+  useEffect(() => () => texture?.dispose(), [texture]);
+
+  if (!texture || !params.closeBottom || fitRadius <= 8) return null;
+
+  const width = fitRadius * PREVIEW_TEXT_WIDTH_FACTOR;
+  const height = fitRadius * PREVIEW_TEXT_HEIGHT_FACTOR;
+  const y = params.bottomThicknessMm - params.heightMm / 2 + PREVIEW_TEXT_Y_OFFSET;
+
+  return (
+    <mesh
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, y, 0]}
+      renderOrder={2}
+    >
+      <planeGeometry args={[width, height]} />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        opacity={0.72}
+        alphaTest={0.12}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+        polygonOffset
+        polygonOffsetFactor={-1}
+      />
+    </mesh>
+  );
+}
 
 function KeyboardControls({ controlsRef }: { controlsRef: React.RefObject<OrbitControlsImpl | null> }) {
   const { camera } = useThree();
@@ -189,6 +284,8 @@ export function VaseViewer3D() {
             rotationSpeed={rotationSpeed}
           />
         )}
+
+        <PreviewEngravingOverlay params={params} seed={seed} />
 
         <mesh
           rotation={[-Math.PI / 2, 0, 0]}
