@@ -74,10 +74,10 @@ function App() {
 
       <div className="app-body">
         <div className={`sidebar-wrapper ${panelOpen ? "open" : ""}`}>
-          <Sidebar onNavigate={() => setPanelOpen(false)} />
+          <Sidebar />
         </div>
 
-        {panelOpen && <div className="mobile-overlay" onClick={() => setPanelOpen(false)} />}
+        {panelOpen && <div className="mobile-overlay" aria-hidden="true" />}
 
         <main className="main-content">
           <div className="viewer-area">

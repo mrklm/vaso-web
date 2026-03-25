@@ -5,28 +5,19 @@ import { SettingsPanel } from "../panels/SettingsPanel";
 
 type Tab = "params" | "profiles" | "options";
 
-interface SidebarProps {
-  onNavigate?: () => void;
-}
-
-export function Sidebar({ onNavigate }: SidebarProps) {
+export function Sidebar() {
   const [tab, setTab] = useState<Tab>("params");
-
-  const selectTab = (t: Tab) => {
-    setTab(t);
-    onNavigate?.();
-  };
 
   return (
     <aside className="sidebar">
       <div className="sidebar-tabs">
-        <button className={tab === "params" ? "active" : ""} onClick={() => selectTab("params")}>
+        <button className={tab === "params" ? "active" : ""} onClick={() => setTab("params")}>
           Paramètres
         </button>
-        <button className={tab === "profiles" ? "active" : ""} onClick={() => selectTab("profiles")}>
+        <button className={tab === "profiles" ? "active" : ""} onClick={() => setTab("profiles")}>
           Profils
         </button>
-        <button className={tab === "options" ? "active" : ""} onClick={() => selectTab("options")}>
+        <button className={tab === "options" ? "active" : ""} onClick={() => setTab("options")}>
           Options
         </button>
       </div>
