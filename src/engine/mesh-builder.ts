@@ -76,6 +76,53 @@ function generateSupportSafeOuterContours(
   return contours;
 }
 
+function buildInnerWallSourceContours(
+  outerContours: Float64Array[],
+  zOuter: Float64Array,
+  zInnerBottom: number,
+): { zInner: number[]; sourceContours: Float64Array[] } {
+  const zInner: number[] = [];
+  const sourceContours: Float64Array[] = [];
+  const height = zOuter[zOuter.length - 1] ?? 0;
+  const clampedBottom = Math.max(0, Math.min(zInnerBottom, height));
+  const epsilon = 1e-9;
+
+  if (clampedBottom >= height - epsilon) {
+    return {
+      zInner: [height],
+      sourceContours: [new Float64Array(outerContours[outerContours.length - 1])],
+    };
+  }
+
+  let insertedBottom = false;
+  for (let layer = 0; layer < zOuter.length; layer++) {
+    const z = zOuter[layer];
+
+    if (!insertedBottom && clampedBottom > epsilon && z > clampedBottom + epsilon) {
+      const lowerLayer = Math.max(0, layer - 1);
+      const z1 = zOuter[lowerLayer];
+      const z2 = z;
+      const t = z2 === z1 ? 0 : (clampedBottom - z1) / (z2 - z1);
+      sourceContours.push(interpolateContours(outerContours[lowerLayer], outerContours[layer], t));
+      zInner.push(clampedBottom);
+      insertedBottom = true;
+    }
+
+    if (z >= clampedBottom - epsilon) {
+      sourceContours.push(new Float64Array(outerContours[layer]));
+      zInner.push(z);
+      insertedBottom = insertedBottom || Math.abs(z - clampedBottom) <= epsilon;
+    }
+  }
+
+  if (!insertedBottom) {
+    sourceContours.unshift(new Float64Array(outerContours[0]));
+    zInner.unshift(clampedBottom);
+  }
+
+  return { zInner, sourceContours };
+}
+
 /**
  * Generate the full vase mesh. Returns vertices (Float32Array, xyz flat) and indices (Uint32Array).
  */
@@ -93,10 +140,12 @@ function generateVaseMeshInternal(
 
   const zOuter = linspace(0, params.heightMm, layers);
   const zInnerBottom = Math.min(params.bottomThicknessMm, params.heightMm);
-  const zInner = linspace(zInnerBottom, params.heightMm, layers);
-
   const outerContours = generateSupportSafeOuterContours(params, zOuter);
-  const innerSourceContours = generateSupportSafeOuterContours(params, zInner);
+  const { zInner, sourceContours: innerSourceContours } = buildInnerWallSourceContours(
+    outerContours,
+    zOuter,
+    zInnerBottom,
+  );
 
   const verts: number[] = [];
   const faces: number[] = [];
@@ -116,7 +165,7 @@ function generateVaseMeshInternal(
   }
 
   // Inner wall vertices
-  for (let layer = 0; layer < layers; layer++) {
+  for (let layer = 0; layer < zInner.length; layer++) {
     const innerContour = computeInnerContour(innerSourceContours[layer], params.wallThicknessMm);
     const ringStart = verts.length / 3;
     const z = zInner[layer];
@@ -147,14 +196,14 @@ function generateVaseMeshInternal(
   }
 
   // Inner wall faces (flipped)
-  for (let layer = 0; layer < layers - 1; layer++) {
+  for (let layer = 0; layer < zInner.length - 1; layer++) {
     addQuadStrip(innerRingStarts[layer], innerRingStarts[layer + 1], ringSize, true);
   }
 
   // Top lip bridge
   {
     const outerTop = outerRingStarts[layers - 1];
-    const innerTop = innerRingStarts[layers - 1];
+    const innerTop = innerRingStarts[innerRingStarts.length - 1];
     for (let i = 0; i < ringSize; i++) {
       const o0 = outerTop + i;
       const o1 = outerTop + ((i + 1) % ringSize);

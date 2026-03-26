@@ -82,6 +82,27 @@ describe("generateVaseMesh", () => {
     expect(countConnectedMeshComponents(mesh)).toBe(1);
     expect(countBoundaryEdges(mesh)).toBe(0);
   });
+
+  it("aligns inner and outer wall layers on the same body z slices", () => {
+    const params = defaultVaseParameters();
+    params.radialSamples = 16;
+    params.verticalSamples = 8;
+    params.bottomThicknessMm = 3;
+
+    const mesh = generateVaseMesh(params);
+    const countsByZ = new Map<number, number>();
+    for (let i = 2; i < mesh.vertices.length; i += 3) {
+      const z = Math.round(mesh.vertices[i] * 1e6) / 1e6;
+      countsByZ.set(z, (countsByZ.get(z) ?? 0) + 1);
+    }
+
+    expect(countsByZ.get(0)).toBe(params.radialSamples + 1);
+    expect(countsByZ.get(3)).toBe(params.radialSamples + 1);
+
+    const sharedBodyLayers = [...countsByZ.entries()]
+      .filter(([z, count]) => z > params.bottomThicknessMm && z <= params.heightMm && count === params.radialSamples * 2);
+    expect(sharedBodyLayers.length).toBe(params.verticalSamples - 1);
+  });
 });
 
 describe("generateOuterProfilePoints", () => {

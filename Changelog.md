@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.16] - 2026-03-26
+
+### 🎨 Ajouté
+ - Mise en place d'un critere d'épaisseur géométrique constante (evite les trous à la réduction d'echelle)
+
 ## [1.0.15] - 2026-03-25
 
 ### 🎨 Ajouté

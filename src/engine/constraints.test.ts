@@ -5,6 +5,25 @@ import {
   computeInnerContour,
 } from "./constraints";
 
+function distancePointToSegment(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const apx = px - ax;
+  const apy = py - ay;
+  const ab2 = abx * abx + aby * aby;
+  const t = ab2 === 0 ? 0 : Math.max(0, Math.min(1, (apx * abx + apy * aby) / ab2));
+  const qx = ax + abx * t;
+  const qy = ay + aby * t;
+  return Math.hypot(px - qx, py - qy);
+}
+
 describe("maxSupportlessRadialStep", () => {
   it("returns minimum 0.25 for tiny dz", () => {
     expect(maxSupportlessRadialStep(0)).toBe(0.25);
@@ -48,17 +67,65 @@ describe("limitContourStepFromPrevious", () => {
 });
 
 describe("computeInnerContour", () => {
-  it("reduces radius by wall thickness", () => {
+  it("keeps a constant distance from a diamond contour", () => {
     const outer = new Float64Array([20, 0, 0, 20, -20, 0, 0, -20]);
     const inner = computeInnerContour(outer, 3);
 
-    const outerR = Math.sqrt(outer[0] ** 2 + outer[1] ** 2);
-    const innerR = Math.sqrt(inner[0] ** 2 + inner[1] ** 2);
-    expect(innerR).toBeCloseTo(outerR - 3, 5);
+    for (let i = 0; i < inner.length / 2; i++) {
+      const px = inner[i * 2];
+      const py = inner[i * 2 + 1];
+      let minDistance = Number.POSITIVE_INFINITY;
+
+      for (let edge = 0; edge < outer.length / 2; edge++) {
+        const next = (edge + 1) % (outer.length / 2);
+        const d = distancePointToSegment(
+          px,
+          py,
+          outer[edge * 2],
+          outer[edge * 2 + 1],
+          outer[next * 2],
+          outer[next * 2 + 1],
+        );
+        minDistance = Math.min(minDistance, d);
+      }
+
+      expect(minDistance).toBeCloseTo(3, 5);
+    }
   });
 
   it("throws when radius is too small for wall thickness", () => {
     const outer = new Float64Array([2, 0, 0, 2]);
     expect(() => computeInnerContour(outer, 3)).toThrow();
+  });
+
+  it("keeps a constant distance from flat faces on an elongated rectangle", () => {
+    const outer = new Float64Array([-20, -8, 20, -8, 20, 8, -20, 8]);
+    const inner = computeInnerContour(outer, 3);
+
+    const expected = new Float64Array([-17, -5, 17, -5, 17, 5, -17, 5]);
+    for (let i = 0; i < inner.length; i++) {
+      expect(inner[i]).toBeCloseTo(expected[i], 5);
+    }
+
+    for (let i = 0; i < inner.length / 2; i++) {
+      const px = inner[i * 2];
+      const py = inner[i * 2 + 1];
+      let minDistance = Number.POSITIVE_INFINITY;
+
+      for (let edge = 0; edge < outer.length / 2; edge++) {
+        const next = (edge + 1) % (outer.length / 2);
+        const d = distancePointToSegment(
+          px,
+          py,
+          outer[edge * 2],
+          outer[edge * 2 + 1],
+          outer[next * 2],
+          outer[next * 2 + 1],
+        );
+        minDistance = Math.min(minDistance, d);
+      }
+
+      expect(minDistance).toBeCloseTo(3, 5);
+    }
   });
 });
