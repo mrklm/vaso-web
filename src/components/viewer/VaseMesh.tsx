@@ -24,6 +24,7 @@ export function VaseMesh({
 }: VaseMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry>(null);
+  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
 
   useFrame((_, delta) => {
     if (!meshRef.current) return;
@@ -52,6 +53,11 @@ export function VaseMesh({
     geo.computeBoundingSphere();
   }, [meshData]);
 
+  useEffect(() => {
+    if (!materialRef.current) return;
+    materialRef.current.needsUpdate = true;
+  }, [flatShading]);
+
   const roughness = 1 - (shading / 100) * 0.7;
   const metalness = (shading / 100) * 0.3;
 
@@ -59,6 +65,7 @@ export function VaseMesh({
     <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
       <bufferGeometry ref={geometryRef} />
       <meshStandardMaterial
+        ref={materialRef}
         color={color}
         roughness={roughness}
         metalness={metalness}

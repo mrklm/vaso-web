@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.18] - 2026-03-26
+
+### 🎨 Modifié
+ - Correction du mode de vue 3D "Flat Shading" qui ne fonctionnait pas
+
 ## [1.0.17] - 2026-03-26
  
 ### 🎨 Ajouté
