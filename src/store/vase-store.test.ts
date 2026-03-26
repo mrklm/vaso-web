@@ -17,10 +17,18 @@ describe("vaseStore", () => {
 
   it("has valid default parameters", () => {
     const { params } = useVaseStore.getState();
-    expect(params.heightMm).toBe(180);
-    expect(params.profiles.length).toBe(2);
+    expect(params.heightMm).toBeGreaterThan(0);
+    expect(params.profiles.length).toBeGreaterThanOrEqual(2);
+    expect(params.profiles.length).toBeLessThanOrEqual(10);
     expect(params.profiles[0].zRatio).toBe(0);
-    expect(params.profiles[1].zRatio).toBe(1);
+    expect(params.profiles[params.profiles.length - 1].zRatio).toBe(1);
+  });
+
+  it("initial seed reproduces the initial vase when reapplied", () => {
+    const before = JSON.stringify(useVaseStore.getState().params);
+    useVaseStore.getState().applySeed();
+    const after = JSON.stringify(useVaseStore.getState().params);
+    expect(after).toBe(before);
   });
 
   it("setHeight updates heightMm", () => {
@@ -67,6 +75,24 @@ describe("vaseStore", () => {
   it("setTextureMode updates texture mode", () => {
     useVaseStore.getState().setTextureMode("Double texture");
     expect(useVaseStore.getState().params.textureMode).toBe("Double texture");
+    expect(useVaseStore.getState().isSeedModified).toBe(true);
+  });
+
+  it("marks the seed as modified when generation settings change", () => {
+    useVaseStore.setState({ ...useVaseStore.getInitialState() });
+    useVaseStore.getState().setRandomStyle("Raw");
+    expect(useVaseStore.getState().isSeedModified).toBe(true);
+
+    useVaseStore.setState({ ...useVaseStore.getInitialState() });
+    useVaseStore.getState().setForceComplexity(true);
+    expect(useVaseStore.getState().isSeedModified).toBe(true);
+
+    useVaseStore.setState({ ...useVaseStore.getInitialState() });
+    useVaseStore.getState().setComplexity("Complexe");
+    expect(useVaseStore.getState().isSeedModified).toBe(true);
+
+    useVaseStore.setState({ ...useVaseStore.getInitialState() });
+    useVaseStore.getState().setForceTexture(true);
     expect(useVaseStore.getState().isSeedModified).toBe(true);
   });
 

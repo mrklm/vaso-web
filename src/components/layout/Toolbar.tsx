@@ -46,6 +46,7 @@ export function Toolbar() {
   const activePrinterProfile = useUIStore((s) => s.activePrinterProfile);
   const enforcePrinterVolume = useUIStore((s) => s.enforcePrinterVolume);
   const { undo, redo, pastStates, futureStates } = useVaseStore.temporal.getState();
+  const showSeedModified = isSeedModified || enforcePrinterVolume;
 
   const handleExport = async () => {
     try {
@@ -53,7 +54,7 @@ export function Toolbar() {
       if (enforcePrinterVolume && activePrinter) {
         validateParamsAgainstBuildVolume(params, activePrinter);
       }
-      const mesh = await generateVaseMeshWithEngraving(params, seed, isSeedModified);
+      const mesh = await generateVaseMeshWithEngraving(params, seed, showSeedModified);
       const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
       await exportSTL(mesh, `vaso_export_${timestamp}.stl`);
       toast.success("STL exporté !");
@@ -77,7 +78,7 @@ export function Toolbar() {
     if (!canvas) return;
     requestAnimationFrame(() => {
       const captureDate = new Date();
-      const seedLabel = formatSeedLabel(seed, isSeedModified);
+      const seedLabel = formatSeedLabel(seed, showSeedModified);
       const footerLines = [
         `Vaso v${APP_VERSION} - n° de seed: ${seedLabel} - ` +
           `capture d'écran du ${formatDisplayDate(captureDate)} à ${formatDisplayTime(captureDate)}`,

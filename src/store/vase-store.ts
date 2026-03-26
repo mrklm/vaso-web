@@ -282,14 +282,28 @@ function constrainToActiveBuildVolume(params: VaseParameters): VaseParameters {
   return clampParamsToBuildVolume(params, getActiveBuildVolume());
 }
 
+const INITIAL_SEED = Math.floor(Math.random() * 999999);
+const INITIAL_RANDOM_STYLE: RandomStyle = "Soft";
+const INITIAL_COMPLEXITY: ComplexityLevel = "Moyen";
+const INITIAL_FORCE_COMPLEXITY = false;
+const INITIAL_FORCE_TEXTURE = false;
+const INITIAL_PARAMS = randomizeParams(
+  INITIAL_SEED,
+  INITIAL_RANDOM_STYLE,
+  INITIAL_COMPLEXITY,
+  INITIAL_FORCE_COMPLEXITY,
+  INITIAL_FORCE_TEXTURE,
+  defaultVaseParameters(),
+);
+
 export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
-  params: defaultVaseParameters(),
-  seed: Math.floor(Math.random() * 999999),
+  params: INITIAL_PARAMS,
+  seed: INITIAL_SEED,
   isSeedModified: false,
-  randomStyle: "Soft",
-  complexity: "Moyen",
-  forceComplexity: false,
-  forceTexture: false,
+  randomStyle: INITIAL_RANDOM_STYLE,
+  complexity: INITIAL_COMPLEXITY,
+  forceComplexity: INITIAL_FORCE_COMPLEXITY,
+  forceTexture: INITIAL_FORCE_TEXTURE,
 
   setHeight: (v) =>
     set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, heightMm: v }), isSeedModified: true })),
@@ -306,8 +320,13 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
     set((s) => {
       const current = s.params.profiles;
       if (count <= current.length) {
+        const profiles = current.slice(0, count);
+        if (profiles.length > 0) {
+          profiles[0].zRatio = 0;
+          profiles[profiles.length - 1].zRatio = 1;
+        }
         return {
-          params: constrainToActiveBuildVolume({ ...s.params, profiles: current.slice(0, count) }),
+          params: constrainToActiveBuildVolume({ ...s.params, profiles }),
           isSeedModified: true,
         };
       }
@@ -349,10 +368,10 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
   setTextureZoom2: (z) =>
     set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, textureZoom2: z }), isSeedModified: true })),
   setSeed: (seed) => set({ seed }),
-  setRandomStyle: (style) => set({ randomStyle: style }),
-  setComplexity: (level) => set({ complexity: level }),
-  setForceComplexity: (v) => set({ forceComplexity: v }),
-  setForceTexture: (v) => set({ forceTexture: v }),
+  setRandomStyle: (style) => set({ randomStyle: style, isSeedModified: true }),
+  setComplexity: (level) => set({ complexity: level, isSeedModified: true }),
+  setForceComplexity: (v) => set({ forceComplexity: v, isSeedModified: true }),
+  setForceTexture: (v) => set({ forceTexture: v, isSeedModified: true }),
   setParams: (params) => set({ params: constrainToActiveBuildVolume(params), isSeedModified: true }),
 
   applySeed: () => {

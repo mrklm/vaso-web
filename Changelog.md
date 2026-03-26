@@ -6,6 +6,19 @@ Le format est basé sur **Keep a Changelog**
 et ce projet suit un versioning de type **SemVer**.
 
 ---
+
+## [1.0.20] - 2026-03-26
+
+### 🎨 Modifié
+ - Le vase initial de session correspond maintenant à la seed générée aléatoirement 
+ - Le "M" de seed modifié est mainteant appliqué si:
+   - Style
+   - Forcer complexité
+   - Complexité
+   - Forcer texture
+   - Preset de profil imprimante 3D
+   est modifié / appliqué.
+
 ## [1.0.19] - 2026-03-26
 
 ### 🎨 Modifié
