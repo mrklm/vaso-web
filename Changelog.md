@@ -6,6 +6,12 @@ Le format est basé sur **Keep a Changelog**
 et ce projet suit un versioning de type **SemVer**.
 
 ---
+## [1.0.19] - 2026-03-26
+
+### 🎨 Modifié
+ - Ajout imprimante 3D "Creality CR-10S" dans la liste des profils en 3eme position
+ - Application complète des thèmes de couleurs (vase compris)
+
 
 ## [1.0.18] - 2026-03-26
 

@@ -6,6 +6,7 @@ export interface Theme {
   fg: string;
   fieldFg: string;
   accent: string;
+  vase: string;
 }
 
 export const THEMES: Theme[] = [
@@ -18,6 +19,7 @@ export const THEMES: Theme[] = [
     fg: "#EAEAEA",
     fieldFg: "#F0F0F0",
     accent: "#FF9800",
+    vase: "#C4956A",
   },
   {
     name: "[Sombre] AIR-KLM Night flight",
@@ -27,6 +29,7 @@ export const THEMES: Theme[] = [
     fg: "#EAF6FF",
     fieldFg: "#FFFFFF",
     accent: "#00A1DE",
+    vase: "#59B8E8",
   },
   {
     name: "[Sombre] Café Serré",
@@ -36,6 +39,7 @@ export const THEMES: Theme[] = [
     fg: "#F2E6D8",
     fieldFg: "#FFF4E6",
     accent: "#C28E5C",
+    vase: "#A86F45",
   },
   {
     name: "[Sombre] Matrix Déjà Vu",
@@ -45,6 +49,7 @@ export const THEMES: Theme[] = [
     fg: "#00FF66",
     fieldFg: "#66FF99",
     accent: "#00FF00",
+    vase: "#00A651",
   },
   {
     name: "[Sombre] Miami Vice 1987",
@@ -54,6 +59,7 @@ export const THEMES: Theme[] = [
     fg: "#FFF0FF",
     fieldFg: "#FFFFFF",
     accent: "#00FFD5",
+    vase: "#FF7CCB",
   },
   {
     name: "[Sombre] Cyber Licorne",
@@ -63,6 +69,7 @@ export const THEMES: Theme[] = [
     fg: "#F6E7FF",
     fieldFg: "#FFFFFF",
     accent: "#FF2CF7",
+    vase: "#9B59FF",
   },
   // Clairs
   {
@@ -73,6 +80,7 @@ export const THEMES: Theme[] = [
     fg: "#0B2A3F",
     fieldFg: "#0B2A3F",
     accent: "#00A1DE",
+    vase: "#59B8E8",
   },
   {
     name: "[Clair] Matin Brumeux",
@@ -82,6 +90,7 @@ export const THEMES: Theme[] = [
     fg: "#1E1F22",
     fieldFg: "#1E1F22",
     accent: "#6B7C93",
+    vase: "#8C98A8",
   },
   {
     name: "[Clair] Latte Vanille",
@@ -91,6 +100,7 @@ export const THEMES: Theme[] = [
     fg: "#3D2E22",
     fieldFg: "#3D2E22",
     accent: "#D8B892",
+    vase: "#CFA77A",
   },
   {
     name: "[Clair] Miellerie La Divette",
@@ -100,6 +110,7 @@ export const THEMES: Theme[] = [
     fg: "#50371A",
     fieldFg: "#50371A",
     accent: "#F2B705",
+    vase: "#D89A1D",
   },
   // Pouêt
   {
@@ -110,6 +121,7 @@ export const THEMES: Theme[] = [
     fg: "#082026",
     fieldFg: "#082026",
     accent: "#FF4FD8",
+    vase: "#FF8AAE",
   },
   {
     name: "[Pouêt] Pamplemousse",
@@ -119,6 +131,7 @@ export const THEMES: Theme[] = [
     fg: "#1A0B00",
     fieldFg: "#1A0B00",
     accent: "#00E5FF",
+    vase: "#FFB000",
   },
   {
     name: "[Pouêt] Raisin Toxique",
@@ -128,6 +141,7 @@ export const THEMES: Theme[] = [
     fg: "#0F001A",
     fieldFg: "#0F001A",
     accent: "#39FF14",
+    vase: "#7E57C2",
   },
   {
     name: "[Pouêt] Citron qui pique",
@@ -137,6 +151,7 @@ export const THEMES: Theme[] = [
     fg: "#1A1A00",
     fieldFg: "#1A1A00",
     accent: "#0066FF",
+    vase: "#FFD54A",
   },
   {
     name: "[Pouêt] Barbie Apocalypse",
@@ -146,6 +161,7 @@ export const THEMES: Theme[] = [
     fg: "#E8FFF8",
     fieldFg: "#FFFFFF",
     accent: "#FFEB3B",
+    vase: "#FF5FA2",
   },
   {
     name: "[Pouêt] Compagnie Créole",
@@ -155,6 +171,7 @@ export const THEMES: Theme[] = [
     fg: "#5A2E0C",
     fieldFg: "#5A2E0C",
     accent: "#8B3A1A",
+    vase: "#2E9B5F",
   },
 ];
 

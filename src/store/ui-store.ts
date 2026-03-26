@@ -54,6 +54,7 @@ interface UIState {
 const DEFAULT_PRINTER_PROFILES: PrinterProfile[] = [
   { name: "Alfawise U30", width: 220, depth: 220, height: 250 },
   { name: "Ender 5 Pro", width: 220, depth: 220, height: 300 },
+  { name: "Creality CR-10S", width: 300, depth: 300, height: 400 },
   { name: "Bambu Lab A1 Mini", width: 180, depth: 180, height: 180 },
   { name: "Bambu Lab A1", width: 256, depth: 256, height: 256 },
   { name: "Bambu Lab P1S", width: 256, depth: 256, height: 256 },
@@ -66,15 +67,26 @@ const DEFAULT_PRINTER_PROFILES: PrinterProfile[] = [
   { name: "ELEGOO Neptune 4 Pro", width: 225, depth: 225, height: 265 },
 ];
 
+function mergeDefaultPrinterProfiles(savedProfiles: PrinterProfile[]): PrinterProfile[] {
+  const savedByName = new Map(savedProfiles.map((profile) => [profile.name, profile]));
+  const mergedDefaults = DEFAULT_PRINTER_PROFILES.map((profile) => savedByName.get(profile.name) ?? profile);
+  const customProfiles = savedProfiles.filter(
+    (profile) => !DEFAULT_PRINTER_PROFILES.some((defaultProfile) => defaultProfile.name === profile.name),
+  );
+  return [...mergedDefaults, ...customProfiles];
+}
+
 function loadPrinterProfiles(): { profiles: PrinterProfile[]; active: string; enforce: boolean } {
   try {
     const saved = localStorage.getItem("vaso-printer-profiles");
     if (saved) {
       const data = JSON.parse(saved);
       if (data.profiles?.length > 0) {
+        const profiles = mergeDefaultPrinterProfiles(data.profiles);
+        const activeProfileExists = profiles.some((profile) => profile.name === data.active);
         return {
-          profiles: data.profiles,
-          active: data.active ?? data.profiles[0].name,
+          profiles,
+          active: activeProfileExists ? data.active : profiles[0].name,
           enforce: data.enforce === true,
         };
       }
@@ -131,7 +143,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   activeTab: "general",
   shading: 70,
   showGrid: true,
-  vaseColor: "#c4956a",
+  vaseColor: initialTheme.vase,
   wireframe: false,
   flatShading: false,
   autoRotate: true,
@@ -152,7 +164,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     } catch {
       /* ignore */
     }
-    set({ theme });
+    set({ theme, vaseColor: theme.vase });
   },
   setActiveTab: (tab) => set({ activeTab: tab }),
   setShading: (v) => set({ shading: v }),
@@ -213,7 +225,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       activeTab: "general",
       shading: 70,
       showGrid: true,
-      vaseColor: "#c4956a",
+      vaseColor: THEMES[0].vase,
       wireframe: false,
       flatShading: false,
       autoRotate: true,
