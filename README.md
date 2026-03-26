@@ -119,6 +119,7 @@ Three.js / WebGL (si utilisé)
 https://github.com/mrklm/vaso
 🌐 Vaso Web (ce projet)
 version navigateur, sans installation
+```bash
 
 📜 Licence
 
