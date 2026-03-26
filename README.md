@@ -24,7 +24,7 @@ Aucune installation requise — fonctionne directement dans le navigateur.
 
 ---
 
-# ✨ Fonctionnalités
+## ✨ Fonctionnalités
 
 - définition de **2 à 10 profils polygonaux**
 - réglage pour chaque profil :
@@ -32,17 +32,36 @@ Aucune installation requise — fonctionne directement dans le navigateur.
   - nombre de côtés
   - rotation
   - position verticale
+- panneau **Paramètres généraux** :
+  - hauteur du vase
+  - nombre de profils
+  - seed
+  - style aléatoire
+  - complexité
+  - textures et zooms
+- panneau **Options** :
+  - apparence et thème
+  - vue 3D
+  - volume imprimante
+  - paramètres STL avancés
+  - presets
 - interpolation entre profils
 - génération d’un **maillage 3D**
 - export en **STL**
+- texte additif sur le fond du vase exporté :
+  - version de l’application
+  - numéro de seed
+  - suffixe `M` si le vase a été modifié manuellement après génération
 - textures paramétriques
 - génération **aléatoire contrôlée**
 - aperçu **temps réel**
+- capture d’écran avec bandeau d’information
+- contrôle du volume d’impression selon le profil d’imprimante choisi
 - interface web moderne (**React**)
 
 ---
 
-# 🎲 Génération aléatoire
+## 🎲 Génération aléatoire
 
 Vaso Web permet de générer automatiquement des formes variées.
 
@@ -58,70 +77,101 @@ Paramètres disponibles :
 
 La génération utilise une **seed** permettant de reproduire une forme identique.
 
+Si l’utilisateur modifie manuellement un vase après génération, la seed affichée reste la même mais reçoit un suffixe `M` :
+
+- dans l’aperçu 3D
+- dans le texte additif du STL
+- sur le bandeau de la capture d’écran
+
+Ce suffixe indique que la forme courante n’est plus un résultat "pur seed".
+
 ---
 
-# 🧱 Architecture du projet
+## 🧱 Architecture du projet
 
-
+```text
 vaso-web
 ├─ src/
 │ ├─ components/
-│ ├─ generator/
-│ ├─ model/
-│ └─ exporter/
+│ ├─ engine/
+│ ├─ hooks/
+│ ├─ store/
+│ ├─ data/
+│ └─ themes/
 ├─ public/
 ├─ screenshots/
+├─ electron/
 ├─ index.html
 ├─ package.json
 ├─ vite.config.ts
-├─ README.md
+└─ README.md
+```
 
 
 ---
 
-# 🧪 Installation (développement)
+## 🧪 Installation (développement)
 
 ## 1. Cloner le projet
 
 ```bash
 git clone https://github.com/mrklm/vaso-web.git
 cd vaso-web
-2. Installer les dépendances
+```
+
+## 2. Installer les dépendances
+
+```bash
 npm install
-3. Lancer en mode développement
+```
+
+## 3. Lancer en mode développement
+
+```bash
 npm run dev
+```
 
 Puis ouvrir :
 
-http://localhost:5173
-4. Build production
+`http://localhost:5173`
+
+## 4. Build production
+
+```bash
 npm run build
+```
 
 Génère :
 
-dist/
-🔄 Déploiement
+`dist/`
+
+## 🔄 Déploiement
 
 Le site est automatiquement déployé via GitHub Actions sur GitHub Pages.
 
 Chaque push sur main déclenche :
 
-build du projet
-publication de dist/
-mise à jour du site en ligne
-🧠 Technologies utilisées
-React
-Vite
-JavaScript / TypeScript
-Three.js / WebGL (si utilisé)
-🔗 Lien avec la version Python
-🐍 Vaso (desktop)
-https://github.com/mrklm/vaso
-🌐 Vaso Web (ce projet)
-version navigateur, sans installation
-```bash
+- build du projet
+- publication de `dist/`
+- mise à jour du site en ligne
 
-📜 Licence
+## 🧠 Technologies utilisées
+
+- React
+- Vite
+- JavaScript / TypeScript
+- Three.js / React Three Fiber
+- Zustand
+- Electron pour la version desktop/export natif
+
+## 🔗 Lien avec la version Python
+
+- 🐍 Vaso (desktop)  
+  https://github.com/mrklm/vaso
+- 🌐 Vaso Web (ce projet)  
+  version navigateur, sans installation, avec export STL et aperçu 3D temps réel
+
+## 📜 Licence
 
 Projet open source.
 
