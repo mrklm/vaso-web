@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ShapeUtils, Vector2 } from "three";
-import { formatEngravingLines } from "./engraving-text";
+import { formatEngravingLines, formatSeedLabel } from "./engraving-text";
 import { sanitizePlanarContour } from "./engraving-planar";
 
 describe("engraving planar contour cleanup", () => {
@@ -64,5 +64,10 @@ describe("engraving planar contour cleanup", () => {
 
     expect(line1).toBe("VASO vtest");
     expect(line2).toBe("001234");
+  });
+
+  it("adds an M suffix when the seed was manually modified", () => {
+    expect(formatSeedLabel(1234, true)).toBe("001234M");
+    expect(formatEngravingLines(1234, true)[1]).toBe("001234M");
   });
 });

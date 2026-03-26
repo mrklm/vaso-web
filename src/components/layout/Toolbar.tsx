@@ -4,6 +4,7 @@ import { useUIStore } from "../../store/ui-store";
 import { exportSTL } from "../../engine/exporter";
 import { generateVaseMeshWithEngraving } from "../../engine/mesh-builder";
 import { validateParamsAgainstBuildVolume } from "../../engine/printer-volume";
+import { formatSeedLabel } from "../../engine/engraving-text";
 import { getShareUrl } from "../../hooks/useUrlShare";
 
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
@@ -38,6 +39,7 @@ export function Toolbar() {
   const randomize = useVaseStore((s) => s.randomize);
   const params = useVaseStore((s) => s.params);
   const seed = useVaseStore((s) => s.seed);
+  const isSeedModified = useVaseStore((s) => s.isSeedModified);
   const autoRotate = useUIStore((s) => s.autoRotate);
   const setAutoRotate = useUIStore((s) => s.setAutoRotate);
   const printerProfiles = useUIStore((s) => s.printerProfiles);
@@ -51,7 +53,7 @@ export function Toolbar() {
       if (enforcePrinterVolume && activePrinter) {
         validateParamsAgainstBuildVolume(params, activePrinter);
       }
-      const mesh = await generateVaseMeshWithEngraving(params, seed);
+      const mesh = await generateVaseMeshWithEngraving(params, seed, isSeedModified);
       const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
       await exportSTL(mesh, `vaso_export_${timestamp}.stl`);
       toast.success("STL exporté !");
@@ -75,7 +77,7 @@ export function Toolbar() {
     if (!canvas) return;
     requestAnimationFrame(() => {
       const captureDate = new Date();
-      const seedLabel = `${Math.abs(Math.trunc(seed)).toString().padStart(6, "0")}`;
+      const seedLabel = formatSeedLabel(seed, isSeedModified);
       const footerLines = [
         `Vaso v${APP_VERSION} - n° de seed: ${seedLabel} - ` +
           `capture d'écran du ${formatDisplayDate(captureDate)} à ${formatDisplayTime(captureDate)}`,

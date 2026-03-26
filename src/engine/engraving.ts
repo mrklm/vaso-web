@@ -168,8 +168,8 @@ function createLineGeometry(font: Font, text: string, size: number): THREE.Buffe
   return geometry;
 }
 
-function buildTextGeometry(font: Font, seed: number): THREE.BufferGeometry | null {
-  const lines = formatEngravingLines(seed);
+function buildTextGeometry(font: Font, seed: number, isSeedModified: boolean): THREE.BufferGeometry | null {
+  const lines = formatEngravingLines(seed, isSeedModified);
   const rawGeometries = lines.map((line, index) => createLineGeometry(font, line, RAW_LINE_SIZES[index]));
 
   const yOffsets = [FONT_LINE_HEIGHT * 0.5, -FONT_LINE_HEIGHT * 0.5];
@@ -305,6 +305,7 @@ function buildAdditiveTextGeometry(
   params: VaseParameters,
   bottomOuterContour: Float64Array,
   seed: number,
+  isSeedModified: boolean,
 ): THREE.BufferGeometry | null {
   if (!params.closeBottom) {
     appendPipelineTrace("[engraving] skipped: closeBottom=0");
@@ -331,7 +332,7 @@ function buildAdditiveTextGeometry(
     return null;
   }
 
-  const merged = buildTextGeometry(font, seed);
+  const merged = buildTextGeometry(font, seed, isSeedModified);
   if (!merged) return null;
 
   merged.computeBoundingBox();
@@ -366,9 +367,10 @@ export async function engraveBaseText(
   params: VaseParameters,
   bottomOuterContour: Float64Array,
   seed: number,
+  isSeedModified = false,
 ): Promise<MeshData> {
   const comparisonTimeline: ComparisonStage[] = [];
-  const engravingLines = formatEngravingLines(seed);
+  const engravingLines = formatEngravingLines(seed, isSeedModified);
   appendPipelineTrace(`[engraving] text line 1=${engravingLines[0]}`);
   appendPipelineTrace(`[engraving] text line 2=${engravingLines[1]}`);
   console.info(`[engraving] text line 1=${engravingLines[0]}`);
@@ -376,7 +378,7 @@ export async function engraveBaseText(
   traceMesh("[engraving] input mesh", meshData, PLANAR_PATCH_TOLERANCE_MM);
   traceMeshComparison("[engraving] compare input vs base", meshData, meshData, PLANAR_PATCH_TOLERANCE_MM, comparisonTimeline);
   const font = await loadRobotoFont();
-  const additiveTextGeometry = buildAdditiveTextGeometry(font, params, bottomOuterContour, seed);
+  const additiveTextGeometry = buildAdditiveTextGeometry(font, params, bottomOuterContour, seed, isSeedModified);
   if (!additiveTextGeometry) return meshData;
 
   const refinedBaseMesh = subdivideBottomCapTriangles(meshData);

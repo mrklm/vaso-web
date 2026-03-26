@@ -38,8 +38,10 @@ function computePreviewBottomFitRadius(params: VaseParameters): number {
   return Math.max(0, minRadius - PREVIEW_TEXT_FIT_MARGIN_MM);
 }
 
-function PreviewEngravingOverlay({ params, seed }: { params: VaseParameters; seed: number }) {
-  const lines = useMemo(() => formatEngravingLines(seed), [seed]);
+function PreviewEngravingOverlay(
+  { params, seed, isSeedModified }: { params: VaseParameters; seed: number; isSeedModified: boolean },
+) {
+  const lines = useMemo(() => formatEngravingLines(seed, isSeedModified), [isSeedModified, seed]);
   const fitRadius = useMemo(() => computePreviewBottomFitRadius(params), [params]);
 
   const texture = useMemo(() => {
@@ -219,6 +221,7 @@ function Autoplay({
 export function VaseViewer3D() {
   const params = useVaseStore((s) => s.params);
   const seed = useVaseStore((s) => s.seed);
+  const isSeedModified = useVaseStore((s) => s.isSeedModified);
   const randomize = useVaseStore((s) => s.randomize);
   const shading = useUIStore((s) => s.shading);
   const showGrid = useUIStore((s) => s.showGrid);
@@ -285,7 +288,7 @@ export function VaseViewer3D() {
           />
         )}
 
-        <PreviewEngravingOverlay params={params} seed={seed} />
+        <PreviewEngravingOverlay params={params} seed={seed} isSeedModified={isSeedModified} />
 
         <mesh
           rotation={[-Math.PI / 2, 0, 0]}

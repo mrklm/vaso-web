@@ -26,6 +26,7 @@ describe("vaseStore", () => {
   it("setHeight updates heightMm", () => {
     useVaseStore.getState().setHeight(200);
     expect(useVaseStore.getState().params.heightMm).toBe(180);
+    expect(useVaseStore.getState().isSeedModified).toBe(true);
   });
 
   it("setProfileCount adds profiles", () => {
@@ -60,11 +61,33 @@ describe("vaseStore", () => {
     const seedAfter = useVaseStore.getState().seed;
     // Extremely unlikely to be the same
     expect(seedAfter).not.toBe(seedBefore);
+    expect(useVaseStore.getState().isSeedModified).toBe(false);
   });
 
   it("setTextureMode updates texture mode", () => {
     useVaseStore.getState().setTextureMode("Double texture");
     expect(useVaseStore.getState().params.textureMode).toBe("Double texture");
+    expect(useVaseStore.getState().isSeedModified).toBe(true);
+  });
+
+  it("resets modified flag when applying a seed after manual edits", () => {
+    useVaseStore.getState().setHeight(160);
+    expect(useVaseStore.getState().isSeedModified).toBe(true);
+
+    useVaseStore.getState().applySeed();
+
+    expect(useVaseStore.getState().isSeedModified).toBe(false);
+  });
+
+  it("restores modified flag through undo and redo", () => {
+    useVaseStore.getState().setHeight(160);
+    expect(useVaseStore.getState().isSeedModified).toBe(true);
+
+    useVaseStore.temporal.getState().undo();
+    expect(useVaseStore.getState().isSeedModified).toBe(false);
+
+    useVaseStore.temporal.getState().redo();
+    expect(useVaseStore.getState().isSeedModified).toBe(true);
   });
 
   it("does not clamp when printer volume enforcement is disabled", () => {

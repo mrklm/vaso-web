@@ -244,6 +244,7 @@ function generateVaseMeshInternal(
 export async function generateVaseMeshWithEngraving(
   params: VaseParameters,
   seed: number,
+  isSeedModified = false,
 ): Promise<MeshData> {
   validateParams(params);
   resetPipelineTrace();
@@ -257,7 +258,7 @@ export async function generateVaseMeshWithEngraving(
     appendPipelineTrace(
       `[mesh-builder] base mesh:v=${mesh.vertices.length / 3},t=${mesh.indices.length / 3}`,
     );
-    const engravedMesh = await engraveBaseText(mesh, params, outerContours[0], seed);
+    const engravedMesh = await engraveBaseText(mesh, params, outerContours[0], seed, isSeedModified);
     const difference = getMeshDifferenceDiagnostics(mesh, engravedMesh);
     appendPipelineTrace(
       `[mesh-builder] final compare vs base:identical=${difference.identical ? 1 : 0},sharedT=${difference.sharedTriangles},removedT=${difference.removedTriangles},addedT=${difference.addedTriangles},sharedRatio=${difference.sharedTriangleRatio.toFixed(4)}`,

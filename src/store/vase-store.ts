@@ -16,6 +16,7 @@ import { useUIStore } from "./ui-store";
 interface VaseState {
   params: VaseParameters;
   seed: number;
+  isSeedModified: boolean;
   randomStyle: RandomStyle;
   complexity: ComplexityLevel;
   forceComplexity: boolean;
@@ -284,22 +285,31 @@ function constrainToActiveBuildVolume(params: VaseParameters): VaseParameters {
 export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
   params: defaultVaseParameters(),
   seed: Math.floor(Math.random() * 999999),
+  isSeedModified: false,
   randomStyle: "Soft",
   complexity: "Moyen",
   forceComplexity: false,
   forceTexture: false,
 
-  setHeight: (v) => set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, heightMm: v }) })),
-  setWallThickness: (v) => set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, wallThicknessMm: v }) })),
-  setBottomThickness: (v) => set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, bottomThicknessMm: v }) })),
-  setRadialSamples: (v) => set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, radialSamples: v }) })),
-  setVerticalSamples: (v) => set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, verticalSamples: v }) })),
+  setHeight: (v) =>
+    set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, heightMm: v }), isSeedModified: true })),
+  setWallThickness: (v) =>
+    set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, wallThicknessMm: v }), isSeedModified: true })),
+  setBottomThickness: (v) =>
+    set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, bottomThicknessMm: v }), isSeedModified: true })),
+  setRadialSamples: (v) =>
+    set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, radialSamples: v }), isSeedModified: true })),
+  setVerticalSamples: (v) =>
+    set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, verticalSamples: v }), isSeedModified: true })),
 
   setProfileCount: (count) =>
     set((s) => {
       const current = s.params.profiles;
       if (count <= current.length) {
-        return { params: constrainToActiveBuildVolume({ ...s.params, profiles: current.slice(0, count) }) };
+        return {
+          params: constrainToActiveBuildVolume({ ...s.params, profiles: current.slice(0, count) }),
+          isSeedModified: true,
+        };
       }
       const newProfiles = [...current];
       for (let i = current.length; i < count; i++) {
@@ -315,30 +325,35 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
       // Ensure first=0, last=1
       newProfiles[0].zRatio = 0;
       newProfiles[newProfiles.length - 1].zRatio = 1;
-      return { params: constrainToActiveBuildVolume({ ...s.params, profiles: newProfiles }) };
+      return { params: constrainToActiveBuildVolume({ ...s.params, profiles: newProfiles }), isSeedModified: true };
     }),
 
   updateProfile: (index, partial) =>
     set((s) => {
       const profiles = s.params.profiles.map((p, i) => (i === index ? { ...p, ...partial } : p));
-      return { params: constrainToActiveBuildVolume({ ...s.params, profiles }) };
+      return { params: constrainToActiveBuildVolume({ ...s.params, profiles }), isSeedModified: true };
     }),
 
   toggleProfile: (_index, _enabled) => {
     // In web version, we just adjust profile count
   },
 
-  setTextureMode: (mode) => set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, textureMode: mode }) })),
-  setTextureType: (t) => set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, textureType: t }) })),
-  setTextureZoom: (z) => set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, textureZoom: z }) })),
-  setTextureType2: (t) => set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, textureType2: t }) })),
-  setTextureZoom2: (z) => set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, textureZoom2: z }) })),
+  setTextureMode: (mode) =>
+    set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, textureMode: mode }), isSeedModified: true })),
+  setTextureType: (t) =>
+    set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, textureType: t }), isSeedModified: true })),
+  setTextureZoom: (z) =>
+    set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, textureZoom: z }), isSeedModified: true })),
+  setTextureType2: (t) =>
+    set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, textureType2: t }), isSeedModified: true })),
+  setTextureZoom2: (z) =>
+    set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, textureZoom2: z }), isSeedModified: true })),
   setSeed: (seed) => set({ seed }),
   setRandomStyle: (style) => set({ randomStyle: style }),
   setComplexity: (level) => set({ complexity: level }),
   setForceComplexity: (v) => set({ forceComplexity: v }),
   setForceTexture: (v) => set({ forceTexture: v }),
-  setParams: (params) => set({ params: constrainToActiveBuildVolume(params) }),
+  setParams: (params) => set({ params: constrainToActiveBuildVolume(params), isSeedModified: true }),
 
   applySeed: () => {
     const state = get();
@@ -350,7 +365,7 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
       state.forceTexture,
       state.params,
     );
-    set({ params: constrainToActiveBuildVolume(params) });
+    set({ params: constrainToActiveBuildVolume(params), isSeedModified: false });
   },
 
   randomize: () => {
@@ -364,6 +379,12 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
       state.forceTexture,
       state.params,
     );
-    set({ params: constrainToActiveBuildVolume(params), seed: newSeed });
+    set({ params: constrainToActiveBuildVolume(params), seed: newSeed, isSeedModified: false });
   },
-}), { limit: 50, equality: (a, b) => JSON.stringify(a.params) === JSON.stringify(b.params) }));
+}), {
+  limit: 50,
+  equality: (a, b) =>
+    JSON.stringify(a.params) === JSON.stringify(b.params) &&
+    a.seed === b.seed &&
+    a.isSeedModified === b.isSeedModified,
+}));
