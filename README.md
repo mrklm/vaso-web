@@ -173,7 +173,9 @@ Chaque push sur main déclenche :
 
 ## 📜 Licence
 
-Projet open source.
+Projet open source distribué sous licence **GNU GPL v3**.
+
+Voir le fichier [LICENSE](LICENSE).
 
 ## 💡 Pourquoi ce projet est-il sous licence libre ?
 
