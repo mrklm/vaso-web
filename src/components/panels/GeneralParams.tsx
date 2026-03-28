@@ -50,6 +50,14 @@ export function GeneralParams() {
         step={5}
       />
       <NumberInput
+        label="Échelle globale"
+        value={p.scale}
+        onChange={store.setScale}
+        min={0.1}
+        max={2.0}
+        step={0.05}
+      />
+      <NumberInput
         label="Nombre de profils"
         value={p.profiles.length}
         onChange={store.setProfileCount}
@@ -58,6 +66,20 @@ export function GeneralParams() {
         step={1}
         integer
       />
+
+      <div className="separator" />
+      <h3>Gravure</h3>
+
+      <div className="checkbox-row">
+        <label>
+          <input
+            type="checkbox"
+            checked={p.printSafeEngraving}
+            onChange={(e) => store.setPrintSafeEngraving(e.target.checked)}
+          />
+          Gravure sécurisée pour FDM
+        </label>
+      </div>
 
       <div className="separator" />
       <h3>Aléatoire</h3>

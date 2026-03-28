@@ -13,15 +13,15 @@ import { getMeshDifferenceDiagnostics, logMeshDiagnostics } from "./mesh-cleanup
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
 const ENGRAVING_PIPELINE_MARKER = `Vaso Engraving ${APP_VERSION}`;
 
-function linspace(start: number, end: number, count: number): Float64Array {
-  const result = new Float64Array(count);
-  if (count <= 1) {
-    result[0] = start;
-    return result;
+function scaleMeshData(mesh: MeshData, scale: number): MeshData {
+  const scaledVertices = new Float32Array(mesh.vertices.length);
+  for (let i = 0; i < mesh.vertices.length; i++) {
+    scaledVertices[i] = mesh.vertices[i] * scale;
   }
-  const step = (end - start) / (count - 1);
-  for (let i = 0; i < count; i++) result[i] = start + step * i;
-  return result;
+  return {
+    vertices: scaledVertices,
+    indices: mesh.indices,
+  };
 }
 
 function interpolatedOuterContour(params: VaseParameters, zMm: number): Float64Array {
@@ -269,7 +269,11 @@ export async function generateVaseMeshWithEngraving(
         `Engraving pipeline produced a mesh identical to the base mesh. trace=${getPipelineTrace()}`,
       );
     }
-    return engravedMesh;
+
+    // Apply global scale
+    const scaledMesh = scaleMeshData(engravedMesh, params.scale);
+    appendPipelineTrace(`[mesh-builder] applied scale=${params.scale.toFixed(3)}`);
+    return scaledMesh;
   } catch (error) {
     appendPipelineTrace(
       `[mesh-builder] engraving error=${error instanceof Error ? error.message : String(error)}`,

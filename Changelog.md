@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.22] - 2026-03-28
+
+### 🎨 Modifié
+ - Ajustement du texte sur STL pour impression
+
 ## [1.0.21] - 2026-03-28
 
 ### 🎨 Modifié

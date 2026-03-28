@@ -80,6 +80,8 @@ export interface VaseParameters {
   textureZoom: TextureZoom;
   textureType2: TextureType;
   textureZoom2: TextureZoom;
+  scale: number;
+  printSafeEngraving: boolean;
   profiles: Profile[];
 }
 
@@ -97,6 +99,8 @@ export function defaultVaseParameters(): VaseParameters {
     textureZoom: "Moyen",
     textureType2: "Aucune",
     textureZoom2: "Moyen",
+    scale: 1.0,
+    printSafeEngraving: true,
     profiles: [
       createProfile({ zRatio: 0, diameter: 80, sides: 6, rotationDeg: 0 }),
       createProfile({ zRatio: 1, diameter: 60, sides: 6, rotationDeg: 30 }),

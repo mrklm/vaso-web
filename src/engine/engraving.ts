@@ -29,6 +29,11 @@ const TEXT_WIDTH_FACTOR = 0.58;
 const TEXT_HEIGHT_FACTOR = 0.45;
 const TEXT_CURVE_SEGMENTS = 10;
 
+// Print-safe engraving constants
+const MIN_FEATURE_MM = 0.8; // Minimum printable feature size for 0.4mm nozzle
+const MIN_ENGRAVING_DEPTH_MM = Math.max(0.8, 2 * 0.2); // At least 0.8mm or 2x layer height (assuming 0.2mm layer)
+const OFFSET_DELTA_MM = MIN_FEATURE_MM / 2; // Offset amount for dilation
+
 let robotoFontPromise: Promise<Font> | null = null;
 
 interface ComparisonStage {
@@ -168,9 +173,9 @@ function createLineGeometry(font: Font, text: string, size: number): THREE.Buffe
   return geometry;
 }
 
-function buildTextGeometry(font: Font, seed: number, isSeedModified: boolean): THREE.BufferGeometry | null {
+function buildTextGeometry(font: Font, seed: number, isSeedModified: boolean, printSafeScale: number = 1): THREE.BufferGeometry | null {
   const lines = formatEngravingLines(seed, isSeedModified);
-  const rawGeometries = lines.map((line, index) => createLineGeometry(font, line, RAW_LINE_SIZES[index]));
+  const rawGeometries = lines.map((line, index) => createLineGeometry(font, line, RAW_LINE_SIZES[index] * printSafeScale));
 
   const yOffsets = [FONT_LINE_HEIGHT * 0.5, -FONT_LINE_HEIGHT * 0.5];
   rawGeometries.forEach((geometry, index) => geometry.translate(0, yOffsets[index], 0));
@@ -313,17 +318,20 @@ function buildAdditiveTextGeometry(
   }
 
   appendPipelineTrace(
-    `[engraving] requested depth=${TARGET_ENGRAVING_DEPTH_MM.toFixed(3)}mm,bottomThickness=${params.bottomThicknessMm.toFixed(3)}mm,minimumRemaining=${MIN_REMAINING_BOTTOM_MM.toFixed(3)}mm`,
+    `[engraving] requested depth=${TARGET_ENGRAVING_DEPTH_MM.toFixed(3)}mm,bottomThickness=${params.bottomThicknessMm.toFixed(3)}mm,minimumRemaining=${MIN_REMAINING_BOTTOM_MM.toFixed(3)}mm,scale=${params.scale.toFixed(3)},printSafe=${params.printSafeEngraving}`,
   );
-  const maxDepth = Math.min(
+  let effectiveDepth = Math.min(
     TARGET_ENGRAVING_DEPTH_MM,
     params.bottomThicknessMm - MIN_REMAINING_BOTTOM_MM,
   );
-  if (maxDepth <= 0) {
-    appendPipelineTrace(`[engraving] skipped: effective depth=${maxDepth.toFixed(3)}mm`);
+  if (params.printSafeEngraving) {
+    effectiveDepth = Math.max(effectiveDepth, MIN_ENGRAVING_DEPTH_MM);
+  }
+  if (effectiveDepth <= 0) {
+    appendPipelineTrace(`[engraving] skipped: effective depth=${effectiveDepth.toFixed(3)}mm`);
     return null;
   }
-  appendPipelineTrace(`[engraving] text depth=${maxDepth.toFixed(3)}mm`);
+  appendPipelineTrace(`[engraving] text depth=${effectiveDepth.toFixed(3)}mm`);
 
   const fitRadius = computeContourMinRadius(bottomOuterContour) - FIT_MARGIN_MM;
   appendPipelineTrace(`[engraving] fit radius=${fitRadius.toFixed(3)}mm`);
@@ -332,7 +340,11 @@ function buildAdditiveTextGeometry(
     return null;
   }
 
-  const merged = buildTextGeometry(font, seed, isSeedModified);
+  // Calculate compensation for user scale
+  const compensatedScale = params.printSafeEngraving ? 1 / params.scale : 1;
+  appendPipelineTrace(`[engraving] compensatedScale=${compensatedScale.toFixed(3)}`);
+
+  const merged = buildTextGeometry(font, seed, isSeedModified, compensatedScale);
   if (!merged) return null;
 
   merged.computeBoundingBox();
@@ -342,12 +354,35 @@ function buildAdditiveTextGeometry(
     return null;
   }
 
-  const size = bounds.getSize(new THREE.Vector3());
+  // Apply morphological offset for print-safe
+  let offsetScale = 1;
+  if (params.printSafeEngraving) {
+    offsetScale = 1 + OFFSET_DELTA_MM / (RAW_LINE_SIZES[0] * compensatedScale * 0.1); // approximate
+    merged.scale(offsetScale, offsetScale, 1);
+    merged.computeBoundingBox();
+    const newBounds = merged.boundingBox;
+    if (newBounds) {
+      appendPipelineTrace(`[engraving] applied offset scale=${offsetScale.toFixed(3)}, new bounds=${newBounds.getSize(new THREE.Vector3()).x.toFixed(3)}mm`);
+    }
+  }
+
+  const currentBounds = merged.boundingBox;
+  if (!currentBounds) {
+    merged.dispose();
+    return null;
+  }
+
+  const size = currentBounds.getSize(new THREE.Vector3());
   const xyScale = Math.min((fitRadius * TEXT_WIDTH_FACTOR) / size.x, (fitRadius * TEXT_HEIGHT_FACTOR) / size.y);
   appendPipelineTrace(
     `[engraving] text bounds width=${size.x.toFixed(3)}mm,height=${size.y.toFixed(3)}mm,xyScale=${xyScale.toFixed(4)}`,
   );
-  merged.scale(xyScale, xyScale, maxDepth + ENGRAVING_SURFACE_OVERLAP_MM);
+
+  // Estimate min feature size after scaling
+  const estimatedStrokeWidth = (RAW_LINE_SIZES[0] * compensatedScale * offsetScale * xyScale * 0.1); // Rough estimate
+  appendPipelineTrace(`[engraving] estimated min feature=${estimatedStrokeWidth.toFixed(3)}mm ${estimatedStrokeWidth < MIN_FEATURE_MM ? 'INVALID' : 'OK'} for FDM`);
+
+  merged.scale(xyScale, xyScale, effectiveDepth + ENGRAVING_SURFACE_OVERLAP_MM);
   const innerBottomZ = Math.min(params.bottomThicknessMm, params.heightMm);
   merged.translate(0, 0, innerBottomZ - ENGRAVING_SURFACE_OVERLAP_MM);
   // TextGeometry duplicates seam vertices when normals/UVs differ; strip them

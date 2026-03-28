@@ -28,6 +28,8 @@ interface VaseState {
   setBottomThickness: (v: number) => void;
   setRadialSamples: (v: number) => void;
   setVerticalSamples: (v: number) => void;
+  setScale: (v: number) => void;
+  setPrintSafeEngraving: (v: boolean) => void;
   setProfileCount: (count: number) => void;
   updateProfile: (index: number, partial: Partial<Profile>) => void;
   toggleProfile: (index: number, enabled: boolean) => void;
@@ -316,6 +318,10 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
     set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, radialSamples: v }), isSeedModified: true })),
   setVerticalSamples: (v) =>
     set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, verticalSamples: v }), isSeedModified: true })),
+  setScale: (v) =>
+    set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, scale: v }), isSeedModified: true })),
+  setPrintSafeEngraving: (v) =>
+    set((s) => ({ params: { ...s.params, printSafeEngraving: v }, isSeedModified: true })),
 
   setProfileCount: (count) =>
     set((s) => {
