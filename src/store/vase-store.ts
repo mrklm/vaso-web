@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { temporal } from "zundo";
+import { MAX_SEED } from "../engine/engraving-text";
 import { clampParamsToBuildVolume, type BuildVolume } from "../engine/printer-volume";
 import type {
   VaseParameters,
@@ -282,7 +283,7 @@ function constrainToActiveBuildVolume(params: VaseParameters): VaseParameters {
   return clampParamsToBuildVolume(params, getActiveBuildVolume());
 }
 
-const INITIAL_SEED = Math.floor(Math.random() * 999999);
+const INITIAL_SEED = Math.floor(Math.random() * (MAX_SEED + 1));
 const INITIAL_RANDOM_STYLE: RandomStyle = "Soft";
 const INITIAL_COMPLEXITY: ComplexityLevel = "Moyen";
 const INITIAL_FORCE_COMPLEXITY = false;
@@ -389,7 +390,7 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
 
   randomize: () => {
     const state = get();
-    const newSeed = Math.floor(Math.random() * 999999);
+    const newSeed = Math.floor(Math.random() * (MAX_SEED + 1));
     const params = randomizeParams(
       newSeed,
       state.randomStyle,

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useUIStore } from "../../store/ui-store";
 import { useVaseStore } from "../../store/vase-store";
+import { MAX_SEED } from "../../engine/engraving-text";
 import { THEMES } from "../../themes";
 import { PRESETS } from "../../data/presets";
 import { clampParamsToBuildVolume } from "../../engine/printer-volume";
@@ -134,7 +135,7 @@ const {
     resetVasoSettings();
     useVaseStore.setState({
       ...useVaseStore.getInitialState(),
-      seed: Math.floor(Math.random() * 999999),
+      seed: Math.floor(Math.random() * (MAX_SEED + 1)),
     });
     window.location.reload();
   };

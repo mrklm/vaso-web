@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MAX_SEED } from "../../engine/engraving-text";
 import { useVaseStore } from "../../store/vase-store";
 import { useUIStore } from "../../store/ui-store";
 import { NumberInput } from "../ui/NumberInput";
@@ -30,7 +31,7 @@ export function GeneralParams() {
       setSeedInput(String(store.seed));
       return;
     }
-    const clamped = Math.max(0, Math.min(999999, v));
+    const clamped = Math.max(0, Math.min(MAX_SEED, v));
     setSeedInput(String(clamped));
     store.setSeed(clamped);
     store.applySeed();
@@ -69,7 +70,7 @@ export function GeneralParams() {
             className="slider-input-number"
             value={seedInput}
             min={0}
-            max={999999}
+            max={MAX_SEED}
             step={1}
             onChange={(e) => setSeedInput(e.target.value)}
             onBlur={commitSeed}

@@ -22,6 +22,7 @@ interface UIState {
   rotationSpeed: number;
   clippingHeight: number; // 0-100 percent
   unlockAdvancedStlParams: boolean;
+  captureViewerImage: (() => Promise<string | null>) | null;
 
   // Printer profiles
   printerProfiles: PrinterProfile[];
@@ -41,6 +42,7 @@ interface UIState {
   setRotationSpeed: (v: number) => void;
   setClippingHeight: (v: number) => void;
   setUnlockAdvancedStlParams: (enabled: boolean) => void;
+  setCaptureViewerImage: (capture: (() => Promise<string | null>) | null) => void;
 
   // Printer profile actions
   setEnforcePrinterVolume: (enabled: boolean) => void;
@@ -152,6 +154,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   rotationSpeed: 0.5,
   clippingHeight: 50,
   unlockAdvancedStlParams: initialAdvancedStlUnlock,
+  captureViewerImage: null,
 
   printerProfiles: initialPrinter.profiles,
   activePrinterProfile: initialPrinter.active,
@@ -185,6 +188,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     }
     set({ unlockAdvancedStlParams: enabled });
   },
+  setCaptureViewerImage: (capture) => set({ captureViewerImage: capture }),
 
   setEnforcePrinterVolume: (enabled) => {
     set({ enforcePrinterVolume: enabled });
@@ -234,6 +238,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       rotationSpeed: 0.5,
       clippingHeight: 50,
       unlockAdvancedStlParams: false,
+      captureViewerImage: null,
       printerProfiles: DEFAULT_PRINTER_PROFILES,
       activePrinterProfile: DEFAULT_PRINTER_PROFILES[0].name,
       enforcePrinterVolume: false,

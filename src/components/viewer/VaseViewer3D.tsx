@@ -218,6 +218,35 @@ function Autoplay({
   return null;
 }
 
+function ScreenshotBridge() {
+  const gl = useThree((state) => state.gl);
+  const scene = useThree((state) => state.scene);
+  const camera = useThree((state) => state.camera);
+  const setCaptureViewerImage = useUIStore((s) => s.setCaptureViewerImage);
+
+  useEffect(() => {
+    const capture = async (): Promise<string | null> => {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          gl.render(scene, camera);
+          resolve();
+        });
+      });
+
+      try {
+        return gl.domElement.toDataURL("image/png");
+      } catch {
+        return null;
+      }
+    };
+
+    setCaptureViewerImage(capture);
+    return () => setCaptureViewerImage(null);
+  }, [camera, gl, scene, setCaptureViewerImage]);
+
+  return null;
+}
+
 export function VaseViewer3D() {
   const params = useVaseStore((s) => s.params);
   const seed = useVaseStore((s) => s.seed);
@@ -310,6 +339,7 @@ export function VaseViewer3D() {
           minDistance={50}
           maxDistance={500}
         />
+        <ScreenshotBridge />
         <KeyboardControls controlsRef={controlsRef} />
         <Autoplay controlsRef={controlsRef} paramsKey={paramsKey} rotationMode={rotationMode} />
 

@@ -59,15 +59,15 @@ describe("engraving planar contour cleanup", () => {
     expect(sanitizedContour.length).toBe(24);
   });
 
-  it("formats the engraved text with version on line 1 and a six-digit seed on line 2", () => {
+  it("formats the engraved text with version on line 1 and an eight-digit seed on line 2", () => {
     const [line1, line2] = formatEngravingLines(1234);
 
     expect(line1).toBe("VASO vtest");
-    expect(line2).toBe("001234");
+    expect(line2).toBe("00001234");
   });
 
   it("adds an M suffix when the seed was manually modified", () => {
-    expect(formatSeedLabel(1234, true)).toBe("001234M");
-    expect(formatEngravingLines(1234, true)[1]).toBe("001234M");
+    expect(formatSeedLabel(1234, true)).toBe("00001234M");
+    expect(formatEngravingLines(1234, true)[1]).toBe("00001234M");
   });
 });

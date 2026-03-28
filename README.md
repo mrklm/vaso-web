@@ -50,7 +50,7 @@ Aucune installation requise — fonctionne directement dans le navigateur.
 - export en **STL**
 - texte additif sur le fond du vase exporté :
   - version de l’application
-  - numéro de seed
+  - numéro de seed sur 8 chiffres
   - suffixe `M` si le vase a été modifié manuellement après génération
 - textures paramétriques
 - génération **aléatoire contrôlée**

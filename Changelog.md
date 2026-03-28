@@ -7,6 +7,12 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.21] - 2026-03-28
+
+### 🎨 Modifié
+ - Le N° de  Seed passe de 6 à 8 chiffres 
+ - Probleme de capture d'écran résolu 
+
 ## [1.0.20] - 2026-03-26
 
 ### 🎨 Modifié
