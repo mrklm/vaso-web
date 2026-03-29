@@ -20,6 +20,8 @@ const base: Omit<VaseParameters, "profiles"> = {
   textureZoom: "Moyen",
   textureType2: "Aucune",
   textureZoom2: "Moyen",
+  scale: 1,
+  printSafeEngraving: true,
 };
 
 export const PRESETS: Preset[] = [

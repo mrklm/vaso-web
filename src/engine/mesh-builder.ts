@@ -13,6 +13,17 @@ import { getMeshDifferenceDiagnostics, logMeshDiagnostics } from "./mesh-cleanup
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
 const ENGRAVING_PIPELINE_MARKER = `Vaso Engraving ${APP_VERSION}`;
 
+function linspace(start: number, end: number, count: number): Float64Array {
+  const result = new Float64Array(count);
+  if (count <= 1) {
+    result[0] = start;
+    return result;
+  }
+  const step = (end - start) / (count - 1);
+  for (let i = 0; i < count; i++) result[i] = start + step * i;
+  return result;
+}
+
 function scaleMeshData(mesh: MeshData, scale: number): MeshData {
   const scaledVertices = new Float32Array(mesh.vertices.length);
   for (let i = 0; i < mesh.vertices.length; i++) {

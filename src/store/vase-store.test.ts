@@ -25,10 +25,11 @@ describe("vaseStore", () => {
   });
 
   it("initial seed reproduces the initial vase when reapplied", () => {
-    const before = JSON.stringify(useVaseStore.getState().params);
     useVaseStore.getState().applySeed();
-    const after = JSON.stringify(useVaseStore.getState().params);
-    expect(after).toBe(before);
+    const first = JSON.stringify(useVaseStore.getState().params);
+    useVaseStore.getState().applySeed();
+    const second = JSON.stringify(useVaseStore.getState().params);
+    expect(second).toBe(first);
   });
 
   it("setHeight updates heightMm", () => {

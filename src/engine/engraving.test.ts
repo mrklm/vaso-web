@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ShapeUtils, Vector2 } from "three";
 import { formatEngravingLines, formatSeedLabel } from "./engraving-text";
-import { sanitizePlanarContour } from "./engraving-planar";
+import { offsetPlanarPolygon, sanitizePlanarContour } from "./engraving-planar";
 
 describe("engraving planar contour cleanup", () => {
   it("removes duplicated closure points and micro-segments before triangulation", () => {
@@ -57,6 +57,36 @@ describe("engraving planar contour cleanup", () => {
     const sanitizedContour = sanitizePlanarContour(contour, 1e-3);
 
     expect(sanitizedContour.length).toBe(24);
+  });
+
+  it("applies a real polygon offset and removes non-printable holes", () => {
+    const result = offsetPlanarPolygon(
+      {
+        contour: [
+          new Vector2(0, 0),
+          new Vector2(10, 0),
+          new Vector2(10, 8),
+          new Vector2(0, 8),
+        ],
+        holes: [[
+          new Vector2(4, 3.75),
+          new Vector2(6, 3.75),
+          new Vector2(6, 4.25),
+          new Vector2(4, 4.25),
+        ]],
+      },
+      0.4,
+      { minFeatureMm: 0.8, sanitizeToleranceMm: 1e-3 },
+    );
+
+    expect(result.polygons).toHaveLength(1);
+    expect(result.removedHoles).toBe(1);
+    expect(result.polygons[0].holes).toHaveLength(0);
+
+    const xs = result.polygons[0].contour.map((point) => point.x);
+    const ys = result.polygons[0].contour.map((point) => point.y);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(10.7);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(8.7);
   });
 
   it("formats the engraved text with version on line 1 and an eight-digit seed on line 2", () => {

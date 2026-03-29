@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { FontLoader, type Font } from "three/examples/jsm/loaders/FontLoader.js";
-import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { MeshData, VaseParameters } from "./types";
 import { appendPipelineTrace } from "./pipeline-trace";
 import { formatEngravingLines } from "./engraving-text";
+import { offsetPlanarPolygon, sanitizePlanarContour } from "./engraving-planar";
 import {
   countBoundaryEdges,
   countBoundaryLoopsAtZ,
@@ -28,6 +28,7 @@ const RAW_LINE_SIZES = [8.6, 7.1] as const;
 const TEXT_WIDTH_FACTOR = 0.58;
 const TEXT_HEIGHT_FACTOR = 0.45;
 const TEXT_CURVE_SEGMENTS = 10;
+const PLANAR_TEXT_SIMPLIFICATION_MM = 0.05;
 
 // Print-safe engraving constants
 const MIN_FEATURE_MM = 0.8; // Minimum printable feature size for 0.4mm nozzle
@@ -155,10 +156,55 @@ async function loadRobotoFont(): Promise<Font> {
   return robotoFontPromise;
 }
 
-function createLineGeometry(font: Font, text: string, size: number): THREE.BufferGeometry {
-  const geometry = new TextGeometry(text, {
-    font,
-    size,
+function buildPrintableLineGeometry(
+  font: Font,
+  text: string,
+  size: number,
+  printSafeScale: number,
+  printSafe: boolean,
+): { geometry: THREE.BufferGeometry | null; removedContours: number; removedHoles: number } {
+  const rawShapes = font.generateShapes(text, size * printSafeScale);
+  const printableShapes: THREE.Shape[] = [];
+  let removedContours = 0;
+  let removedHoles = 0;
+
+  for (const rawShape of rawShapes) {
+    const extracted = rawShape.extractPoints(TEXT_CURVE_SEGMENTS);
+    const polygon = {
+      contour: sanitizePlanarContour(extracted.shape, PLANAR_TEXT_SIMPLIFICATION_MM),
+      holes: extracted.holes.map((hole) => sanitizePlanarContour(hole, PLANAR_TEXT_SIMPLIFICATION_MM)),
+    };
+
+    if (polygon.contour.length < 3) {
+      removedContours += 1;
+      removedHoles += polygon.holes.length;
+      continue;
+    }
+
+    const result = printSafe
+      ? offsetPlanarPolygon(polygon, OFFSET_DELTA_MM, {
+        minFeatureMm: MIN_FEATURE_MM,
+        sanitizeToleranceMm: PLANAR_TEXT_SIMPLIFICATION_MM,
+      })
+      : { polygons: [polygon], removedContours: 0, removedHoles: 0 };
+
+    removedContours += result.removedContours;
+    removedHoles += result.removedHoles;
+
+    for (const printablePolygon of result.polygons) {
+      const shape = new THREE.Shape(printablePolygon.contour);
+      for (const hole of printablePolygon.holes) {
+        shape.holes.push(new THREE.Path(hole));
+      }
+      printableShapes.push(shape);
+    }
+  }
+
+  if (printableShapes.length === 0) {
+    return { geometry: null, removedContours, removedHoles };
+  }
+
+  const geometry = new THREE.ExtrudeGeometry(printableShapes, {
     depth: 1,
     curveSegments: TEXT_CURVE_SEGMENTS,
     bevelEnabled: false,
@@ -170,12 +216,20 @@ function createLineGeometry(font: Font, text: string, size: number): THREE.Buffe
     geometry.translate(-centerX, 0, 0);
   }
   geometry.clearGroups();
-  return geometry;
+  return { geometry, removedContours, removedHoles };
 }
 
-function buildTextGeometry(font: Font, seed: number, isSeedModified: boolean, printSafeScale: number = 1): THREE.BufferGeometry | null {
+function buildTextGeometry(font: Font, seed: number, isSeedModified: boolean, printSafeScale = 1, printSafe = false): THREE.BufferGeometry | null {
   const lines = formatEngravingLines(seed, isSeedModified);
-  const rawGeometries = lines.map((line, index) => createLineGeometry(font, line, RAW_LINE_SIZES[index] * printSafeScale));
+  const lineResults = lines.map((line, index) =>
+    buildPrintableLineGeometry(font, line, RAW_LINE_SIZES[index], printSafeScale, printSafe));
+  const rawGeometries = lineResults
+    .map((result) => result.geometry)
+    .filter((geometry): geometry is THREE.BufferGeometry => geometry !== null);
+  const removedContours = lineResults.reduce((sum, result) => sum + result.removedContours, 0);
+  const removedHoles = lineResults.reduce((sum, result) => sum + result.removedHoles, 0);
+  appendPipelineTrace(`[engraving] removed contours=${removedContours},removed holes=${removedHoles}`);
+  if (rawGeometries.length === 0) return null;
 
   const yOffsets = [FONT_LINE_HEIGHT * 0.5, -FONT_LINE_HEIGHT * 0.5];
   rawGeometries.forEach((geometry, index) => geometry.translate(0, yOffsets[index], 0));
@@ -320,12 +374,16 @@ function buildAdditiveTextGeometry(
   appendPipelineTrace(
     `[engraving] requested depth=${TARGET_ENGRAVING_DEPTH_MM.toFixed(3)}mm,bottomThickness=${params.bottomThicknessMm.toFixed(3)}mm,minimumRemaining=${MIN_REMAINING_BOTTOM_MM.toFixed(3)}mm,scale=${params.scale.toFixed(3)},printSafe=${params.printSafeEngraving}`,
   );
-  let effectiveDepth = Math.min(
+  const maxSafeDepth = Math.min(
     TARGET_ENGRAVING_DEPTH_MM,
     params.bottomThicknessMm - MIN_REMAINING_BOTTOM_MM,
   );
+  let effectiveDepth = maxSafeDepth;
   if (params.printSafeEngraving) {
-    effectiveDepth = Math.max(effectiveDepth, MIN_ENGRAVING_DEPTH_MM);
+    effectiveDepth = Math.min(
+      Math.max(maxSafeDepth, MIN_ENGRAVING_DEPTH_MM),
+      params.bottomThicknessMm - MIN_REMAINING_BOTTOM_MM,
+    );
   }
   if (effectiveDepth <= 0) {
     appendPipelineTrace(`[engraving] skipped: effective depth=${effectiveDepth.toFixed(3)}mm`);
@@ -344,7 +402,7 @@ function buildAdditiveTextGeometry(
   const compensatedScale = params.printSafeEngraving ? 1 / params.scale : 1;
   appendPipelineTrace(`[engraving] compensatedScale=${compensatedScale.toFixed(3)}`);
 
-  const merged = buildTextGeometry(font, seed, isSeedModified, compensatedScale);
+  const merged = buildTextGeometry(font, seed, isSeedModified, compensatedScale, params.printSafeEngraving);
   if (!merged) return null;
 
   merged.computeBoundingBox();
@@ -354,16 +412,9 @@ function buildAdditiveTextGeometry(
     return null;
   }
 
-  // Apply morphological offset for print-safe
   let offsetScale = 1;
   if (params.printSafeEngraving) {
-    offsetScale = 1 + OFFSET_DELTA_MM / (RAW_LINE_SIZES[0] * compensatedScale * 0.1); // approximate
-    merged.scale(offsetScale, offsetScale, 1);
-    merged.computeBoundingBox();
-    const newBounds = merged.boundingBox;
-    if (newBounds) {
-      appendPipelineTrace(`[engraving] applied offset scale=${offsetScale.toFixed(3)}, new bounds=${newBounds.getSize(new THREE.Vector3()).x.toFixed(3)}mm`);
-    }
+    appendPipelineTrace(`[engraving] applied polygon offset=${OFFSET_DELTA_MM.toFixed(3)}mm`);
   }
 
   const currentBounds = merged.boundingBox;
