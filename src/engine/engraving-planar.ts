@@ -5,6 +5,28 @@ const DEFAULT_PLANAR_PATCH_TOLERANCE_MM = 1e-4;
 const DEFAULT_PLANAR_SIMPLIFICATION_MM = 0.05;
 const DEFAULT_CLIPPER_SCALE = 1000;
 
+type ClipperShapeConstructor = new (
+  paths?: Array<Array<{ x: number; y: number }>>,
+  closed?: boolean,
+  capitalConversion?: boolean,
+  integerConversion?: boolean,
+  removeDuplicates?: boolean,
+) => ClipperShapeInstance;
+
+interface ClipperShapeInstance {
+  clean(cleanDelta: number): ClipperShapeInstance;
+  simplify(fillType: string): ClipperShapeInstance;
+  offset(offset: number, options?: unknown): ClipperShapeInstance;
+  separateShapes(): Array<{ mapToLower(): Array<Array<{ x: number; y: number }>> }>;
+}
+
+function getClipperShapeConstructor(): ClipperShapeConstructor {
+  const candidate = ClipperShape as unknown as {
+    default?: ClipperShapeConstructor;
+  } & ClipperShapeConstructor;
+  return typeof candidate.default === "function" ? candidate.default : candidate;
+}
+
 export interface PlanarPolygon {
   contour: THREE.Vector2[];
   holes: THREE.Vector2[][];
@@ -163,7 +185,8 @@ export function offsetPlanarPolygon(
   ];
 
   const cleanDelta = Math.max(1, Math.round(sanitizeToleranceMm * clipperScale));
-  const clipperShape = new ClipperShape(clipperPaths, true, true, true, true)
+  const ShapeConstructor = getClipperShapeConstructor();
+  const clipperShape = new ShapeConstructor(clipperPaths, true, true, true, true)
     .clean(cleanDelta)
     .simplify("pftNonZero");
 
@@ -177,8 +200,8 @@ export function offsetPlanarPolygon(
 
   const polygons = offsetShape
     .separateShapes()
-    .map((shape) => shape.mapToLower())
-    .map((paths) => {
+    .map((shape: { mapToLower(): Array<Array<{ x: number; y: number }>> }) => shape.mapToLower())
+    .map((paths: Array<Array<{ x: number; y: number }>>) => {
       const [outerPath, ...holePaths] = paths;
       if (!outerPath) return null;
 
@@ -190,8 +213,8 @@ export function offsetPlanarPolygon(
       }
 
       const holes = holePaths
-        .map((hole) => sanitizePlanarContour(clipperPathToContour(hole, clipperScale), sanitizeToleranceMm))
-        .filter((hole) => {
+        .map((hole: Array<{ x: number; y: number }>) => sanitizePlanarContour(clipperPathToContour(hole, clipperScale), sanitizeToleranceMm))
+        .filter((hole: THREE.Vector2[]) => {
           if (hole.length < 3 || !meetsMinimumFeature(hole, minFeatureMm)) {
             removedHoles += 1;
             return false;
@@ -201,7 +224,7 @@ export function offsetPlanarPolygon(
 
       return { contour, holes };
     })
-    .filter((polygonShape): polygonShape is PlanarPolygon => polygonShape !== null);
+    .filter((polygonShape: PlanarPolygon | null): polygonShape is PlanarPolygon => polygonShape !== null);
 
   return { polygons, removedContours, removedHoles };
 }
