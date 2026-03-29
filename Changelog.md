@@ -7,6 +7,12 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.23] - 2026-03-28
+
+### 🎨 Modifié
+ - correction gravure FDM robuste 
+ - rétablit le workflow deploy
+
 ## [1.0.22] - 2026-03-28
 
 ### 🎨 Modifié
