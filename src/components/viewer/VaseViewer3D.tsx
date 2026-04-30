@@ -15,12 +15,12 @@ import type { VaseParameters } from "../../engine/types";
 
 const ROTATE_SPEED = 0.05;
 const PREVIEW_TEXT_FIT_MARGIN_MM = 4;
-const PREVIEW_TEXT_WIDTH_FACTOR = 1.72;
-const PREVIEW_TEXT_HEIGHT_FACTOR = 0.88;
+const PREVIEW_TEXT_WIDTH_FACTOR = 1.9;
+const PREVIEW_TEXT_HEIGHT_FACTOR = 0.78;
 const PREVIEW_TEXT_CANVAS_WIDTH = 1536;
 const PREVIEW_TEXT_CANVAS_HEIGHT = 512;
 const PREVIEW_TEXT_Y_OFFSET = 0.08;
-const PREVIEW_TEXT_LINE_GAP_FACTOR = 0.1;
+const PREVIEW_TEXT_LINE_GAP_FACTOR = 0.08;
 const PREVIEW_TEXT_BASE_FONT_SIZES = [108, 96, 66] as const;
 
 function fitPreviewText(
@@ -75,7 +75,7 @@ function PreviewEngravingOverlay(
     context.fillStyle = "rgba(28,28,28,0.45)";
 
     const centerX = canvas.width / 2;
-    const targetWidth = canvas.width * 0.94;
+    const targetWidth = canvas.width * 0.98;
     const lineFontSizes = lines.map((line, index) =>
       fitPreviewText(
         context,
@@ -87,7 +87,7 @@ function PreviewEngravingOverlay(
     const totalHeight =
       lineFontSizes.reduce((sum, fontSize) => sum + fontSize, 0) +
       lineGap * Math.max(0, lineFontSizes.length - 1);
-    const maxHeight = canvas.height * 0.92;
+    const maxHeight = canvas.height * 0.82;
     const heightScale = totalHeight > maxHeight ? maxHeight / totalHeight : 1;
     const scaledLineFontSizes = lineFontSizes.map((fontSize) => fontSize * heightScale);
     const scaledGap = lineGap * heightScale;

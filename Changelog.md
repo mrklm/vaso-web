@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.27] - 2026-05-01
+
+### 🎨 Modifié
+ - Élargit davantage le texte du fond dans l’aperçu et la gravure
+
 ## [1.0.26] - 2026-05-01
 
 ### 🎨 Modifié
