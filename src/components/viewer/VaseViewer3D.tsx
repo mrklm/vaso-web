@@ -15,11 +15,25 @@ import type { VaseParameters } from "../../engine/types";
 
 const ROTATE_SPEED = 0.05;
 const PREVIEW_TEXT_FIT_MARGIN_MM = 4;
-const PREVIEW_TEXT_WIDTH_FACTOR = 1.45;
-const PREVIEW_TEXT_HEIGHT_FACTOR = 0.44;
+const PREVIEW_TEXT_WIDTH_FACTOR = 1.72;
+const PREVIEW_TEXT_HEIGHT_FACTOR = 0.62;
 const PREVIEW_TEXT_CANVAS_WIDTH = 1536;
 const PREVIEW_TEXT_CANVAS_HEIGHT = 512;
 const PREVIEW_TEXT_Y_OFFSET = 0.08;
+const PREVIEW_TEXT_LINE_GAP_FACTOR = 0.18;
+const PREVIEW_TEXT_BASE_FONT_SIZES = [108, 96, 82] as const;
+
+function fitPreviewText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  baseFontSize: number,
+  targetWidth: number,
+): number {
+  context.font = `700 ${baseFontSize}px Arial`;
+  const measuredWidth = context.measureText(text).width;
+  if (measuredWidth <= 0) return baseFontSize;
+  return (baseFontSize * targetWidth) / measuredWidth;
+}
 
 function computePreviewBottomFitRadius(params: VaseParameters): number {
   const bottomProfiles = [...params.profiles]
@@ -61,18 +75,37 @@ function PreviewEngravingOverlay(
     context.fillStyle = "rgba(28,28,28,0.45)";
 
     const centerX = canvas.width / 2;
-    const line1Y = canvas.height * 0.39;
-    const line2Y = canvas.height * 0.69;
+    const targetWidth = canvas.width * 0.9;
+    const lineFontSizes = lines.map((line, index) =>
+      fitPreviewText(
+        context,
+        line,
+        PREVIEW_TEXT_BASE_FONT_SIZES[index] ?? PREVIEW_TEXT_BASE_FONT_SIZES[PREVIEW_TEXT_BASE_FONT_SIZES.length - 1],
+        targetWidth,
+      ));
+    const lineGap = Math.max(20, Math.max(...lineFontSizes) * PREVIEW_TEXT_LINE_GAP_FACTOR);
+    const totalHeight =
+      lineFontSizes.reduce((sum, fontSize) => sum + fontSize, 0) +
+      lineGap * Math.max(0, lineFontSizes.length - 1);
+    const maxHeight = canvas.height * 0.78;
+    const heightScale = totalHeight > maxHeight ? maxHeight / totalHeight : 1;
+    const scaledLineFontSizes = lineFontSizes.map((fontSize) => fontSize * heightScale);
+    const scaledGap = lineGap * heightScale;
+    let currentY =
+      canvas.height * 0.5 -
+      (scaledLineFontSizes.reduce((sum, fontSize) => sum + fontSize, 0) +
+        scaledGap * Math.max(0, scaledLineFontSizes.length - 1)) *
+        0.5;
 
-    context.font = "700 108px Arial";
-    context.lineWidth = 10;
-    context.strokeText(lines[0], centerX, line1Y);
-    context.fillText(lines[0], centerX, line1Y);
-
-    context.font = "700 96px Arial";
-    context.lineWidth = 8;
-    context.strokeText(lines[1], centerX, line2Y);
-    context.fillText(lines[1], centerX, line2Y);
+    lines.forEach((line, index) => {
+      const fontSize = scaledLineFontSizes[index];
+      const lineCenterY = currentY + fontSize * 0.5;
+      context.font = `700 ${fontSize}px Arial`;
+      context.lineWidth = Math.max(4, fontSize * 0.09);
+      context.strokeText(line, centerX, lineCenterY);
+      context.fillText(line, centerX, lineCenterY);
+      currentY += fontSize + scaledGap;
+    });
 
     const nextTexture = new THREE.CanvasTexture(canvas);
     nextTexture.colorSpace = THREE.SRGBColorSpace;

@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.25] - 2026-05-01
+
+### 🎨 Modifié
+ - Agrandit la gravure du fond et ajoute la ligne centrée `K l m`
+
 ## [1.0.24] - 2026-03-28
 
 ### 🎨 Modifié

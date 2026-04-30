@@ -7,7 +7,7 @@ export function formatSeedLabel(seed: number, isSeedModified = false): string {
   return isSeedModified ? `${seedLabel}M` : seedLabel;
 }
 
-export function formatEngravingLines(seed: number, isSeedModified = false): readonly [string, string] {
+export function formatEngravingLines(seed: number, isSeedModified = false): readonly [string, string, string] {
   const version = `v${APP_VERSION}`;
-  return [`VASO ${version}`, formatSeedLabel(seed, isSeedModified)];
+  return [`VASO ${version}`, formatSeedLabel(seed, isSeedModified), "K l m"];
 }
