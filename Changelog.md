@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.30] - 2026-05-01
+
+### 🎨 Modifié
+ - Améliore la lisibilité du texte STL avec plus d’interligne et un K l m plus discret
+
 ## [1.0.29] - 2026-05-01
 
 ### 🎨 Modifié
