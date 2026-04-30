@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.32] - 2026-05-01
+
+### 🎨 Modifié
+ - Augmente légèrement la marge du texte du fond pour l’aérer visuellement
+
 ## [1.0.31] - 2026-05-01
 
 ### 🎨 Modifié

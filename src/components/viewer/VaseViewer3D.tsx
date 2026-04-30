@@ -24,7 +24,7 @@ const PREVIEW_TEXT_LINE_GAP_FACTOR = 0.55;
 const PREVIEW_TEXT_BASE_FONT_SIZES = [108, 96, 96] as const;
 const PREVIEW_TEXT_LINE_WIDTH_FACTORS = [0.98, 0.98] as const;
 const PREVIEW_TEXT_SIGNATURE_HEIGHT_FACTOR = 0.92;
-const PREVIEW_TEXT_SIDE_MARGIN_PX = 24;
+const PREVIEW_TEXT_SIDE_MARGIN_PX = 29;
 
 function fitPreviewText(
   context: CanvasRenderingContext2D,
