@@ -24,10 +24,11 @@ const GEOMETRY_WELD_TOLERANCE_MM = 1e-3;
 const PLANAR_PATCH_TOLERANCE_MM = 1e-4;
 const BOTTOM_FINISH_PLANE_TOLERANCE_MM = 5e-4;
 const ADDITIVE_TEXT_DEGENERATE_AREA_EPSILON_MM2 = 1e-12;
-const RAW_LINE_SIZES = [8.6, 7.8, 4.2] as const;
-const TEXT_LINE_WIDTH_FACTORS = [1.9, 1.9, 0.9] as const;
+const RAW_LINE_SIZES = [8.6, 7.8, 7.2] as const;
+const TEXT_LINE_WIDTH_FACTORS = [1.9, 1.9] as const;
+const TEXT_SIGNATURE_HEIGHT_FACTOR = 0.92;
 const TEXT_MAX_HEIGHT_FACTOR = 0.78;
-const TEXT_LINE_GAP_FACTOR = 0.5;
+const TEXT_LINE_GAP_FACTOR = 0.55;
 const TEXT_SIDE_MARGIN_MM = 1.2;
 const TEXT_CURVE_SEGMENTS = 10;
 const PLANAR_TEXT_SIMPLIFICATION_MM = 0.05;
@@ -257,11 +258,24 @@ function buildTextGeometry(
   };
 
   rawGeometries.forEach((geometry, index) => {
-    const widthFactor = TEXT_LINE_WIDTH_FACTORS[index] ?? TEXT_LINE_WIDTH_FACTORS[TEXT_LINE_WIDTH_FACTORS.length - 1];
+    const widthFactor = TEXT_LINE_WIDTH_FACTORS[index];
+    if (widthFactor === undefined) return;
     const targetLineWidth = fitRadius * widthFactor;
     const { width } = getLineSize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT);
     if (width > 0) {
       const scale = targetLineWidth / width;
+      geometry.scale(scale, scale, 1);
+    }
+  });
+
+  const referenceLineHeight =
+    getLineSize(rawGeometries[Math.min(1, rawGeometries.length - 1)], lineResults[Math.min(1, lineResults.length - 1)]?.rawSize ?? FONT_LINE_HEIGHT).height;
+  rawGeometries.forEach((geometry, index) => {
+    if (index < TEXT_LINE_WIDTH_FACTORS.length) return;
+    const { height } = getLineSize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT);
+    const targetHeight = referenceLineHeight * TEXT_SIGNATURE_HEIGHT_FACTOR;
+    if (height > 0 && targetHeight > 0) {
+      const scale = targetHeight / height;
       geometry.scale(scale, scale, 1);
     }
   });

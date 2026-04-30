@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.31] - 2026-05-01
+
+### 🎨 Modifié
+ - Ajuste le rendu STL de K l m pour le rendre plus discret et plus propre
+
 ## [1.0.30] - 2026-05-01
 
 ### 🎨 Modifié

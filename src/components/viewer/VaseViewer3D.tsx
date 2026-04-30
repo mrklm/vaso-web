@@ -20,9 +20,10 @@ const PREVIEW_TEXT_HEIGHT_FACTOR = 0.78;
 const PREVIEW_TEXT_CANVAS_WIDTH = 1536;
 const PREVIEW_TEXT_CANVAS_HEIGHT = 512;
 const PREVIEW_TEXT_Y_OFFSET = 0.08;
-const PREVIEW_TEXT_LINE_GAP_FACTOR = 0.5;
-const PREVIEW_TEXT_BASE_FONT_SIZES = [108, 96, 52] as const;
-const PREVIEW_TEXT_LINE_WIDTH_FACTORS = [0.98, 0.98, 0.48] as const;
+const PREVIEW_TEXT_LINE_GAP_FACTOR = 0.55;
+const PREVIEW_TEXT_BASE_FONT_SIZES = [108, 96, 96] as const;
+const PREVIEW_TEXT_LINE_WIDTH_FACTORS = [0.98, 0.98] as const;
+const PREVIEW_TEXT_SIGNATURE_HEIGHT_FACTOR = 0.92;
 const PREVIEW_TEXT_SIDE_MARGIN_PX = 24;
 
 function fitPreviewText(
@@ -77,13 +78,22 @@ function PreviewEngravingOverlay(
     context.fillStyle = "rgba(28,28,28,0.45)";
 
     const centerX = canvas.width / 2;
-    const lineFontSizes = lines.map((line, index) =>
-      fitPreviewText(
+    const lineFontSizes = lines.map((line, index) => {
+      const widthFactor = PREVIEW_TEXT_LINE_WIDTH_FACTORS[index];
+      if (widthFactor === undefined) {
+        return PREVIEW_TEXT_BASE_FONT_SIZES[index] ?? PREVIEW_TEXT_BASE_FONT_SIZES[PREVIEW_TEXT_BASE_FONT_SIZES.length - 1];
+      }
+      return fitPreviewText(
         context,
         line,
         PREVIEW_TEXT_BASE_FONT_SIZES[index] ?? PREVIEW_TEXT_BASE_FONT_SIZES[PREVIEW_TEXT_BASE_FONT_SIZES.length - 1],
-        canvas.width * (PREVIEW_TEXT_LINE_WIDTH_FACTORS[index] ?? PREVIEW_TEXT_LINE_WIDTH_FACTORS[PREVIEW_TEXT_LINE_WIDTH_FACTORS.length - 1]),
-      ));
+        canvas.width * widthFactor,
+      );
+    });
+    const referenceFontSize = lineFontSizes[Math.min(1, lineFontSizes.length - 1)] ?? PREVIEW_TEXT_BASE_FONT_SIZES[1];
+    for (let index = PREVIEW_TEXT_LINE_WIDTH_FACTORS.length; index < lineFontSizes.length; index += 1) {
+      lineFontSizes[index] = referenceFontSize * PREVIEW_TEXT_SIGNATURE_HEIGHT_FACTOR;
+    }
     const maxHeight = canvas.height * 0.82;
     const computeLayout = (fontSizes: number[]) => {
       const lineGap = Math.max(20, Math.max(...fontSizes) * PREVIEW_TEXT_LINE_GAP_FACTOR);
@@ -112,7 +122,9 @@ function PreviewEngravingOverlay(
       const dy = (firstLayout.lineCenters[index] ?? canvas.height * 0.5) - canvas.height * 0.5;
       const halfChordFactor = Math.sqrt(Math.max(0, 1 - (dy / previewRadiusY) ** 2));
       const baseWidth =
-        canvas.width * (PREVIEW_TEXT_LINE_WIDTH_FACTORS[index] ?? PREVIEW_TEXT_LINE_WIDTH_FACTORS[PREVIEW_TEXT_LINE_WIDTH_FACTORS.length - 1]);
+        canvas.width *
+        (PREVIEW_TEXT_LINE_WIDTH_FACTORS[index] ??
+          (PREVIEW_TEXT_LINE_WIDTH_FACTORS[PREVIEW_TEXT_LINE_WIDTH_FACTORS.length - 1] * 0.55));
       const allowedWidth = Math.max(0, baseWidth * halfChordFactor - PREVIEW_TEXT_SIDE_MARGIN_PX * 2);
       if (allowedWidth <= 0) return fontSize;
       context.font = `700 ${fontSize}px Arial`;
