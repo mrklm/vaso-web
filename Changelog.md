@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.28] - 2026-05-01
+
+### 🎨 Modifié
+ - Préserve un texte du fond réellement plus large dans l’aperçu et le STL
+
 ## [1.0.27] - 2026-05-01
 
 ### 🎨 Modifié

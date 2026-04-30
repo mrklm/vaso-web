@@ -88,23 +88,28 @@ function PreviewEngravingOverlay(
       lineFontSizes.reduce((sum, fontSize) => sum + fontSize, 0) +
       lineGap * Math.max(0, lineFontSizes.length - 1);
     const maxHeight = canvas.height * 0.82;
-    const heightScale = totalHeight > maxHeight ? maxHeight / totalHeight : 1;
-    const scaledLineFontSizes = lineFontSizes.map((fontSize) => fontSize * heightScale);
-    const scaledGap = lineGap * heightScale;
+    const yScale = totalHeight > maxHeight ? maxHeight / totalHeight : 1;
+    const scaledLineHeights = lineFontSizes.map((fontSize) => fontSize * yScale);
+    const scaledGap = lineGap * yScale;
     let currentY =
       canvas.height * 0.5 -
-      (scaledLineFontSizes.reduce((sum, fontSize) => sum + fontSize, 0) +
-        scaledGap * Math.max(0, scaledLineFontSizes.length - 1)) *
+      (scaledLineHeights.reduce((sum, fontSize) => sum + fontSize, 0) +
+        scaledGap * Math.max(0, scaledLineHeights.length - 1)) *
         0.5;
 
     lines.forEach((line, index) => {
-      const fontSize = scaledLineFontSizes[index];
-      const lineCenterY = currentY + fontSize * 0.5;
+      const fontSize = lineFontSizes[index];
+      const lineHeight = scaledLineHeights[index];
+      const lineCenterY = currentY + lineHeight * 0.5;
       context.font = `700 ${fontSize}px Arial`;
       context.lineWidth = Math.max(4, fontSize * 0.09);
-      context.strokeText(line, centerX, lineCenterY);
-      context.fillText(line, centerX, lineCenterY);
-      currentY += fontSize + scaledGap;
+      context.save();
+      context.translate(centerX, lineCenterY);
+      context.scale(1, yScale);
+      context.strokeText(line, 0, 0);
+      context.fillText(line, 0, 0);
+      context.restore();
+      currentY += lineHeight + scaledGap;
     });
 
     const nextTexture = new THREE.CanvasTexture(canvas);

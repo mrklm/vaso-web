@@ -290,8 +290,8 @@ function buildTextGeometry(
   const maxHeight = fitRadius * TEXT_MAX_HEIGHT_FACTOR;
   const size = bounds.getSize(new THREE.Vector3());
   if (size.y > maxHeight && size.y > 0) {
-    const scale = maxHeight / size.y;
-    merged.scale(scale, scale, 1);
+    const yScale = maxHeight / size.y;
+    merged.scale(1, yScale, 1);
     merged.computeBoundingBox();
   }
 
