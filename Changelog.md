@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.29] - 2026-05-01
+
+### 🎨 Modifié
+ - Évite la troncature du texte du fond tout en conservant sa largeur utile
+
 ## [1.0.28] - 2026-05-01
 
 ### 🎨 Modifié

@@ -22,6 +22,7 @@ const PREVIEW_TEXT_CANVAS_HEIGHT = 512;
 const PREVIEW_TEXT_Y_OFFSET = 0.08;
 const PREVIEW_TEXT_LINE_GAP_FACTOR = 0.08;
 const PREVIEW_TEXT_BASE_FONT_SIZES = [108, 96, 66] as const;
+const PREVIEW_TEXT_SIDE_MARGIN_PX = 24;
 
 function fitPreviewText(
   context: CanvasRenderingContext2D,
@@ -83,33 +84,54 @@ function PreviewEngravingOverlay(
         PREVIEW_TEXT_BASE_FONT_SIZES[index] ?? PREVIEW_TEXT_BASE_FONT_SIZES[PREVIEW_TEXT_BASE_FONT_SIZES.length - 1],
         targetWidth,
       ));
-    const lineGap = Math.max(20, Math.max(...lineFontSizes) * PREVIEW_TEXT_LINE_GAP_FACTOR);
-    const totalHeight =
-      lineFontSizes.reduce((sum, fontSize) => sum + fontSize, 0) +
-      lineGap * Math.max(0, lineFontSizes.length - 1);
     const maxHeight = canvas.height * 0.82;
-    const yScale = totalHeight > maxHeight ? maxHeight / totalHeight : 1;
-    const scaledLineHeights = lineFontSizes.map((fontSize) => fontSize * yScale);
-    const scaledGap = lineGap * yScale;
-    let currentY =
-      canvas.height * 0.5 -
-      (scaledLineHeights.reduce((sum, fontSize) => sum + fontSize, 0) +
-        scaledGap * Math.max(0, scaledLineHeights.length - 1)) *
-        0.5;
+    const computeLayout = (fontSizes: number[]) => {
+      const lineGap = Math.max(20, Math.max(...fontSizes) * PREVIEW_TEXT_LINE_GAP_FACTOR);
+      const totalHeight =
+        fontSizes.reduce((sum, fontSize) => sum + fontSize, 0) +
+        lineGap * Math.max(0, fontSizes.length - 1);
+      const yScale = totalHeight > maxHeight ? maxHeight / totalHeight : 1;
+      const scaledLineHeights = fontSizes.map((fontSize) => fontSize * yScale);
+      const scaledGap = lineGap * yScale;
+      let currentY =
+        canvas.height * 0.5 -
+        (scaledLineHeights.reduce((sum, fontSize) => sum + fontSize, 0) +
+          scaledGap * Math.max(0, scaledLineHeights.length - 1)) *
+          0.5;
+      const lineCenters = scaledLineHeights.map((lineHeight) => {
+        const centerY = currentY + lineHeight * 0.5;
+        currentY += lineHeight + scaledGap;
+        return centerY;
+      });
+      return { lineGap, yScale, scaledLineHeights, scaledGap, lineCenters };
+    };
+
+    const firstLayout = computeLayout(lineFontSizes);
+    const previewRadiusY = maxHeight * 0.5;
+    const safeFontSizes = lineFontSizes.map((fontSize, index) => {
+      const dy = (firstLayout.lineCenters[index] ?? canvas.height * 0.5) - canvas.height * 0.5;
+      const halfChordFactor = Math.sqrt(Math.max(0, 1 - (dy / previewRadiusY) ** 2));
+      const allowedWidth = Math.max(0, targetWidth * halfChordFactor - PREVIEW_TEXT_SIDE_MARGIN_PX * 2);
+      if (allowedWidth <= 0) return fontSize;
+      context.font = `700 ${fontSize}px Arial`;
+      const measuredWidth = context.measureText(lines[index]).width;
+      if (measuredWidth <= 0 || measuredWidth <= allowedWidth) return fontSize;
+      return fontSize * (allowedWidth / measuredWidth);
+    });
+
+    const finalLayout = computeLayout(safeFontSizes);
 
     lines.forEach((line, index) => {
-      const fontSize = lineFontSizes[index];
-      const lineHeight = scaledLineHeights[index];
-      const lineCenterY = currentY + lineHeight * 0.5;
+      const fontSize = safeFontSizes[index];
+      const lineCenterY = finalLayout.lineCenters[index];
       context.font = `700 ${fontSize}px Arial`;
       context.lineWidth = Math.max(4, fontSize * 0.09);
       context.save();
       context.translate(centerX, lineCenterY);
-      context.scale(1, yScale);
+      context.scale(1, finalLayout.yScale);
       context.strokeText(line, 0, 0);
       context.fillText(line, 0, 0);
       context.restore();
-      currentY += lineHeight + scaledGap;
     });
 
     const nextTexture = new THREE.CanvasTexture(canvas);

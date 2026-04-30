@@ -28,6 +28,7 @@ const RAW_LINE_SIZES = [8.6, 7.8, 5.4] as const;
 const TEXT_LINE_WIDTH_FACTOR = 1.9;
 const TEXT_MAX_HEIGHT_FACTOR = 0.78;
 const TEXT_LINE_GAP_FACTOR = 0.08;
+const TEXT_SIDE_MARGIN_MM = 1.2;
 const TEXT_CURVE_SEGMENTS = 10;
 const PLANAR_TEXT_SIMPLIFICATION_MM = 0.05;
 
@@ -229,51 +230,71 @@ function buildTextGeometry(
   printSafe = false,
 ): THREE.BufferGeometry | null {
   const lines = formatEngravingLines(seed, isSeedModified);
-  const lineResults = lines.map((line, index) =>
-    buildPrintableLineGeometry(
+  const lineResults = lines.map((line, index) => ({
+    geometry: buildPrintableLineGeometry(
       font,
       line,
       RAW_LINE_SIZES[index] ?? RAW_LINE_SIZES[RAW_LINE_SIZES.length - 1],
       printSafeScale,
       printSafe,
-    ));
+    ),
+    rawSize: RAW_LINE_SIZES[index] ?? RAW_LINE_SIZES[RAW_LINE_SIZES.length - 1],
+  }));
   const rawGeometries = lineResults
-    .map((result) => result.geometry)
+    .map((result) => result.geometry.geometry)
     .filter((geometry): geometry is THREE.BufferGeometry => geometry !== null);
-  const removedContours = lineResults.reduce((sum, result) => sum + result.removedContours, 0);
-  const removedHoles = lineResults.reduce((sum, result) => sum + result.removedHoles, 0);
+  const removedContours = lineResults.reduce((sum, result) => sum + result.geometry.removedContours, 0);
+  const removedHoles = lineResults.reduce((sum, result) => sum + result.geometry.removedHoles, 0);
   appendPipelineTrace(`[engraving] removed contours=${removedContours},removed holes=${removedHoles}`);
   if (rawGeometries.length === 0) return null;
 
   const targetLineWidth = fitRadius * TEXT_LINE_WIDTH_FACTOR;
-  const lineHeights: number[] = [];
-
-  rawGeometries.forEach((geometry, index) => {
+  const getLineSize = (geometry: THREE.BufferGeometry, fallbackSize: number) => {
     geometry.computeBoundingBox();
     const bounds = geometry.boundingBox;
-    if (!bounds) return;
+    if (!bounds) return { width: fallbackSize, height: fallbackSize };
     const size = bounds.getSize(new THREE.Vector3());
-    if (size.x > 0) {
-      const scale = targetLineWidth / size.x;
+    return { width: size.x, height: size.y };
+  };
+
+  rawGeometries.forEach((geometry, index) => {
+    const { width } = getLineSize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT);
+    if (width > 0) {
+      const scale = targetLineWidth / width;
       geometry.scale(scale, scale, 1);
-      geometry.computeBoundingBox();
     }
-    const scaledBounds = geometry.boundingBox;
-    const fallbackSize = RAW_LINE_SIZES[index] ?? RAW_LINE_SIZES[RAW_LINE_SIZES.length - 1];
-    const scaledHeight = scaledBounds ? scaledBounds.max.y - scaledBounds.min.y : fallbackSize;
-    lineHeights.push(scaledHeight);
   });
 
-  const maxLineHeight = lineHeights.length > 0 ? Math.max(...lineHeights) : FONT_LINE_HEIGHT;
-  const lineGap = Math.max(0.8, maxLineHeight * TEXT_LINE_GAP_FACTOR);
-  const totalHeight = lineHeights.reduce((sum, height) => sum + height, 0) + lineGap * Math.max(0, lineHeights.length - 1);
+  const computeLayout = () => {
+    const lineHeights = rawGeometries.map((geometry, index) =>
+      getLineSize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT).height);
+    const maxLineHeight = lineHeights.length > 0 ? Math.max(...lineHeights) : FONT_LINE_HEIGHT;
+    const lineGap = Math.max(0.8, maxLineHeight * TEXT_LINE_GAP_FACTOR);
+    const totalHeight = lineHeights.reduce((sum, height) => sum + height, 0) + lineGap * Math.max(0, lineHeights.length - 1);
+    let currentTop = totalHeight * 0.5;
+    const lineCenters = lineHeights.map((lineHeight) => {
+      const centerY = currentTop - lineHeight * 0.5;
+      currentTop -= lineHeight + lineGap;
+      return centerY;
+    });
+    return { lineCenters };
+  };
 
-  let currentTop = totalHeight * 0.5;
+  const firstLayout = computeLayout();
   rawGeometries.forEach((geometry, index) => {
-    const lineHeight = lineHeights[index] ?? maxLineHeight;
-    const centerY = currentTop - lineHeight * 0.5;
-    geometry.translate(0, centerY, 0);
-    currentTop -= lineHeight + lineGap;
+    const centerY = firstLayout.lineCenters[index] ?? 0;
+    const { width } = getLineSize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT);
+    const halfChord = Math.sqrt(Math.max(0, fitRadius * fitRadius - centerY * centerY));
+    const allowedWidth = Math.max(0, halfChord * 2 - TEXT_SIDE_MARGIN_MM * 2);
+    if (width > 0 && allowedWidth > 0 && width > allowedWidth) {
+      const scale = allowedWidth / width;
+      geometry.scale(scale, scale, 1);
+    }
+  });
+
+  const finalLayout = computeLayout();
+  rawGeometries.forEach((geometry, index) => {
+    geometry.translate(0, finalLayout.lineCenters[index] ?? 0, 0);
   });
 
   const merged = mergeGeometries(rawGeometries, false);
