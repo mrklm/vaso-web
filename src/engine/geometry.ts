@@ -1,5 +1,8 @@
 import type { Profile } from "./types";
 
+const SEAM_BACK_ANGLE_RAD = -Math.PI / 2;
+const FACETED_SEAM_SIDES_THRESHOLD = 12;
+
 /**
  * Generate vertices of a regular polygon for a given profile.
  * Returns Nx2 array as flat pairs [x0,y0, x1,y1, ...].
@@ -82,12 +85,74 @@ export function resampleClosedContour(vertices: Float64Array, samples: number): 
   return result;
 }
 
+function normalizedAngularDistance(a: number, b: number): number {
+  const diff = Math.atan2(Math.sin(a - b), Math.cos(a - b));
+  return Math.abs(diff);
+}
+
+function computeSeamTargetPoint(vertices: Float64Array, profile: Profile): { x: number; y: number } {
+  const n = vertices.length / 2;
+  const preferEdge = profile.sides <= FACETED_SEAM_SIDES_THRESHOLD;
+  let bestScore = Number.POSITIVE_INFINITY;
+  let bestX = vertices[0];
+  let bestY = vertices[1];
+
+  for (let i = 0; i < n; i++) {
+    const ax = vertices[i * 2];
+    const ay = vertices[i * 2 + 1];
+    const ni = (i + 1) % n;
+    const bx = vertices[ni * 2];
+    const by = vertices[ni * 2 + 1];
+
+    const sampleX = preferEdge ? (ax + bx) * 0.5 : ax;
+    const sampleY = preferEdge ? (ay + by) * 0.5 : ay;
+    const angle = Math.atan2(sampleY - profile.offsetY, sampleX - profile.offsetX);
+    const score = normalizedAngularDistance(angle, SEAM_BACK_ANGLE_RAD);
+
+    if (score < bestScore) {
+      bestScore = score;
+      bestX = sampleX;
+      bestY = sampleY;
+    }
+  }
+
+  return { x: bestX, y: bestY };
+}
+
+function rotateContourToNearestPoint(contour: Float64Array, targetX: number, targetY: number): Float64Array {
+  const n = contour.length / 2;
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < n; i++) {
+    const dx = contour[i * 2] - targetX;
+    const dy = contour[i * 2 + 1] - targetY;
+    const distance = dx * dx + dy * dy;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = i;
+    }
+  }
+
+  if (bestIndex === 0) return contour;
+
+  const result = new Float64Array(contour.length);
+  for (let i = 0; i < n; i++) {
+    const src = (bestIndex + i) % n;
+    result[i * 2] = contour[src * 2];
+    result[i * 2 + 1] = contour[src * 2 + 1];
+  }
+  return result;
+}
+
 /**
  * Build a resampled contour for a profile.
  */
 export function buildProfileContour(profile: Profile, samples: number): Float64Array {
   const polygon = regularPolygonVertices(profile);
-  return resampleClosedContour(polygon, samples);
+  const contour = resampleClosedContour(polygon, samples);
+  const seamTarget = computeSeamTargetPoint(polygon, profile);
+  return rotateContourToNearestPoint(contour, seamTarget.x, seamTarget.y);
 }
 
 /**

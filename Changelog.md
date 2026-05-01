@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.34] - 2026-05-01
+
+### 🎨 Modifié
+ - Repositionne la couture du maillage pour la rendre moins visible
+
 ## [1.0.33] - 2026-05-01
 
 ### 🎨 Modifié
