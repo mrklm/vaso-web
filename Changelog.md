@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.33] - 2026-05-01
+
+### 🎨 Modifié
+ - Corrige le nom des exports STL pour inclure la seed et la date
+
 ## [1.0.32] - 2026-05-01
 
 ### 🎨 Modifié

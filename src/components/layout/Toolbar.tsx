@@ -35,6 +35,11 @@ function buildScreenshotFilename(seed: number): string {
   return `vaso_v${APP_VERSION}_${seedLabel}_${formatCompactDate()}.png`;
 }
 
+function buildStlFilename(seed: number, isSeedModified: boolean): string {
+  const seedLabel = formatSeedLabel(seed, isSeedModified);
+  return `vaso_v${APP_VERSION}_${seedLabel}_${formatCompactDate()}.stl`;
+}
+
 async function loadImage(src: string): Promise<HTMLImageElement | null> {
   const image = new Image();
   image.decoding = "sync";
@@ -72,8 +77,7 @@ export function Toolbar() {
         validateParamsAgainstBuildVolume(params, activePrinter);
       }
       const mesh = await generateVaseMeshWithEngraving(params, seed, showSeedModified);
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
-      await exportSTL(mesh, `vaso_export_${timestamp}.stl`);
+      await exportSTL(mesh, buildStlFilename(seed, showSeedModified));
       toast.success("STL exporte !");
     } catch (e) {
       toast.error(`Erreur: ${e instanceof Error ? e.message : e}`);

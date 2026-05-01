@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  saveSTL: (buffer) => ipcRenderer.invoke('save-stl', buffer),
+  saveSTL: (buffer, filename) => ipcRenderer.invoke('save-stl', buffer, filename),
   isElectron: true,
 });

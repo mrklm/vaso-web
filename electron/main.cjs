@@ -31,10 +31,10 @@ function createWindow() {
 }
 
 // IPC: Native file save dialog for STL export
-ipcMain.handle('save-stl', async (_event, buffer) => {
+ipcMain.handle('save-stl', async (_event, buffer, filename) => {
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: 'Exporter STL',
-    defaultPath: `vaso_export_${Date.now()}.stl`,
+    defaultPath: filename || `vaso_export_${Date.now()}.stl`,
     filters: [{ name: 'STL Files', extensions: ['stl'] }],
   });
 

@@ -133,7 +133,7 @@ export async function exportSTL(mesh: MeshData, filename = "vaso_export.stl"): P
 
   // Electron: native save dialog
   if (window.electronAPI?.isElectron) {
-    const result = await window.electronAPI.saveSTL(buffer);
+    const result = await window.electronAPI.saveSTL(buffer, filename);
     if (!result.success && result.error) {
       throw new Error(result.error);
     }
