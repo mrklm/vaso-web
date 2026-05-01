@@ -2,6 +2,7 @@ import type { Profile } from "./types";
 
 const SEAM_BACK_ANGLE_RAD = -Math.PI / 2;
 const FACETED_SEAM_SIDES_THRESHOLD = 12;
+const SEAM_SWITCH_MIN_IMPROVEMENT_MM = 0.35;
 
 /**
  * Generate vertices of a regular polygon for a given profile.
@@ -149,10 +150,7 @@ export function alignContourToPrevious(contour: Float64Array, previousContour: F
   const n = contour.length / 2;
   if (n === 0 || previousContour.length !== contour.length) return contour;
 
-  let bestShift = 0;
-  let bestScore = Number.POSITIVE_INFINITY;
-
-  for (let shift = 0; shift < n; shift++) {
+  const scoreShift = (shift: number): number => {
     let score = 0;
     for (let i = 0; i < n; i++) {
       const prevX = previousContour[i * 2];
@@ -162,7 +160,15 @@ export function alignContourToPrevious(contour: Float64Array, previousContour: F
       const dy = contour[src * 2 + 1] - prevY;
       score += dx * dx + dy * dy;
     }
+    return score / n;
+  };
 
+  const zeroShiftScore = scoreShift(0);
+  let bestShift = 0;
+  let bestScore = zeroShiftScore;
+
+  for (let shift = 1; shift < n; shift++) {
+    const score = scoreShift(shift);
     if (score < bestScore) {
       bestScore = score;
       bestShift = shift;
@@ -170,6 +176,11 @@ export function alignContourToPrevious(contour: Float64Array, previousContour: F
   }
 
   if (bestShift === 0) return contour;
+
+  const improvement = Math.sqrt(Math.max(0, zeroShiftScore)) - Math.sqrt(Math.max(0, bestScore));
+  if (improvement < SEAM_SWITCH_MIN_IMPROVEMENT_MM) {
+    return contour;
+  }
 
   const result = new Float64Array(contour.length);
   for (let i = 0; i < n; i++) {

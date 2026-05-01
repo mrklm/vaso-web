@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.36] - 2026-05-01
+
+### 🎨 Modifié
+ - Ajoute une hysteresis de couture pour limiter les bascules entre arretes voisines
+
 ## [1.0.35] - 2026-05-01
 
 ### 🎨 Modifié

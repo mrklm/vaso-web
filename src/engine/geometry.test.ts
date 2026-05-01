@@ -147,4 +147,18 @@ describe("alignContourToPrevious", () => {
 
     expect(Array.from(aligned)).toEqual(Array.from(previous));
   });
+
+  it("keeps shift 0 when an alternative alignment is only marginally better", () => {
+    const previous = new Float64Array([0, 0, 10, 0, 10, 10, 0, 10]);
+    const contour = new Float64Array([
+      0.4, 0,
+      10.4, 0,
+      10.4, 10,
+      0.4, 10,
+    ]);
+
+    const aligned = alignContourToPrevious(contour, previous);
+
+    expect(Array.from(aligned)).toEqual(Array.from(contour));
+  });
 });
