@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.39] - 2026-05-01
+
+### 🎨 Modifié
+ - Aligne le resampling sur la couture pour reduire les petits artefacts locaux
+
 ## [1.0.38] - 2026-05-01
 
 ### 🎨 Modifié
