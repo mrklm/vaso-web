@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.35] - 2026-05-01
+
+### 🎨 Modifié
+ - Stabilise la couture du maillage entre les couches pour limiter les residus verticaux
+
 ## [1.0.34] - 2026-05-01
 
 ### 🎨 Modifié

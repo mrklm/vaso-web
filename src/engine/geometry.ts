@@ -145,6 +145,41 @@ function rotateContourToNearestPoint(contour: Float64Array, targetX: number, tar
   return result;
 }
 
+export function alignContourToPrevious(contour: Float64Array, previousContour: Float64Array): Float64Array {
+  const n = contour.length / 2;
+  if (n === 0 || previousContour.length !== contour.length) return contour;
+
+  let bestShift = 0;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (let shift = 0; shift < n; shift++) {
+    let score = 0;
+    for (let i = 0; i < n; i++) {
+      const prevX = previousContour[i * 2];
+      const prevY = previousContour[i * 2 + 1];
+      const src = (shift + i) % n;
+      const dx = contour[src * 2] - prevX;
+      const dy = contour[src * 2 + 1] - prevY;
+      score += dx * dx + dy * dy;
+    }
+
+    if (score < bestScore) {
+      bestScore = score;
+      bestShift = shift;
+    }
+  }
+
+  if (bestShift === 0) return contour;
+
+  const result = new Float64Array(contour.length);
+  for (let i = 0; i < n; i++) {
+    const src = (bestShift + i) % n;
+    result[i * 2] = contour[src * 2];
+    result[i * 2 + 1] = contour[src * 2 + 1];
+  }
+  return result;
+}
+
 /**
  * Build a resampled contour for a profile.
  */

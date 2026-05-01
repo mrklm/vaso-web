@@ -1,7 +1,7 @@
 import type { VaseParameters, MeshData } from "./types";
 import { appendPipelineTrace, dumpPipelineTrace, getPipelineTrace, resetPipelineTrace } from "./pipeline-trace";
 import { validateParams } from "./validation";
-import { buildProfileContour, interpolateContours } from "./geometry";
+import { alignContourToPrevious, buildProfileContour, interpolateContours } from "./geometry";
 import { applyTexture } from "./textures";
 import {
   maxSupportlessRadialStep,
@@ -74,6 +74,7 @@ function generateSupportSafeOuterContours(
     let contour = interpolatedOuterContour(params, zMm);
 
     if (previous !== null && previousZ !== null) {
+      contour = alignContourToPrevious(contour, previous);
       const dz = Math.abs(zMm - previousZ);
       const maxStep = maxSupportlessRadialStep(dz);
       contour = limitContourStepFromPrevious(previous, contour, maxStep, params.wallThicknessMm);

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  alignContourToPrevious,
   regularPolygonVertices,
   resampleClosedContour,
   buildProfileContour,
@@ -134,5 +135,16 @@ describe("interpolateContours", () => {
     const result = interpolateContours(c1, c2, 0.5);
     expect(result[0]).toBeCloseTo(5);
     expect(result[2]).toBeCloseTo(15);
+  });
+});
+
+describe("alignContourToPrevious", () => {
+  it("realigns a cyclically shifted contour to the previous one", () => {
+    const previous = new Float64Array([0, 0, 1, 0, 1, 1, 0, 1]);
+    const shifted = new Float64Array([1, 0, 1, 1, 0, 1, 0, 0]);
+
+    const aligned = alignContourToPrevious(shifted, previous);
+
+    expect(Array.from(aligned)).toEqual(Array.from(previous));
   });
 });
