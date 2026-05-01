@@ -3,6 +3,11 @@ import type { Profile } from "./types";
 const SEAM_BACK_ANGLE_RAD = -Math.PI / 2;
 const SEAM_SWITCH_MIN_IMPROVEMENT_MM = 0.35;
 
+export interface ContourAlignmentOptions {
+  maxShift?: number;
+  minImprovementMm?: number;
+}
+
 /**
  * Generate vertices of a regular polygon for a given profile.
  * Returns Nx2 array as flat pairs [x0,y0, x1,y1, ...].
@@ -135,16 +140,22 @@ function computeSeamTargetDistance(vertices: Float64Array, profile: Profile): nu
   return bestDistance;
 }
 
-export function alignContourToPrevious(contour: Float64Array, previousContour: Float64Array): Float64Array {
+export function alignContourToPrevious(
+  contour: Float64Array,
+  previousContour: Float64Array,
+  options: ContourAlignmentOptions = {},
+): Float64Array {
   const n = contour.length / 2;
   if (n === 0 || previousContour.length !== contour.length) return contour;
+  const maxShift = Math.max(0, Math.min(n - 1, options.maxShift ?? n - 1));
+  const minImprovementMm = options.minImprovementMm ?? SEAM_SWITCH_MIN_IMPROVEMENT_MM;
 
   const scoreShift = (shift: number): number => {
     let score = 0;
     for (let i = 0; i < n; i++) {
       const prevX = previousContour[i * 2];
       const prevY = previousContour[i * 2 + 1];
-      const src = (shift + i) % n;
+      const src = ((shift + i) % n + n) % n;
       const dx = contour[src * 2] - prevX;
       const dy = contour[src * 2 + 1] - prevY;
       score += dx * dx + dy * dy;
@@ -156,7 +167,8 @@ export function alignContourToPrevious(contour: Float64Array, previousContour: F
   let bestShift = 0;
   let bestScore = zeroShiftScore;
 
-  for (let shift = 1; shift < n; shift++) {
+  for (let shift = -maxShift; shift <= maxShift; shift++) {
+    if (shift === 0) continue;
     const score = scoreShift(shift);
     if (score < bestScore) {
       bestScore = score;
@@ -167,13 +179,13 @@ export function alignContourToPrevious(contour: Float64Array, previousContour: F
   if (bestShift === 0) return contour;
 
   const improvement = Math.sqrt(Math.max(0, zeroShiftScore)) - Math.sqrt(Math.max(0, bestScore));
-  if (improvement < SEAM_SWITCH_MIN_IMPROVEMENT_MM) {
+  if (improvement < minImprovementMm) {
     return contour;
   }
 
   const result = new Float64Array(contour.length);
   for (let i = 0; i < n; i++) {
-    const src = (bestShift + i) % n;
+    const src = ((bestShift + i) % n + n) % n;
     result[i * 2] = contour[src * 2];
     result[i * 2 + 1] = contour[src * 2 + 1];
   }

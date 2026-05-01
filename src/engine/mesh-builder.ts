@@ -12,6 +12,15 @@ import { getMeshDifferenceDiagnostics, logMeshDiagnostics } from "./mesh-cleanup
 
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
 const ENGRAVING_PIPELINE_MARKER = `Vaso Engraving ${APP_VERSION}`;
+const TEXTURED_SEAM_MAX_SHIFT = 3;
+
+function hasActiveTexture(params: VaseParameters): boolean {
+  if (params.textureMode === "Pas de texture") return false;
+  if (params.textureMode === "Double texture") {
+    return params.textureType !== "Aucune" || params.textureType2 !== "Aucune";
+  }
+  return params.textureType !== "Aucune";
+}
 
 function linspace(start: number, end: number, count: number): Float64Array {
   const result = new Float64Array(count);
@@ -68,13 +77,18 @@ function generateSupportSafeOuterContours(
   const contours: Float64Array[] = [];
   let previous: Float64Array | null = null;
   let previousZ: number | null = null;
+  const texturedSeam = hasActiveTexture(params);
 
   for (let i = 0; i < zValues.length; i++) {
     const zMm = zValues[i];
     let contour = interpolatedOuterContour(params, zMm);
 
     if (previous !== null && previousZ !== null) {
-      contour = alignContourToPrevious(contour, previous);
+      contour = alignContourToPrevious(
+        contour,
+        previous,
+        texturedSeam ? { maxShift: TEXTURED_SEAM_MAX_SHIFT } : undefined,
+      );
       const dz = Math.abs(zMm - previousZ);
       const maxStep = maxSupportlessRadialStep(dz);
       contour = limitContourStepFromPrevious(previous, contour, maxStep, params.wallThicknessMm);

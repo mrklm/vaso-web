@@ -161,4 +161,14 @@ describe("alignContourToPrevious", () => {
 
     expect(Array.from(aligned)).toEqual(Array.from(contour));
   });
+
+  it("limits seam drift to a local neighborhood when requested", () => {
+    const previous = new Float64Array([0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0]);
+    const shifted = new Float64Array([4, 0, 5, 0, 0, 0, 1, 0, 2, 0, 3, 0]);
+
+    const aligned = alignContourToPrevious(shifted, previous, { maxShift: 1, minImprovementMm: 0 });
+
+    expect(Array.from(aligned)).not.toEqual(Array.from(previous));
+    expect(Array.from(aligned)).toEqual([5, 0, 0, 0, 1, 0, 2, 0, 3, 0, 4, 0]);
+  });
 });
