@@ -99,8 +99,10 @@ function computeSeamTargetPoint(vertices: Float64Array, profile: Profile): { x: 
   for (let i = 0; i < n; i++) {
     const ax = vertices[i * 2];
     const ay = vertices[i * 2 + 1];
-    const sampleX = ax;
-    const sampleY = ay;
+    const bx = vertices[((i + 1) % n) * 2];
+    const by = vertices[((i + 1) % n) * 2 + 1];
+    const sampleX = (ax + bx) * 0.5;
+    const sampleY = (ay + by) * 0.5;
     const angle = Math.atan2(sampleY - profile.offsetY, sampleX - profile.offsetX);
     const score = normalizedAngularDistance(angle, SEAM_BACK_ANGLE_RAD);
 

@@ -91,7 +91,7 @@ describe("buildProfileContour", () => {
     expect(contour.length).toBe(96); // 48 × 2
   });
 
-  it("places the seam on a stable back vertex for faceted profiles", () => {
+  it("places the seam near the middle of a stable back edge for faceted profiles", () => {
     const profile = createProfile({ zRatio: 0, diameter: 80, sides: 6, rotationDeg: 0 });
     const contour = buildProfileContour(profile, 48);
     const x = contour[0];

@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.38] - 2026-05-01
+
+### 🎨 Modifié
+ - Retablit une couture plus stable en revenant a un ancrage au milieu d'arrete
+
 ## [1.0.37] - 2026-05-01
 
 ### 🎨 Modifié
