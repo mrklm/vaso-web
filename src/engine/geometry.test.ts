@@ -91,14 +91,14 @@ describe("buildProfileContour", () => {
     expect(contour.length).toBe(96); // 48 × 2
   });
 
-  it("places the seam on a back edge for faceted profiles", () => {
+  it("places the seam on a stable back vertex for faceted profiles", () => {
     const profile = createProfile({ zRatio: 0, diameter: 80, sides: 6, rotationDeg: 0 });
     const contour = buildProfileContour(profile, 48);
     const x = contour[0];
     const y = contour[1];
+    const angle = Math.atan2(y, x);
 
-    expect(Math.abs(x)).toBeLessThan(5);
-    expect(y).toBeLessThan(-30);
+    expect(Math.abs(angle + Math.PI / 2)).toBeLessThan(0.6);
   });
 
   it("keeps the seam at a stable back angle for rounder profiles", () => {

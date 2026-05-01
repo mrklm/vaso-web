@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.37] - 2026-05-01
+
+### 🎨 Modifié
+ - Ancre la couture sur un sommet d'arrete stable pour reduire les artefacts locaux
+
 ## [1.0.36] - 2026-05-01
 
 ### 🎨 Modifié

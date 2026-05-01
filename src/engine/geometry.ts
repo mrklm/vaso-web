@@ -1,7 +1,6 @@
 import type { Profile } from "./types";
 
 const SEAM_BACK_ANGLE_RAD = -Math.PI / 2;
-const FACETED_SEAM_SIDES_THRESHOLD = 12;
 const SEAM_SWITCH_MIN_IMPROVEMENT_MM = 0.35;
 
 /**
@@ -93,7 +92,6 @@ function normalizedAngularDistance(a: number, b: number): number {
 
 function computeSeamTargetPoint(vertices: Float64Array, profile: Profile): { x: number; y: number } {
   const n = vertices.length / 2;
-  const preferEdge = profile.sides <= FACETED_SEAM_SIDES_THRESHOLD;
   let bestScore = Number.POSITIVE_INFINITY;
   let bestX = vertices[0];
   let bestY = vertices[1];
@@ -101,12 +99,8 @@ function computeSeamTargetPoint(vertices: Float64Array, profile: Profile): { x: 
   for (let i = 0; i < n; i++) {
     const ax = vertices[i * 2];
     const ay = vertices[i * 2 + 1];
-    const ni = (i + 1) % n;
-    const bx = vertices[ni * 2];
-    const by = vertices[ni * 2 + 1];
-
-    const sampleX = preferEdge ? (ax + bx) * 0.5 : ax;
-    const sampleY = preferEdge ? (ay + by) * 0.5 : ay;
+    const sampleX = ax;
+    const sampleY = ay;
     const angle = Math.atan2(sampleY - profile.offsetY, sampleX - profile.offsetX);
     const score = normalizedAngularDistance(angle, SEAM_BACK_ANGLE_RAD);
 
