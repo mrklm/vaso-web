@@ -1,7 +1,7 @@
 import type { VaseParameters, MeshData } from "./types";
 import { appendPipelineTrace, dumpPipelineTrace, getPipelineTrace, resetPipelineTrace } from "./pipeline-trace";
 import { validateParams } from "./validation";
-import { alignContourToPrevious, buildProfileContour, interpolateContours } from "./geometry";
+import { alignContourToPrevious, buildProfileContour, interpolateContours, rotateContour } from "./geometry";
 import { applyTexture } from "./textures";
 import {
   maxSupportlessRadialStep,
@@ -13,40 +13,86 @@ import { getMeshDifferenceDiagnostics, logMeshDiagnostics } from "./mesh-cleanup
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
 const ENGRAVING_PIPELINE_MARKER = `Vaso Engraving ${APP_VERSION}`;
 const TEXTURED_SEAM_MAX_SHIFT = 6;
-const TEXTURED_SEAM_MIN_IMPROVEMENT_MM = 0.05;
+const TEXTURED_SEAM_SWITCH_THRESHOLD = 0.03;
 
 function wrapIndex(index: number, size: number): number {
   return ((index % size) + size) % size;
 }
 
-function buildTexturedSeamShiftScorer(contour: Float64Array): (shift: number) => number {
+function computeTexturedSeamShiftScore(
+  contour: Float64Array,
+  previousContour: Float64Array,
+  shift: number,
+): number {
   const n = contour.length / 2;
-  const radii = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
-    const x = contour[i * 2];
-    const y = contour[i * 2 + 1];
-    radii[i] = Math.hypot(x, y);
+  const center = wrapIndex(shift, n);
+  const prev = wrapIndex(center - 1, n);
+  const next = wrapIndex(center + 1, n);
+
+  const centerX = contour[center * 2];
+  const centerY = contour[center * 2 + 1];
+  const prevX = contour[prev * 2];
+  const prevY = contour[prev * 2 + 1];
+  const nextX = contour[next * 2];
+  const nextY = contour[next * 2 + 1];
+
+  const seamDx = centerX - previousContour[0];
+  const seamDy = centerY - previousContour[1];
+  const continuityPenalty = seamDx * seamDx + seamDy * seamDy;
+
+  const prevSeamTx = previousContour[2] - previousContour[(n - 1) * 2];
+  const prevSeamTy = previousContour[3] - previousContour[(n - 1) * 2 + 1];
+  const seamTx = nextX - prevX;
+  const seamTy = nextY - prevY;
+  const tangentDx = seamTx - prevSeamTx;
+  const tangentDy = seamTy - prevSeamTy;
+  const tangentPenalty = 0.2 * (tangentDx * tangentDx + tangentDy * tangentDy);
+
+  const centerRadius = Math.hypot(centerX, centerY);
+  const prevRadius = Math.hypot(prevX, prevY);
+  const nextRadius = Math.hypot(nextX, nextY);
+  const localMeanRadius = (prevRadius + centerRadius + nextRadius) / 3;
+  const localMinRadius = Math.min(prevRadius, centerRadius, nextRadius);
+  const ridgePenalty = Math.max(0, centerRadius - localMeanRadius);
+  const valleyReward = Math.max(0, localMeanRadius - centerRadius);
+  const flatnessPenalty = Math.abs(nextRadius - prevRadius) * 0.2;
+  const shiftPenalty = Math.abs(shift) * 0.01;
+
+  return (
+    continuityPenalty +
+    tangentPenalty +
+    ridgePenalty * ridgePenalty +
+    flatnessPenalty * flatnessPenalty +
+    shiftPenalty -
+    0.35 * valleyReward * valleyReward -
+    0.1 * Math.max(0, localMeanRadius - localMinRadius)
+  );
+}
+
+function alignTexturedContourSeam(contour: Float64Array, previousContour: Float64Array): Float64Array {
+  const n = contour.length / 2;
+  if (n === 0 || previousContour.length !== contour.length) return contour;
+
+  let bestShift = 0;
+  let bestScore = computeTexturedSeamShiftScore(contour, previousContour, 0);
+
+  for (let shift = -TEXTURED_SEAM_MAX_SHIFT; shift <= TEXTURED_SEAM_MAX_SHIFT; shift++) {
+    if (shift === 0) continue;
+    const score = computeTexturedSeamShiftScore(contour, previousContour, shift);
+    if (score < bestScore) {
+      bestScore = score;
+      bestShift = shift;
+    }
   }
 
-  return (shift: number): number => {
-    const center = wrapIndex(shift, n);
-    const prev = wrapIndex(center - 1, n);
-    const next = wrapIndex(center + 1, n);
+  if (bestShift === 0) return contour;
 
-    let localMin = radii[center];
-    for (let offset = -2; offset <= 2; offset++) {
-      localMin = Math.min(localMin, radii[wrapIndex(center + offset, n)]);
-    }
+  const zeroScore = computeTexturedSeamShiftScore(contour, previousContour, 0);
+  if (zeroScore - bestScore < TEXTURED_SEAM_SWITCH_THRESHOLD) {
+    return contour;
+  }
 
-    const centerRadius = radii[center];
-    const prevRadius = radii[prev];
-    const nextRadius = radii[next];
-    const valleyPenalty = centerRadius - localMin;
-    const ridgePenalty = Math.max(0, centerRadius - (prevRadius + nextRadius) * 0.5);
-    const slopePenalty = Math.abs(nextRadius - prevRadius) * 0.5;
-
-    return valleyPenalty * valleyPenalty + ridgePenalty * ridgePenalty + 0.25 * slopePenalty * slopePenalty;
-  };
+  return rotateContour(contour, bestShift);
 }
 
 function hasActiveTexture(params: VaseParameters): boolean {
@@ -119,17 +165,9 @@ function generateSupportSafeOuterContours(
     let contour = interpolatedOuterContour(params, zMm);
 
     if (previous !== null && previousZ !== null) {
-      contour = alignContourToPrevious(
-        contour,
-        previous,
-        texturedSeam
-          ? {
-              extraShiftScore: buildTexturedSeamShiftScorer(contour),
-              maxShift: TEXTURED_SEAM_MAX_SHIFT,
-              minImprovementMm: TEXTURED_SEAM_MIN_IMPROVEMENT_MM,
-            }
-          : undefined,
-      );
+      contour = texturedSeam
+        ? alignTexturedContourSeam(contour, previous)
+        : alignContourToPrevious(contour, previous);
       const dz = Math.abs(zMm - previousZ);
       const maxStep = maxSupportlessRadialStep(dz);
       contour = limitContourStepFromPrevious(previous, contour, maxStep, params.wallThicknessMm);

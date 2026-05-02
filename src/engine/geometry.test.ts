@@ -5,6 +5,7 @@ import {
   resampleClosedContour,
   buildProfileContour,
   interpolateContours,
+  rotateContour,
 } from "./geometry";
 import { createProfile } from "./types";
 
@@ -135,6 +136,15 @@ describe("interpolateContours", () => {
     const result = interpolateContours(c1, c2, 0.5);
     expect(result[0]).toBeCloseTo(5);
     expect(result[2]).toBeCloseTo(15);
+  });
+});
+
+describe("rotateContour", () => {
+  it("rotates a contour by a cyclic shift", () => {
+    const contour = new Float64Array([0, 0, 1, 0, 1, 1, 0, 1]);
+    const rotated = rotateContour(contour, 1);
+
+    expect(Array.from(rotated)).toEqual([1, 0, 1, 1, 0, 1, 0, 0]);
   });
 });
 

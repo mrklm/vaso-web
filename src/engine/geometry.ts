@@ -195,6 +195,21 @@ export function alignContourToPrevious(
   return result;
 }
 
+export function rotateContour(contour: Float64Array, shift: number): Float64Array {
+  const n = contour.length / 2;
+  if (n === 0) return contour;
+  const normalizedShift = ((shift % n) + n) % n;
+  if (normalizedShift === 0) return contour;
+
+  const result = new Float64Array(contour.length);
+  for (let i = 0; i < n; i++) {
+    const src = (normalizedShift + i) % n;
+    result[i * 2] = contour[src * 2];
+    result[i * 2 + 1] = contour[src * 2 + 1];
+  }
+  return result;
+}
+
 /**
  * Build a resampled contour for a profile.
  */

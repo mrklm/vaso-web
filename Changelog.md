@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.42] - 2026-05-02
+
+### 🎨 Modifié
+ - Choisit localement la couture texturee pour mieux suivre la continuite du relief
+
 ## [1.0.41] - 2026-05-02
 
 ### 🎨 Modifié
