@@ -4,6 +4,7 @@ const SEAM_BACK_ANGLE_RAD = -Math.PI / 2;
 const SEAM_SWITCH_MIN_IMPROVEMENT_MM = 0.35;
 
 export interface ContourAlignmentOptions {
+  extraShiftScore?: (shift: number) => number;
   maxShift?: number;
   minImprovementMm?: number;
 }
@@ -147,6 +148,7 @@ export function alignContourToPrevious(
 ): Float64Array {
   const n = contour.length / 2;
   if (n === 0 || previousContour.length !== contour.length) return contour;
+  const extraShiftScore = options.extraShiftScore;
   const maxShift = Math.max(0, Math.min(n - 1, options.maxShift ?? n - 1));
   const minImprovementMm = options.minImprovementMm ?? SEAM_SWITCH_MIN_IMPROVEMENT_MM;
 
@@ -160,7 +162,8 @@ export function alignContourToPrevious(
       const dy = contour[src * 2 + 1] - prevY;
       score += dx * dx + dy * dy;
     }
-    return score / n;
+    const averageScore = score / n;
+    return averageScore + (extraShiftScore ? extraShiftScore(shift) : 0);
   };
 
   const zeroShiftScore = scoreShift(0);

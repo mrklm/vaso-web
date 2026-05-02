@@ -12,7 +12,42 @@ import { getMeshDifferenceDiagnostics, logMeshDiagnostics } from "./mesh-cleanup
 
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
 const ENGRAVING_PIPELINE_MARKER = `Vaso Engraving ${APP_VERSION}`;
-const TEXTURED_SEAM_MAX_SHIFT = 3;
+const TEXTURED_SEAM_MAX_SHIFT = 6;
+const TEXTURED_SEAM_MIN_IMPROVEMENT_MM = 0.05;
+
+function wrapIndex(index: number, size: number): number {
+  return ((index % size) + size) % size;
+}
+
+function buildTexturedSeamShiftScorer(contour: Float64Array): (shift: number) => number {
+  const n = contour.length / 2;
+  const radii = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = contour[i * 2];
+    const y = contour[i * 2 + 1];
+    radii[i] = Math.hypot(x, y);
+  }
+
+  return (shift: number): number => {
+    const center = wrapIndex(shift, n);
+    const prev = wrapIndex(center - 1, n);
+    const next = wrapIndex(center + 1, n);
+
+    let localMin = radii[center];
+    for (let offset = -2; offset <= 2; offset++) {
+      localMin = Math.min(localMin, radii[wrapIndex(center + offset, n)]);
+    }
+
+    const centerRadius = radii[center];
+    const prevRadius = radii[prev];
+    const nextRadius = radii[next];
+    const valleyPenalty = centerRadius - localMin;
+    const ridgePenalty = Math.max(0, centerRadius - (prevRadius + nextRadius) * 0.5);
+    const slopePenalty = Math.abs(nextRadius - prevRadius) * 0.5;
+
+    return valleyPenalty * valleyPenalty + ridgePenalty * ridgePenalty + 0.25 * slopePenalty * slopePenalty;
+  };
+}
 
 function hasActiveTexture(params: VaseParameters): boolean {
   if (params.textureMode === "Pas de texture") return false;
@@ -87,7 +122,13 @@ function generateSupportSafeOuterContours(
       contour = alignContourToPrevious(
         contour,
         previous,
-        texturedSeam ? { maxShift: TEXTURED_SEAM_MAX_SHIFT } : undefined,
+        texturedSeam
+          ? {
+              extraShiftScore: buildTexturedSeamShiftScorer(contour),
+              maxShift: TEXTURED_SEAM_MAX_SHIFT,
+              minImprovementMm: TEXTURED_SEAM_MIN_IMPROVEMENT_MM,
+            }
+          : undefined,
       );
       const dz = Math.abs(zMm - previousZ);
       const maxStep = maxSupportlessRadialStep(dz);

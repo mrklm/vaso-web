@@ -171,4 +171,17 @@ describe("alignContourToPrevious", () => {
     expect(Array.from(aligned)).not.toEqual(Array.from(previous));
     expect(Array.from(aligned)).toEqual([5, 0, 0, 0, 1, 0, 2, 0, 3, 0, 4, 0]);
   });
+
+  it("can bias the seam toward a locally preferred candidate", () => {
+    const previous = new Float64Array([0, 0, 1, 0, 2, 0, 3, 0]);
+    const contour = new Float64Array([0, 0, 1, 0, 2, 0, 3, 0]);
+
+    const aligned = alignContourToPrevious(contour, previous, {
+      extraShiftScore: (shift) => (shift === 1 ? -10 : 0),
+      maxShift: 1,
+      minImprovementMm: 0,
+    });
+
+    expect(Array.from(aligned)).toEqual([1, 0, 2, 0, 3, 0, 0, 0]);
+  });
 });
