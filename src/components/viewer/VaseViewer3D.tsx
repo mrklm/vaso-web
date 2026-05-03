@@ -331,13 +331,12 @@ export function VaseViewer3D() {
   const vaseColor = useUIStore((s) => s.vaseColor);
   const wireframe = useUIStore((s) => s.wireframe);
   const flatShading = useUIStore((s) => s.flatShading);
-  const enforcePrinterVolume = useUIStore((s) => s.enforcePrinterVolume);
   const showClipping = useUIStore((s) => s.showClipping);
   const clippingHeight = useUIStore((s) => s.clippingHeight);
   const rotationMode = useUIStore((s) => s.rotationMode);
   const rotationSpeed = useUIStore((s) => s.rotationSpeed);
   const meshData = useVaseMesh(params, seed);
-  const showSeedModified = isSeedModified || enforcePrinterVolume;
+  const showSeedModified = isSeedModified;
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const lastTapRef = useRef(0);
   const paramsKey = JSON.stringify(params);

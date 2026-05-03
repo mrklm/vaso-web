@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.44] - 2026-05-03
+
+### 🎨 Modifié
+ - Limite le suffixe M aux seeds reellement modifiees
+
 ## [1.0.43] - 2026-05-03
 
 ### 🎨 Modifié

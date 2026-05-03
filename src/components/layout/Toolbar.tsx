@@ -68,7 +68,7 @@ export function Toolbar() {
   const enforcePrinterVolume = useUIStore((s) => s.enforcePrinterVolume);
   const captureViewerImage = useUIStore((s) => s.captureViewerImage);
   const { undo, redo, pastStates, futureStates } = useVaseStore.temporal.getState();
-  const showSeedModified = isSeedModified || enforcePrinterVolume;
+  const showSeedModified = isSeedModified;
 
   const handleExport = async () => {
     try {
