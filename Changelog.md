@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.47] - 2026-05-03
+
+### 🎨 Modifié
+ - Conserve la meme arrete de couture entre profils facettes
+
 ## [1.0.46] - 2026-05-03
 
 ### 🎨 Modifié

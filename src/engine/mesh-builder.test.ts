@@ -194,4 +194,21 @@ describe("generateTopOuterContour", () => {
     const contour = generateTopOuterContour(params);
     expect(contour.length).toBe(48); // 24 × 2
   });
+
+  it("keeps the same faceted seam edge through profile rotation", () => {
+    const params = defaultVaseParameters();
+    params.radialSamples = 48;
+    params.verticalSamples = 2;
+    params.textureMode = "Texture imposée";
+    params.textureType = "Cannelures";
+    params.profiles = [
+      createProfile({ zRatio: 0, diameter: 80, sides: 6, rotationDeg: 0 }),
+      createProfile({ zRatio: 1, diameter: 80, sides: 6, rotationDeg: 30 }),
+    ];
+
+    const contour = generateTopOuterContour(params);
+    const seamAngleDeg = Math.atan2(contour[1], contour[0]) * 180 / Math.PI;
+
+    expect(seamAngleDeg).toBeCloseTo(-60, 0);
+  });
 });

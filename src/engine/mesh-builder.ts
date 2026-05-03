@@ -1,7 +1,15 @@
 import type { VaseParameters, MeshData } from "./types";
 import { appendPipelineTrace, dumpPipelineTrace, getPipelineTrace, resetPipelineTrace } from "./pipeline-trace";
 import { validateParams } from "./validation";
-import { alignContourToPrevious, buildProfileContour, interpolateContours, rotateContour } from "./geometry";
+import {
+  alignContourToPrevious,
+  buildProfileContour,
+  buildProfileContourFromEdge,
+  computeSeamTargetEdgeIndex,
+  interpolateContours,
+  regularPolygonVertices,
+  rotateContour,
+} from "./geometry";
 import { applyTexture } from "./textures";
 import {
   maxSupportlessRadialStep,
@@ -119,6 +127,15 @@ function hasActiveTexture(params: VaseParameters): boolean {
   return params.textureType !== "Aucune";
 }
 
+function shouldKeepFacetEdgeSeamIdentity(profiles: VaseParameters["profiles"]): boolean {
+  if (profiles.length === 0) return false;
+  const firstSides = profiles[0].sides;
+  return (
+    firstSides <= FACETED_SEAM_MAX_PROFILE_SIDES &&
+    profiles.every((profile) => profile.sides === firstSides)
+  );
+}
+
 function linspace(start: number, end: number, count: number): Float64Array {
   const result = new Float64Array(count);
   if (count <= 1) {
@@ -144,7 +161,14 @@ function scaleMeshData(mesh: MeshData, scale: number): MeshData {
 function interpolatedOuterContour(params: VaseParameters, zMm: number): Float64Array {
   const profiles = [...params.profiles].sort((a, b) => a.zRatio - b.zRatio);
   const zPositions = profiles.map((p) => p.zRatio * params.heightMm);
-  const contours = profiles.map((p) => buildProfileContour(p, params.radialSamples));
+  const sharedFacetSeamEdge = shouldKeepFacetEdgeSeamIdentity(profiles)
+    ? computeSeamTargetEdgeIndex(regularPolygonVertices(profiles[0]), profiles[0])
+    : null;
+  const contours = profiles.map((p) =>
+    sharedFacetSeamEdge === null
+      ? buildProfileContour(p, params.radialSamples)
+      : buildProfileContourFromEdge(p, params.radialSamples, sharedFacetSeamEdge)
+  );
 
   if (zMm <= zPositions[0]) {
     return applyTexture(new Float64Array(contours[0]), zMm, params);
