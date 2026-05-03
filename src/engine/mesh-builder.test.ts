@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  computeTexturedSeamMaxShift,
-  generateVaseMesh,
-  generateOuterProfilePoints,
-  generateTopOuterContour,
-} from "./mesh-builder";
+import { generateVaseMesh, generateOuterProfilePoints, generateTopOuterContour } from "./mesh-builder";
 import { countBoundaryEdges, countConnectedMeshComponents } from "./mesh-cleanup";
 import { defaultVaseParameters, createProfile } from "./types";
 
@@ -108,51 +103,29 @@ describe("generateVaseMesh", () => {
       .filter(([z, count]) => z > params.bottomThicknessMm && z <= params.heightMm && count === params.radialSamples * 2);
     expect(sharedBodyLayers.length).toBe(params.verticalSamples - 1);
   });
-});
 
-describe("computeTexturedSeamMaxShift", () => {
-  it("keeps textured seam search inside the anchored edge on faceted profiles", () => {
-    const params = defaultVaseParameters();
-    params.radialSamples = 48;
-    params.profiles = [
-      createProfile({ zRatio: 0, diameter: 80, sides: 6, rotationDeg: 0 }),
-      createProfile({ zRatio: 1, diameter: 60, sides: 6, rotationDeg: 30 }),
-    ];
-
-    expect(computeTexturedSeamMaxShift(params)).toBe(0);
-  });
-
-  it("disables textured seam wandering when any profile is faceted", () => {
+  it("keeps a single seam line on round textured vases", () => {
     const params = defaultVaseParameters();
     params.radialSamples = 96;
+    params.verticalSamples = 24;
+    params.textureMode = "Texture imposée";
+    params.textureType = "Vagues";
+    params.textureZoom = "Gros";
     params.profiles = [
-      createProfile({ zRatio: 0, diameter: 80, sides: 6, rotationDeg: 0 }),
-      createProfile({ zRatio: 1, diameter: 60, sides: 24, rotationDeg: 0 }),
+      createProfile({ zRatio: 0, diameter: 80, sides: 48, rotationDeg: 0 }),
+      createProfile({ zRatio: 1, diameter: 80, sides: 48, rotationDeg: 0 }),
     ];
 
-    expect(computeTexturedSeamMaxShift(params)).toBe(0);
-  });
+    const mesh = generateVaseMesh(params);
+    const seamAngles: number[] = [];
+    for (let layer = 0; layer < params.verticalSamples; layer++) {
+      const vertexOffset = layer * params.radialSamples * 3;
+      seamAngles.push(Math.atan2(mesh.vertices[vertexOffset + 1], mesh.vertices[vertexOffset]));
+    }
 
-  it("keeps extra room from facet boundaries at preview resolution", () => {
-    const params = defaultVaseParameters();
-    params.radialSamples = 72;
-    params.profiles = [
-      createProfile({ zRatio: 0, diameter: 80, sides: 24, rotationDeg: 0 }),
-      createProfile({ zRatio: 1, diameter: 60, sides: 24, rotationDeg: 30 }),
-    ];
-
-    expect(computeTexturedSeamMaxShift(params)).toBe(0);
-  });
-
-  it("allows local textured seam search for rounder profiles", () => {
-    const params = defaultVaseParameters();
-    params.radialSamples = 96;
-    params.profiles = [
-      createProfile({ zRatio: 0, diameter: 80, sides: 24, rotationDeg: 0 }),
-      createProfile({ zRatio: 1, diameter: 60, sides: 24, rotationDeg: 30 }),
-    ];
-
-    expect(computeTexturedSeamMaxShift(params)).toBe(1);
+    const minAngle = Math.min(...seamAngles);
+    const maxAngle = Math.max(...seamAngles);
+    expect(maxAngle - minAngle).toBeLessThan(0.05);
   });
 });
 

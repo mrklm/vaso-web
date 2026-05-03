@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.48] - 2026-05-03
+
+### 🎨 Modifié
+ - Impose une ligne de couture unique sur les textures
+
 ## [1.0.47] - 2026-05-03
 
 ### 🎨 Modifié
