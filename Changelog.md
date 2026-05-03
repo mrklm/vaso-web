@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.43] - 2026-05-03
+
+### 🎨 Modifié
+ - Garde la couture texturee dans son arrete d'ancrage
+
 ## [1.0.42] - 2026-05-02
 
 ### 🎨 Modifié

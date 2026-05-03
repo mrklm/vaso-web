@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { generateVaseMesh, generateOuterProfilePoints, generateTopOuterContour } from "./mesh-builder";
+import {
+  computeTexturedSeamMaxShift,
+  generateVaseMesh,
+  generateOuterProfilePoints,
+  generateTopOuterContour,
+} from "./mesh-builder";
 import { countBoundaryEdges, countConnectedMeshComponents } from "./mesh-cleanup";
 import { defaultVaseParameters, createProfile } from "./types";
 
@@ -102,6 +107,30 @@ describe("generateVaseMesh", () => {
     const sharedBodyLayers = [...countsByZ.entries()]
       .filter(([z, count]) => z > params.bottomThicknessMm && z <= params.heightMm && count === params.radialSamples * 2);
     expect(sharedBodyLayers.length).toBe(params.verticalSamples - 1);
+  });
+});
+
+describe("computeTexturedSeamMaxShift", () => {
+  it("keeps textured seam search inside the anchored edge on faceted profiles", () => {
+    const params = defaultVaseParameters();
+    params.radialSamples = 48;
+    params.profiles = [
+      createProfile({ zRatio: 0, diameter: 80, sides: 6, rotationDeg: 0 }),
+      createProfile({ zRatio: 1, diameter: 60, sides: 6, rotationDeg: 30 }),
+    ];
+
+    expect(computeTexturedSeamMaxShift(params)).toBe(3);
+  });
+
+  it("uses the shortest profile edge when profiles have different side counts", () => {
+    const params = defaultVaseParameters();
+    params.radialSamples = 96;
+    params.profiles = [
+      createProfile({ zRatio: 0, diameter: 80, sides: 6, rotationDeg: 0 }),
+      createProfile({ zRatio: 1, diameter: 60, sides: 24, rotationDeg: 0 }),
+    ];
+
+    expect(computeTexturedSeamMaxShift(params)).toBe(1);
   });
 });
 

@@ -69,14 +69,26 @@ function computeTexturedSeamShiftScore(
   );
 }
 
-function alignTexturedContourSeam(contour: Float64Array, previousContour: Float64Array): Float64Array {
+export function computeTexturedSeamMaxShift(params: VaseParameters): number {
+  const maxSides = Math.max(1, ...params.profiles.map((profile) => profile.sides));
+  const samplesPerShortestEdge = params.radialSamples / maxSides;
+  const maxShiftInsideEdge = Math.max(0, Math.ceil(samplesPerShortestEdge * 0.5) - 1);
+  return Math.min(TEXTURED_SEAM_MAX_SHIFT, maxShiftInsideEdge);
+}
+
+function alignTexturedContourSeam(
+  contour: Float64Array,
+  previousContour: Float64Array,
+  maxShift: number,
+): Float64Array {
   const n = contour.length / 2;
   if (n === 0 || previousContour.length !== contour.length) return contour;
 
   let bestShift = 0;
   let bestScore = computeTexturedSeamShiftScore(contour, previousContour, 0);
+  const boundedMaxShift = Math.max(0, Math.min(n - 1, maxShift));
 
-  for (let shift = -TEXTURED_SEAM_MAX_SHIFT; shift <= TEXTURED_SEAM_MAX_SHIFT; shift++) {
+  for (let shift = -boundedMaxShift; shift <= boundedMaxShift; shift++) {
     if (shift === 0) continue;
     const score = computeTexturedSeamShiftScore(contour, previousContour, shift);
     if (score < bestScore) {
@@ -159,6 +171,7 @@ function generateSupportSafeOuterContours(
   let previous: Float64Array | null = null;
   let previousZ: number | null = null;
   const texturedSeam = hasActiveTexture(params);
+  const texturedSeamMaxShift = texturedSeam ? computeTexturedSeamMaxShift(params) : 0;
 
   for (let i = 0; i < zValues.length; i++) {
     const zMm = zValues[i];
@@ -166,7 +179,7 @@ function generateSupportSafeOuterContours(
 
     if (previous !== null && previousZ !== null) {
       contour = texturedSeam
-        ? alignTexturedContourSeam(contour, previous)
+        ? alignTexturedContourSeam(contour, previous, texturedSeamMaxShift)
         : alignContourToPrevious(contour, previous);
       const dz = Math.abs(zMm - previousZ);
       const maxStep = maxSupportlessRadialStep(dz);
