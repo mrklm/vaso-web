@@ -119,10 +119,10 @@ describe("computeTexturedSeamMaxShift", () => {
       createProfile({ zRatio: 1, diameter: 60, sides: 6, rotationDeg: 30 }),
     ];
 
-    expect(computeTexturedSeamMaxShift(params)).toBe(2);
+    expect(computeTexturedSeamMaxShift(params)).toBe(0);
   });
 
-  it("uses the shortest profile edge when profiles have different side counts", () => {
+  it("disables textured seam wandering when any profile is faceted", () => {
     const params = defaultVaseParameters();
     params.radialSamples = 96;
     params.profiles = [
@@ -130,18 +130,29 @@ describe("computeTexturedSeamMaxShift", () => {
       createProfile({ zRatio: 1, diameter: 60, sides: 24, rotationDeg: 0 }),
     ];
 
-    expect(computeTexturedSeamMaxShift(params)).toBe(1);
+    expect(computeTexturedSeamMaxShift(params)).toBe(0);
   });
 
   it("keeps extra room from facet boundaries at preview resolution", () => {
     const params = defaultVaseParameters();
     params.radialSamples = 72;
     params.profiles = [
-      createProfile({ zRatio: 0, diameter: 80, sides: 6, rotationDeg: 0 }),
-      createProfile({ zRatio: 1, diameter: 60, sides: 6, rotationDeg: 30 }),
+      createProfile({ zRatio: 0, diameter: 80, sides: 24, rotationDeg: 0 }),
+      createProfile({ zRatio: 1, diameter: 60, sides: 24, rotationDeg: 30 }),
     ];
 
-    expect(computeTexturedSeamMaxShift(params)).toBe(3);
+    expect(computeTexturedSeamMaxShift(params)).toBe(0);
+  });
+
+  it("allows local textured seam search for rounder profiles", () => {
+    const params = defaultVaseParameters();
+    params.radialSamples = 96;
+    params.profiles = [
+      createProfile({ zRatio: 0, diameter: 80, sides: 24, rotationDeg: 0 }),
+      createProfile({ zRatio: 1, diameter: 60, sides: 24, rotationDeg: 30 }),
+    ];
+
+    expect(computeTexturedSeamMaxShift(params)).toBe(1);
   });
 });
 

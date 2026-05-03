@@ -14,6 +14,7 @@ const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "tes
 const ENGRAVING_PIPELINE_MARKER = `Vaso Engraving ${APP_VERSION}`;
 const TEXTURED_SEAM_MAX_SHIFT = 6;
 const TEXTURED_SEAM_SWITCH_THRESHOLD = 0.03;
+const FACETED_SEAM_MAX_PROFILE_SIDES = 12;
 
 function wrapIndex(index: number, size: number): number {
   return ((index % size) + size) % size;
@@ -70,6 +71,9 @@ function computeTexturedSeamShiftScore(
 }
 
 export function computeTexturedSeamMaxShift(params: VaseParameters): number {
+  const minSides = Math.min(...params.profiles.map((profile) => profile.sides));
+  if (minSides <= FACETED_SEAM_MAX_PROFILE_SIDES) return 0;
+
   const maxSides = Math.max(1, ...params.profiles.map((profile) => profile.sides));
   const samplesPerShortestEdge = params.radialSamples / maxSides;
   const maxShiftNearEdgeCenter = Math.max(0, Math.floor(samplesPerShortestEdge * 0.25));

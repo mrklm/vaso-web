@@ -1,7 +1,7 @@
 {
   "name": "vaso-web",
   "private": true,
-  "version": "1.0.45",
+  "version": "1.0.46",
   "description": "Générateur paramétrique de vases pour impression 3D",
   "author": {
     "name": "mrklm",

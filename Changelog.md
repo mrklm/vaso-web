@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.46] - 2026-05-03
+
+### 🎨 Modifié
+ - Fige la couture texturee sur les profils a arretes
+
 ## [1.0.45] - 2026-05-03
 
 ### 🎨 Modifié
