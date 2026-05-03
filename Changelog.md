@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.45] - 2026-05-03
+
+### 🎨 Modifié
+ - Garde une marge centrale autour des coutures d'arrete
+
 ## [1.0.44] - 2026-05-03
 
 ### 🎨 Modifié

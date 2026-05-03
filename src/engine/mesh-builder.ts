@@ -72,8 +72,8 @@ function computeTexturedSeamShiftScore(
 export function computeTexturedSeamMaxShift(params: VaseParameters): number {
   const maxSides = Math.max(1, ...params.profiles.map((profile) => profile.sides));
   const samplesPerShortestEdge = params.radialSamples / maxSides;
-  const maxShiftInsideEdge = Math.max(0, Math.ceil(samplesPerShortestEdge * 0.5) - 1);
-  return Math.min(TEXTURED_SEAM_MAX_SHIFT, maxShiftInsideEdge);
+  const maxShiftNearEdgeCenter = Math.max(0, Math.floor(samplesPerShortestEdge * 0.25));
+  return Math.min(TEXTURED_SEAM_MAX_SHIFT, maxShiftNearEdgeCenter);
 }
 
 function alignTexturedContourSeam(
