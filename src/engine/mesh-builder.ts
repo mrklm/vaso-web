@@ -1,11 +1,15 @@
 import type { VaseParameters, MeshData } from "./types";
-import { appendPipelineTrace, dumpPipelineTrace, getPipelineTrace, resetPipelineTrace } from "./pipeline-trace";
+import {
+  appendPipelineTrace,
+  dumpPipelineTrace,
+  getPipelineTrace,
+  resetPipelineTrace,
+} from "./pipeline-trace";
 import { validateParams } from "./validation";
 import {
   alignContourToPrevious,
   buildProfileContour,
-  buildProfileContourFromEdge,
-  computeSeamTargetEdgeIndex,
+  buildProfileContourFromVertex,
   interpolateContours,
   regularPolygonVertices,
 } from "./geometry";
@@ -20,6 +24,7 @@ import { getMeshDifferenceDiagnostics, logMeshDiagnostics } from "./mesh-cleanup
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
 const ENGRAVING_PIPELINE_MARKER = `Vaso Engraving ${APP_VERSION}`;
 const FACETED_SEAM_MAX_PROFILE_SIDES = 12;
+const SEAM_BACK_ANGLE_RAD = -Math.PI / 2;
 
 function hasActiveTexture(params: VaseParameters): boolean {
   if (params.textureMode === "Pas de texture") return false;
@@ -36,6 +41,36 @@ function shouldKeepFacetEdgeSeamIdentity(profiles: VaseParameters["profiles"]): 
     firstSides <= FACETED_SEAM_MAX_PROFILE_SIDES &&
     profiles.every((profile) => profile.sides === firstSides)
   );
+}
+
+function normalizedAngularDistance(a: number, b: number): number {
+  const diff = Math.atan2(Math.sin(a - b), Math.cos(a - b));
+  return Math.abs(diff);
+}
+
+function computeSharedFacetSeamVertexIndex(profiles: VaseParameters["profiles"]): number {
+  const sideCount = profiles[0]?.sides ?? 0;
+  let bestIndex = 0;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (let vertexIndex = 0; vertexIndex < sideCount; vertexIndex++) {
+    let score = 0;
+
+    for (const profile of profiles) {
+      const vertices = regularPolygonVertices(profile);
+      const x = vertices[vertexIndex * 2];
+      const y = vertices[vertexIndex * 2 + 1];
+      const angle = Math.atan2(y - profile.offsetY, x - profile.offsetX);
+      score += normalizedAngularDistance(angle, SEAM_BACK_ANGLE_RAD);
+    }
+
+    if (score < bestScore) {
+      bestScore = score;
+      bestIndex = vertexIndex;
+    }
+  }
+
+  return bestIndex;
 }
 
 function linspace(start: number, end: number, count: number): Float64Array {
@@ -63,13 +98,13 @@ function scaleMeshData(mesh: MeshData, scale: number): MeshData {
 function interpolatedOuterContour(params: VaseParameters, zMm: number): Float64Array {
   const profiles = [...params.profiles].sort((a, b) => a.zRatio - b.zRatio);
   const zPositions = profiles.map((p) => p.zRatio * params.heightMm);
-  const sharedFacetSeamEdge = shouldKeepFacetEdgeSeamIdentity(profiles)
-    ? computeSeamTargetEdgeIndex(regularPolygonVertices(profiles[0]), profiles[0])
+  const sharedFacetSeamVertex = shouldKeepFacetEdgeSeamIdentity(profiles)
+    ? computeSharedFacetSeamVertexIndex(profiles)
     : null;
   const contours = profiles.map((p) =>
-    sharedFacetSeamEdge === null
+    sharedFacetSeamVertex === null
       ? buildProfileContour(p, params.radialSamples)
-      : buildProfileContourFromEdge(p, params.radialSamples, sharedFacetSeamEdge)
+      : buildProfileContourFromVertex(p, params.radialSamples, sharedFacetSeamVertex),
   );
 
   if (zMm <= zPositions[0]) {
@@ -177,9 +212,7 @@ export function generateVaseMesh(params: VaseParameters): MeshData {
   return generateVaseMeshInternal(params);
 }
 
-function generateVaseMeshInternal(
-  params: VaseParameters,
-): MeshData {
+function generateVaseMeshInternal(params: VaseParameters): MeshData {
   validateParams(params);
 
   const ringSize = params.radialSamples;
@@ -305,12 +338,21 @@ export async function generateVaseMeshWithEngraving(
     appendPipelineTrace(
       `[mesh-builder] base mesh:v=${mesh.vertices.length / 3},t=${mesh.indices.length / 3}`,
     );
-    const engravedMesh = await engraveBaseText(mesh, params, outerContours[0], seed, isSeedModified);
+    const engravedMesh = await engraveBaseText(
+      mesh,
+      params,
+      outerContours[0],
+      seed,
+      isSeedModified,
+    );
     const difference = getMeshDifferenceDiagnostics(mesh, engravedMesh);
     appendPipelineTrace(
       `[mesh-builder] final compare vs base:identical=${difference.identical ? 1 : 0},sharedT=${difference.sharedTriangles},removedT=${difference.removedTriangles},addedT=${difference.addedTriangles},sharedRatio=${difference.sharedTriangleRatio.toFixed(4)}`,
     );
-    if (difference.identical || (difference.addedTriangles === 0 && difference.removedTriangles === 0)) {
+    if (
+      difference.identical ||
+      (difference.addedTriangles === 0 && difference.removedTriangles === 0)
+    ) {
       dumpPipelineTrace(ENGRAVING_PIPELINE_MARKER);
       throw new Error(
         `Engraving pipeline produced a mesh identical to the base mesh. trace=${getPipelineTrace()}`,

@@ -12,6 +12,19 @@ function textureZoomToParams(zoom: TextureZoom): [number, number] {
   return mapping[zoom] ?? mapping["Moyen"];
 }
 
+function staggeredVerticalWave(
+  angle: number,
+  angularFrequency: number,
+  verticalFrequency: number,
+  zRatio: number,
+): number {
+  const PI2 = 2 * Math.PI;
+  const angularPhase =
+    0.52 * Math.sin(angularFrequency * angle) +
+    0.18 * Math.sin((angularFrequency * 0.5 + 1.0) * angle);
+  return Math.sin(PI2 * verticalFrequency * zRatio + angularPhase);
+}
+
 /**
  * Apply a single texture to a contour (Nx2 flat Float64Array).
  * Returns a new contour with the texture applied.
@@ -26,6 +39,7 @@ export function applySingleTexture(
   if (textureType === "Aucune") return contour;
 
   const [amplitudeMm, baseFrequency] = textureZoomToParams(textureZoom);
+  const angularCycles = Math.max(1, Math.round(baseFrequency));
   const pts = new Float64Array(contour);
   const n = pts.length / 2;
   if (n === 0) return pts;
@@ -49,7 +63,7 @@ export function applySingleTexture(
   switch (textureType) {
     case "Cannelures":
       for (let i = 0; i < n; i++)
-        offset[i] = amplitudeMm * envelope * Math.cos(baseFrequency * angles[i]);
+        offset[i] = amplitudeMm * envelope * Math.cos(angularCycles * angles[i]);
       break;
 
     case "Anneaux":
@@ -84,11 +98,9 @@ export function applySingleTexture(
     case "Bulles":
       for (let i = 0; i < n; i++) {
         const bf = Math.max(2, baseFrequency * 0.62);
+        const vertical = staggeredVerticalWave(angles[i], angularCycles, bf, zRatio);
         const bubble = Math.exp(
-          -(
-            2.8 * Math.sin(baseFrequency * angles[i]) ** 2 +
-            2.2 * Math.sin(PI2 * bf * zRatio) ** 2
-          ),
+          -(2.8 * Math.sin(angularCycles * angles[i]) ** 2 + 2.2 * vertical ** 2),
         );
         offset[i] = amplitudeMm * envelope * (bubble - 0.3);
       }
@@ -97,7 +109,8 @@ export function applySingleTexture(
     case "Hexagones":
       for (let i = 0; i < n; i++) {
         const bf = Math.max(2, baseFrequency * 0.65);
-        const cell = Math.sin(baseFrequency * angles[i]) * Math.sin(PI2 * bf * zRatio);
+        const vertical = staggeredVerticalWave(angles[i], angularCycles, bf, zRatio);
+        const cell = Math.sin(angularCycles * angles[i]) * vertical;
         const quantized = Math.round(cell * 4) / 4;
         offset[i] = amplitudeMm * envelope * quantized;
       }
@@ -105,11 +118,10 @@ export function applySingleTexture(
 
     case "LowPoly":
       {
-        const step = PI2 / Math.max(6, Math.round(baseFrequency));
+        const step = PI2 / Math.max(6, angularCycles);
         for (let i = 0; i < n; i++) {
           const aq = Math.round(angles[i] / step) * step;
-          offset[i] =
-            amplitudeMm * envelope * Math.sign(Math.cos(aq * Math.max(3, baseFrequency * 0.8)));
+          offset[i] = amplitudeMm * envelope * Math.sign(Math.cos(aq * Math.max(3, angularCycles)));
         }
       }
       break;
@@ -119,17 +131,17 @@ export function applySingleTexture(
         offset[i] =
           amplitudeMm *
           envelope *
-          (0.6 * Math.sin(5.3 * angles[i] + PI2 * 3 * zRatio) +
-            0.25 * Math.sin(9.7 * angles[i] - PI2 * 1.7 * zRatio) +
-            0.15 * Math.cos(13.1 * angles[i] + PI2 * 4.2 * zRatio));
+          (0.6 * Math.sin(5 * angles[i] + PI2 * 3 * zRatio) +
+            0.25 * Math.sin(10 * angles[i] - PI2 * 1.7 * zRatio) +
+            0.15 * Math.cos(13 * angles[i] + PI2 * 4.2 * zRatio));
       }
       break;
 
     case "Écailles":
       for (let i = 0; i < n; i++) {
         const bf = Math.max(2, baseFrequency * 0.58);
-        const scales =
-          Math.max(0, Math.sin(baseFrequency * angles[i])) * Math.sin(PI2 * bf * zRatio);
+        const vertical = staggeredVerticalWave(angles[i], angularCycles, bf, zRatio);
+        const scales = Math.max(0, Math.sin(angularCycles * angles[i])) * vertical;
         offset[i] = amplitudeMm * envelope * scales;
       }
       break;
@@ -137,7 +149,8 @@ export function applySingleTexture(
     case "Diamants":
       for (let i = 0; i < n; i++) {
         const bf = Math.max(2, baseFrequency * 0.72);
-        const diamonds = Math.sin(baseFrequency * angles[i]) * Math.sin(PI2 * bf * zRatio);
+        const vertical = staggeredVerticalWave(angles[i], angularCycles, bf, zRatio);
+        const diamonds = Math.sin(angularCycles * angles[i]) * vertical;
         offset[i] = amplitudeMm * envelope * Math.sign(diamonds) * Math.sqrt(Math.abs(diamonds));
       }
       break;

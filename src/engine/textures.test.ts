@@ -9,6 +9,27 @@ function makeContour(samples = 24): Float64Array {
   return buildProfileContour(profile, samples);
 }
 
+function radialSpan(contour: Float64Array): number {
+  let minRadius = Number.POSITIVE_INFINITY;
+  let maxRadius = 0;
+
+  for (let i = 0; i < contour.length / 2; i++) {
+    const x = contour[i * 2];
+    const y = contour[i * 2 + 1];
+    const radius = Math.hypot(x, y);
+    minRadius = Math.min(minRadius, radius);
+    maxRadius = Math.max(maxRadius, radius);
+  }
+
+  return maxRadius - minRadius;
+}
+
+function radiusAt(contour: Float64Array, index: number): number {
+  const x = contour[index * 2];
+  const y = contour[index * 2 + 1];
+  return Math.hypot(x, y);
+}
+
 describe("applySingleTexture", () => {
   const allTextures: TextureType[] = [
     "Cannelures",
@@ -58,6 +79,34 @@ describe("applySingleTexture", () => {
       }
     }
     expect(hasDiff).toBe(true);
+  });
+
+  it("does not synchronize diamond relief into a full horizontal neutral band", () => {
+    const roundProfile = createProfile({ zRatio: 0, diameter: 80, sides: 96, rotationDeg: 0 });
+    const contour = buildProfileContour(roundProfile, 96);
+    const params = defaultVaseParameters();
+    const diamondVerticalFrequency = 9 * 0.72;
+    const zAtOldVerticalZero = params.heightMm / diamondVerticalFrequency;
+
+    const result = applySingleTexture(contour, zAtOldVerticalZero, "Diamants", "Moyen", params);
+
+    expect(radialSpan(result) - radialSpan(contour)).toBeGreaterThan(0.5);
+  });
+
+  it("keeps diamond relief continuous across the atan2 branch", () => {
+    const radius = 40;
+    const epsilon = 0.001;
+    const contour = new Float64Array([
+      Math.cos(Math.PI - epsilon) * radius,
+      Math.sin(Math.PI - epsilon) * radius,
+      Math.cos(-Math.PI + epsilon) * radius,
+      Math.sin(-Math.PI + epsilon) * radius,
+    ]);
+    const params = defaultVaseParameters();
+
+    const result = applySingleTexture(contour, 90, "Diamants", "Gros", params);
+
+    expect(Math.abs(radiusAt(result, 0) - radiusAt(result, 1))).toBeLessThan(0.25);
   });
 });
 

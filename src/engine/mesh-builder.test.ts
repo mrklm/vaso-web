@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { generateVaseMesh, generateOuterProfilePoints, generateTopOuterContour } from "./mesh-builder";
+import {
+  generateVaseMesh,
+  generateOuterProfilePoints,
+  generateTopOuterContour,
+} from "./mesh-builder";
 import { countBoundaryEdges, countConnectedMeshComponents } from "./mesh-cleanup";
 import { defaultVaseParameters, createProfile } from "./types";
 
@@ -99,8 +103,10 @@ describe("generateVaseMesh", () => {
     expect(countsByZ.get(0)).toBe(params.radialSamples + 1);
     expect(countsByZ.get(3)).toBe(params.radialSamples + 1);
 
-    const sharedBodyLayers = [...countsByZ.entries()]
-      .filter(([z, count]) => z > params.bottomThicknessMm && z <= params.heightMm && count === params.radialSamples * 2);
+    const sharedBodyLayers = [...countsByZ.entries()].filter(
+      ([z, count]) =>
+        z > params.bottomThicknessMm && z <= params.heightMm && count === params.radialSamples * 2,
+    );
     expect(sharedBodyLayers.length).toBe(params.verticalSamples - 1);
   });
 
@@ -168,7 +174,7 @@ describe("generateTopOuterContour", () => {
     expect(contour.length).toBe(48); // 24 × 2
   });
 
-  it("keeps the same faceted seam edge through profile rotation", () => {
+  it("keeps the faceted seam on the same back corner through profile rotation", () => {
     const params = defaultVaseParameters();
     params.radialSamples = 48;
     params.verticalSamples = 2;
@@ -180,8 +186,8 @@ describe("generateTopOuterContour", () => {
     ];
 
     const contour = generateTopOuterContour(params);
-    const seamAngleDeg = Math.atan2(contour[1], contour[0]) * 180 / Math.PI;
+    const seamAngleDeg = (Math.atan2(contour[1], contour[0]) * 180) / Math.PI;
 
-    expect(seamAngleDeg).toBeCloseTo(-60, 0);
+    expect(seamAngleDeg).toBeCloseTo(-90, 0);
   });
 });

@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.49] - 2026-05-04
+
+### 🎨 Modifié
+ - Place la couture des profils facettes sur une arrete et rend les textures plus continues
+
 ## [1.0.48] - 2026-05-03
 
 ### 🎨 Modifié
