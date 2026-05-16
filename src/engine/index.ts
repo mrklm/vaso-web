@@ -4,6 +4,7 @@ export * from "./geometry";
 export * from "./textures";
 export * from "./constraints";
 export * from "./printer-volume";
+export * from "./insert-compatibility";
 export * from "./engraving";
 export * from "./mesh-builder";
 export * from "./exporter";

@@ -151,6 +151,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 8px;
 }
 
 .view-2d-title {
@@ -165,6 +166,20 @@
 .view-2d svg {
   background: color-mix(in srgb, var(--color-field) 50%, var(--color-bg));
   border-radius: 6px;
+}
+
+.view-2d-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.view-2d-caption strong {
+  font-size: 12px;
 }
 
 /* ── Toolbar ── */

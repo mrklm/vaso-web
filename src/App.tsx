@@ -5,6 +5,7 @@ import { Toolbar } from "./components/layout/Toolbar";
 import { VaseViewer3D } from "./components/viewer/VaseViewer3D";
 import { ProfileView2D } from "./components/viewer/ProfileView2D";
 import { TopView2D } from "./components/viewer/TopView2D";
+import { InsertView2D } from "./components/viewer/InsertView2D";
 import { useVaseStore } from "./store/vase-store";
 import { useUIStore } from "./store/ui-store";
 import { useUrlShare } from "./hooks/useUrlShare";
@@ -89,6 +90,7 @@ function App() {
         <aside className="right-panel">
           <ProfileView2D />
           <TopView2D />
+          <InsertView2D />
         </aside>
       </div>
     </div>

@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.50] - 2026-05-16
+
+### 🎨 Ajouté
+ - Analyse le plus grand contenant compatible et l'affiche avec une vue en coupe dans le panneau de droite
+
 ## [1.0.49] - 2026-05-04
 
 ### 🎨 Modifié
