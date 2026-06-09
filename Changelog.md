@@ -7,6 +7,13 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.51] - 2026-06-09
+
+### 🎨 Ajouté
+ - Ajoute le support tube à essai dans le maillage quand aucun Eco-Cup ne rentre
+ - Aligne le contenant tube à essai sur le format 75 × 12 mm de Vaso Shop
+ - Met à jour la vue en coupe pour afficher le tube suspendu depuis le haut
+
 ## [1.0.50] - 2026-05-16
 
 ### 🎨 Ajouté

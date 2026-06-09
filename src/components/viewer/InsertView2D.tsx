@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 import { useVaseStore } from "../../store/vase-store";
-import { analyzeWaterproofInsertCompatibility, getInsertPresetById } from "../../engine/insert-compatibility";
+import {
+  analyzeWaterproofInsertCompatibility,
+  getInsertPresetById,
+} from "../../engine/insert-compatibility";
 import { generateOuterProfilePoints } from "../../engine/mesh-builder";
 
 export function InsertView2D() {
@@ -52,8 +55,14 @@ export function InsertView2D() {
   }
 
   const innerBottomZ = Math.min(params.bottomThicknessMm, params.heightMm);
-  const insertBottomZ = innerBottomZ;
-  const insertTopZ = Math.min(params.heightMm, innerBottomZ + preset.heightMm);
+  const insertTopZ =
+    preset.type === "test_tube"
+      ? Math.max(innerBottomZ, params.heightMm - 5)
+      : Math.min(params.heightMm, innerBottomZ + preset.heightMm);
+  const insertBottomZ =
+    preset.type === "test_tube"
+      ? Math.max(innerBottomZ, insertTopZ - preset.heightMm)
+      : innerBottomZ;
   const insertBottomRadius = (preset.bottomDiameterMm ?? preset.topDiameterMm) / 2;
   const insertTopRadius = preset.topDiameterMm / 2;
   const insertLeftBottomX = margin + plotW / 2 - (insertBottomRadius / maxR) * (plotW / 2);
@@ -62,20 +71,35 @@ export function InsertView2D() {
   const insertRightTopX = margin + plotW / 2 + (insertTopRadius / maxR) * (plotW / 2);
   const insertBottomY = h - margin - (insertBottomZ / maxZ) * plotH;
   const insertTopY = h - margin - (insertTopZ / maxZ) * plotH;
-  const insertPath = [
-    `M${insertLeftBottomX.toFixed(1)},${insertBottomY.toFixed(1)}`,
-    `L${insertLeftTopX.toFixed(1)},${insertTopY.toFixed(1)}`,
-    `L${insertRightTopX.toFixed(1)},${insertTopY.toFixed(1)}`,
-    `L${insertRightBottomX.toFixed(1)},${insertBottomY.toFixed(1)}`,
-    "Z",
-  ].join(" ");
+  const insertPath =
+    preset.type === "test_tube"
+      ? (() => {
+          const roundedBottomRadiusMm = Math.min(insertTopRadius, (insertTopZ - insertBottomZ) / 2);
+          const roundedBottomTopZ = insertBottomZ + roundedBottomRadiusMm;
+          const roundedBottomTopY = h - margin - (roundedBottomTopZ / maxZ) * plotH;
+
+          return [
+            `M${insertLeftTopX.toFixed(1)},${insertTopY.toFixed(1)}`,
+            `L${insertLeftBottomX.toFixed(1)},${roundedBottomTopY.toFixed(1)}`,
+            `Q${(w / 2).toFixed(1)},${insertBottomY.toFixed(1)} ${insertRightBottomX.toFixed(1)},${roundedBottomTopY.toFixed(1)}`,
+            `L${insertRightTopX.toFixed(1)},${insertTopY.toFixed(1)}`,
+            "Z",
+          ].join(" ");
+        })()
+      : [
+          `M${insertLeftBottomX.toFixed(1)},${insertBottomY.toFixed(1)}`,
+          `L${insertLeftTopX.toFixed(1)},${insertTopY.toFixed(1)}`,
+          `L${insertRightTopX.toFixed(1)},${insertTopY.toFixed(1)}`,
+          `L${insertRightBottomX.toFixed(1)},${insertBottomY.toFixed(1)}`,
+          "Z",
+        ].join(" ");
 
   const dimensionsLabel =
     preset.type === "eco_cup"
       ? `${preset.heightMm - 3} × ${preset.topDiameterMm - 3} / ${(
           (preset.bottomDiameterMm ?? preset.topDiameterMm) - 3
         ).toFixed(0)} mm`
-      : "75 × 20 mm";
+      : "75 × 12 mm";
 
   return (
     <div className="view-2d view-2d-insert">
@@ -83,7 +107,13 @@ export function InsertView2D() {
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
         <path d={pathRight} fill="none" stroke="var(--color-accent)" strokeWidth="2" />
         <path d={pathLeft} fill="none" stroke="var(--color-accent)" strokeWidth="2" opacity="0.5" />
-        <path d={insertPath} fill="var(--color-accent)" fillOpacity="0.2" stroke="var(--color-accent)" strokeWidth="1.5" />
+        <path
+          d={insertPath}
+          fill="var(--color-accent)"
+          fillOpacity="0.2"
+          stroke="var(--color-accent)"
+          strokeWidth="1.5"
+        />
         <line
           x1={w / 2}
           y1={margin}

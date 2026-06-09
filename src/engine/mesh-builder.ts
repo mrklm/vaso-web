@@ -20,11 +20,22 @@ import {
   computeInnerContour,
 } from "./constraints";
 import { getMeshDifferenceDiagnostics, logMeshDiagnostics } from "./mesh-cleanup";
+import { analyzeWaterproofInsertCompatibility } from "./insert-compatibility";
 
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
 const ENGRAVING_PIPELINE_MARKER = `Vaso Engraving ${APP_VERSION}`;
 const FACETED_SEAM_MAX_PROFILE_SIDES = 12;
 const SEAM_BACK_ANGLE_RAD = -Math.PI / 2;
+const TEST_TUBE_GUIDE_INNER_RADIUS_MM = 6.5;
+const TEST_TUBE_GUIDE_OUTER_RADIUS_MM = 8;
+const TEST_TUBE_GUIDE_HEIGHT_MM = 4;
+const TEST_TUBE_GUIDE_TOP_INSET_MM = 8;
+const TEST_TUBE_ARM_COUNT = 3;
+const TEST_TUBE_ARM_RADIUS_MM = 0.8;
+const TEST_TUBE_ARM_SEGMENTS = 8;
+const TEST_TUBE_ARM_PATH_SAMPLES = 7;
+const TEST_TUBE_RING_SEGMENTS = 32;
+const TEST_TUBE_SUPPORT_WALL_MARGIN_MM = 0.8;
 
 function hasActiveTexture(params: VaseParameters): boolean {
   if (params.textureMode === "Pas de texture") return false;
@@ -93,6 +104,101 @@ function scaleMeshData(mesh: MeshData, scale: number): MeshData {
     vertices: scaledVertices,
     indices: mesh.indices,
   };
+}
+
+function pointInContour(contour: Float64Array, x: number, y: number): boolean {
+  const count = contour.length / 2;
+  let isInside = false;
+
+  for (let index = 0, previous = count - 1; index < count; previous = index++) {
+    const xi = contour[index * 2];
+    const yi = contour[index * 2 + 1];
+    const xj = contour[previous * 2];
+    const yj = contour[previous * 2 + 1];
+    const intersects =
+      yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi || Number.EPSILON) + xi;
+    if (intersects) {
+      isInside = !isInside;
+    }
+  }
+
+  return isInside;
+}
+
+function distanceToSegment(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const apx = px - ax;
+  const apy = py - ay;
+  const squaredLength = abx * abx + aby * aby;
+
+  if (squaredLength <= Number.EPSILON) {
+    return Math.hypot(px - ax, py - ay);
+  }
+
+  const projected = Math.max(0, Math.min(1, (apx * abx + apy * aby) / squaredLength));
+  return Math.hypot(px - (ax + projected * abx), py - (ay + projected * aby));
+}
+
+function distanceFromOriginToContourEdges(contour: Float64Array): number {
+  const count = contour.length / 2;
+  let minimumDistance = Number.POSITIVE_INFINITY;
+
+  for (let index = 0; index < count; index++) {
+    const nextIndex = (index + 1) % count;
+    minimumDistance = Math.min(
+      minimumDistance,
+      distanceToSegment(
+        0,
+        0,
+        contour[index * 2],
+        contour[index * 2 + 1],
+        contour[nextIndex * 2],
+        contour[nextIndex * 2 + 1],
+      ),
+    );
+  }
+
+  return minimumDistance;
+}
+
+function cross2D(ax: number, ay: number, bx: number, by: number): number {
+  return ax * by - ay * bx;
+}
+
+function findRayContourRadius(contour: Float64Array, angle: number): number | null {
+  const directionX = Math.cos(angle);
+  const directionY = Math.sin(angle);
+  const count = contour.length / 2;
+  let bestRadius = Number.POSITIVE_INFINITY;
+
+  for (let index = 0; index < count; index++) {
+    const nextIndex = (index + 1) % count;
+    const ax = contour[index * 2];
+    const ay = contour[index * 2 + 1];
+    const segmentX = contour[nextIndex * 2] - ax;
+    const segmentY = contour[nextIndex * 2 + 1] - ay;
+    const denominator = cross2D(directionX, directionY, segmentX, segmentY);
+
+    if (Math.abs(denominator) <= Number.EPSILON) {
+      continue;
+    }
+
+    const rayDistance = cross2D(ax, ay, segmentX, segmentY) / denominator;
+    const segmentRatio = cross2D(ax, ay, directionX, directionY) / denominator;
+    if (rayDistance >= 0 && segmentRatio >= 0 && segmentRatio <= 1) {
+      bestRadius = Math.min(bestRadius, rayDistance);
+    }
+  }
+
+  return Number.isFinite(bestRadius) ? bestRadius : null;
 }
 
 function interpolatedOuterContour(params: VaseParameters, zMm: number): Float64Array {
@@ -205,6 +311,290 @@ function buildInnerWallSourceContours(
   return { zInner, sourceContours };
 }
 
+interface TestTubeSupportPoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
+function normalizeVector(x: number, y: number, z: number): TestTubeSupportPoint {
+  const length = Math.hypot(x, y, z);
+  if (length <= Number.EPSILON) {
+    return { x: 1, y: 0, z: 0 };
+  }
+
+  return { x: x / length, y: y / length, z: z / length };
+}
+
+function addSweptTube(
+  verts: number[],
+  faces: number[],
+  path: readonly TestTubeSupportPoint[],
+  radius: number,
+  segments: number,
+) {
+  if (radius <= 0 || path.length < 2 || segments < 3) {
+    return;
+  }
+
+  const ringStarts: number[] = [];
+
+  for (let pointIndex = 0; pointIndex < path.length; pointIndex++) {
+    const point = path[pointIndex];
+    const previousPoint = path[Math.max(0, pointIndex - 1)];
+    const nextPoint = path[Math.min(path.length - 1, pointIndex + 1)];
+    const tangent = normalizeVector(
+      nextPoint.x - previousPoint.x,
+      nextPoint.y - previousPoint.y,
+      nextPoint.z - previousPoint.z,
+    );
+    const radialAngle = Math.atan2(point.y, point.x);
+    const tangentAroundZ = {
+      x: -Math.sin(radialAngle),
+      y: Math.cos(radialAngle),
+      z: 0,
+    };
+    const cross = normalizeVector(
+      tangent.y * tangentAroundZ.z - tangent.z * tangentAroundZ.y,
+      tangent.z * tangentAroundZ.x - tangent.x * tangentAroundZ.z,
+      tangent.x * tangentAroundZ.y - tangent.y * tangentAroundZ.x,
+    );
+
+    const ringStart = verts.length / 3;
+    for (let segmentIndex = 0; segmentIndex < segments; segmentIndex++) {
+      const angle = (segmentIndex / segments) * Math.PI * 2;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      verts.push(
+        point.x + (tangentAroundZ.x * cos + cross.x * sin) * radius,
+        point.y + (tangentAroundZ.y * cos + cross.y * sin) * radius,
+        point.z + (tangentAroundZ.z * cos + cross.z * sin) * radius,
+      );
+    }
+    ringStarts.push(ringStart);
+  }
+
+  for (let ringIndex = 0; ringIndex < ringStarts.length - 1; ringIndex++) {
+    const currentRing = ringStarts[ringIndex];
+    const nextRing = ringStarts[ringIndex + 1];
+    for (let segmentIndex = 0; segmentIndex < segments; segmentIndex++) {
+      const nextSegmentIndex = (segmentIndex + 1) % segments;
+      const a = currentRing + segmentIndex;
+      const b = currentRing + nextSegmentIndex;
+      const c = nextRing + segmentIndex;
+      const d = nextRing + nextSegmentIndex;
+      faces.push(a, b, c, b, d, c);
+    }
+  }
+
+  const firstCenter = verts.length / 3;
+  verts.push(path[0].x, path[0].y, path[0].z);
+  const firstRing = ringStarts[0];
+  for (let segmentIndex = 0; segmentIndex < segments; segmentIndex++) {
+    faces.push(firstCenter, firstRing + segmentIndex, firstRing + ((segmentIndex + 1) % segments));
+  }
+
+  const lastCenter = verts.length / 3;
+  const lastPathPoint = path[path.length - 1];
+  verts.push(lastPathPoint.x, lastPathPoint.y, lastPathPoint.z);
+  const lastRing = ringStarts[ringStarts.length - 1];
+  for (let segmentIndex = 0; segmentIndex < segments; segmentIndex++) {
+    faces.push(lastCenter, lastRing + ((segmentIndex + 1) % segments), lastRing + segmentIndex);
+  }
+}
+
+function addClosedRing(
+  verts: number[],
+  faces: number[],
+  innerRadius: number,
+  outerRadius: number,
+  zBottom: number,
+  zTop: number,
+  segments: number,
+) {
+  if (innerRadius <= 0 || outerRadius <= innerRadius || zTop <= zBottom || segments < 3) {
+    return;
+  }
+
+  const outerBottomStart = verts.length / 3;
+  for (let index = 0; index < segments; index++) {
+    const angle = (index / segments) * Math.PI * 2;
+    verts.push(Math.cos(angle) * outerRadius, Math.sin(angle) * outerRadius, zBottom);
+  }
+
+  const outerTopStart = verts.length / 3;
+  for (let index = 0; index < segments; index++) {
+    const angle = (index / segments) * Math.PI * 2;
+    verts.push(Math.cos(angle) * outerRadius, Math.sin(angle) * outerRadius, zTop);
+  }
+
+  const innerBottomStart = verts.length / 3;
+  for (let index = 0; index < segments; index++) {
+    const angle = (index / segments) * Math.PI * 2;
+    verts.push(Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius, zBottom);
+  }
+
+  const innerTopStart = verts.length / 3;
+  for (let index = 0; index < segments; index++) {
+    const angle = (index / segments) * Math.PI * 2;
+    verts.push(Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius, zTop);
+  }
+
+  for (let index = 0; index < segments; index++) {
+    const nextIndex = (index + 1) % segments;
+    const outerBottomA = outerBottomStart + index;
+    const outerBottomB = outerBottomStart + nextIndex;
+    const outerTopA = outerTopStart + index;
+    const outerTopB = outerTopStart + nextIndex;
+    const innerBottomA = innerBottomStart + index;
+    const innerBottomB = innerBottomStart + nextIndex;
+    const innerTopA = innerTopStart + index;
+    const innerTopB = innerTopStart + nextIndex;
+
+    faces.push(outerBottomA, outerBottomB, outerTopA, outerBottomB, outerTopB, outerTopA);
+    faces.push(innerBottomA, innerTopA, innerBottomB, innerBottomB, innerTopA, innerTopB);
+    faces.push(outerTopA, outerTopB, innerTopA, outerTopB, innerTopB, innerTopA);
+    faces.push(outerBottomA, innerBottomA, outerBottomB, outerBottomB, innerBottomA, innerBottomB);
+  }
+}
+
+function canFitCenteredTestTubeSupport(
+  params: VaseParameters,
+  zValues: readonly number[],
+  requiredRadius: number,
+): boolean {
+  for (const zMm of zValues) {
+    const outerContour = interpolatedOuterContour(params, zMm);
+    const innerContour = computeInnerContour(outerContour, params.wallThicknessMm);
+    if (!pointInContour(innerContour, 0, 0)) {
+      return false;
+    }
+
+    if (
+      distanceFromOriginToContourEdges(innerContour) <
+      requiredRadius + TEST_TUBE_SUPPORT_WALL_MARGIN_MM
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function buildTestTubeSupportArmPath(
+  params: VaseParameters,
+  angle: number,
+  guideBottomZ: number,
+  zInnerBottom: number,
+): TestTubeSupportPoint[] | null {
+  const guideOuterRadius = TEST_TUBE_GUIDE_OUTER_RADIUS_MM;
+  const guideInnerContour = computeInnerContour(
+    interpolatedOuterContour(params, guideBottomZ),
+    params.wallThicknessMm,
+  );
+  const guideWallRadius = findRayContourRadius(guideInnerContour, angle);
+  if (
+    guideWallRadius === null ||
+    guideWallRadius <= guideOuterRadius + TEST_TUBE_SUPPORT_WALL_MARGIN_MM
+  ) {
+    return null;
+  }
+
+  const radialSpan = guideWallRadius - guideOuterRadius;
+  const attachZ = Math.max(zInnerBottom + TEST_TUBE_ARM_RADIUS_MM, guideBottomZ - radialSpan);
+  const attachInnerContour = computeInnerContour(
+    interpolatedOuterContour(params, attachZ),
+    params.wallThicknessMm,
+  );
+  const attachWallRadius = findRayContourRadius(attachInnerContour, angle);
+  if (
+    attachWallRadius === null ||
+    attachWallRadius <= guideOuterRadius + TEST_TUBE_SUPPORT_WALL_MARGIN_MM
+  ) {
+    return null;
+  }
+
+  const startRadius = Math.max(
+    guideOuterRadius + TEST_TUBE_ARM_RADIUS_MM,
+    attachWallRadius - TEST_TUBE_ARM_RADIUS_MM * 0.55,
+  );
+  const endRadius = guideOuterRadius - TEST_TUBE_ARM_RADIUS_MM * 0.3;
+  const path: TestTubeSupportPoint[] = [];
+
+  for (let sampleIndex = 0; sampleIndex < TEST_TUBE_ARM_PATH_SAMPLES; sampleIndex++) {
+    const ratio = sampleIndex / (TEST_TUBE_ARM_PATH_SAMPLES - 1);
+    const radius = startRadius * (1 - ratio) + endRadius * ratio;
+    const z = attachZ * (1 - ratio) + guideBottomZ * ratio;
+    path.push({
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+      z,
+    });
+  }
+
+  return path;
+}
+
+function addTestTubeSupportIfNeeded(
+  params: VaseParameters,
+  verts: number[],
+  faces: number[],
+  zInnerBottom: number,
+) {
+  const compatibility = analyzeWaterproofInsertCompatibility(params);
+  if (compatibility.type !== "test_tube") {
+    return;
+  }
+
+  const guideTopZ = Math.min(
+    params.heightMm - 1,
+    Math.max(
+      zInnerBottom + TEST_TUBE_GUIDE_HEIGHT_MM + 1,
+      params.heightMm - TEST_TUBE_GUIDE_TOP_INSET_MM,
+    ),
+  );
+  const guideBottomZ = guideTopZ - TEST_TUBE_GUIDE_HEIGHT_MM;
+
+  if (guideBottomZ <= zInnerBottom) {
+    return;
+  }
+
+  if (
+    !canFitCenteredTestTubeSupport(
+      params,
+      [guideBottomZ, guideTopZ],
+      TEST_TUBE_GUIDE_OUTER_RADIUS_MM,
+    )
+  ) {
+    return;
+  }
+
+  const armPaths: TestTubeSupportPoint[][] = [];
+  for (let index = 0; index < TEST_TUBE_ARM_COUNT; index++) {
+    const angle = (index / TEST_TUBE_ARM_COUNT) * Math.PI * 2;
+    const path = buildTestTubeSupportArmPath(params, angle, guideBottomZ, zInnerBottom);
+    if (!path) {
+      return;
+    }
+
+    armPaths.push(path);
+  }
+
+  addClosedRing(
+    verts,
+    faces,
+    TEST_TUBE_GUIDE_INNER_RADIUS_MM,
+    TEST_TUBE_GUIDE_OUTER_RADIUS_MM,
+    guideBottomZ,
+    guideTopZ,
+    TEST_TUBE_RING_SEGMENTS,
+  );
+
+  for (const path of armPaths) {
+    addSweptTube(verts, faces, path, TEST_TUBE_ARM_RADIUS_MM, TEST_TUBE_ARM_SEGMENTS);
+  }
+}
+
 /**
  * Generate the full vase mesh. Returns vertices (Float32Array, xyz flat) and indices (Uint32Array).
  */
@@ -314,6 +704,8 @@ function generateVaseMeshInternal(params: VaseParameters): MeshData {
       faces.push(innerCenter, a, b);
     }
   }
+
+  addTestTubeSupportIfNeeded(params, verts, faces, zInnerBottom);
 
   return {
     vertices: new Float32Array(verts),

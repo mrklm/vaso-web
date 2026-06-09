@@ -57,12 +57,12 @@ export const INSERT_PRESETS: readonly InsertPreset[] = [
     clearanceMm: 3,
   },
   {
-    id: "test-tube-75x20",
-    label: "Tube à essai 75 × 20 mm",
+    id: "test-tube-75x12",
+    label: "Tube à essai 75 × 12 mm",
     type: "test_tube",
     heightMm: 75,
-    topDiameterMm: 21.5,
-    bottomDiameterMm: 21.5,
+    topDiameterMm: 13.5,
+    bottomDiameterMm: 13.5,
     clearanceMm: 1.5,
   },
 ] as const;
@@ -110,7 +110,10 @@ function computeSharedFacetSeamVertexIndex(profiles: VaseParameters["profiles"])
   return bestIndex;
 }
 
-function buildOrderedContours(params: VaseParameters): { zPositions: number[]; contours: Float64Array[] } {
+function buildOrderedContours(params: VaseParameters): {
+  zPositions: number[];
+  contours: Float64Array[];
+} {
   const profiles = [...params.profiles].sort((a, b) => a.zRatio - b.zRatio);
   const zPositions = profiles.map((profile) => profile.zRatio * params.heightMm);
   const sharedFacetSeamVertex = shouldKeepFacetEdgeSeamIdentity(profiles)
@@ -164,7 +167,8 @@ function pointInPolygon(contour: Float64Array, x: number, y: number): boolean {
     const yi = contour[index * 2 + 1];
     const xj = contour[previous * 2];
     const yj = contour[previous * 2 + 1];
-    const intersects = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi || Number.EPSILON) + xi;
+    const intersects =
+      yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi || Number.EPSILON) + xi;
     if (intersects) {
       isInside = !isInside;
     }
@@ -173,7 +177,14 @@ function pointInPolygon(contour: Float64Array, x: number, y: number): boolean {
   return isInside;
 }
 
-function distancePointToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+function distancePointToSegment(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
   const abx = bx - ax;
   const aby = by - ay;
   const squaredLength = abx * abx + aby * aby;
@@ -328,7 +339,10 @@ function getInterpolatedAvailableDiameter(
       }
 
       const interpolation = (zMm - zStart) / (zEnd - zStart);
-      return availableDiameters[index] * (1 - interpolation) + availableDiameters[index + 1] * interpolation;
+      return (
+        availableDiameters[index] * (1 - interpolation) +
+        availableDiameters[index + 1] * interpolation
+      );
     }
   }
 
@@ -354,8 +368,14 @@ function isPresetCompatible(
     return false;
   }
 
-  const openingDiameter = getInterpolatedAvailableDiameter(availabilityProfile.topZ, availabilityProfile);
-  const largestPresetDiameter = Math.max(preset.topDiameterMm, preset.bottomDiameterMm ?? preset.topDiameterMm);
+  const openingDiameter = getInterpolatedAvailableDiameter(
+    availabilityProfile.topZ,
+    availabilityProfile,
+  );
+  const largestPresetDiameter = Math.max(
+    preset.topDiameterMm,
+    preset.bottomDiameterMm ?? preset.topDiameterMm,
+  );
   if (openingDiameter + INSERT_DIAMETER_TOLERANCE_MM < largestPresetDiameter) {
     return false;
   }
@@ -374,7 +394,9 @@ function isPresetCompatible(
   return true;
 }
 
-export function analyzeWaterproofInsertCompatibility(params: VaseParameters): WaterproofInsertCompatibility {
+export function analyzeWaterproofInsertCompatibility(
+  params: VaseParameters,
+): WaterproofInsertCompatibility {
   const availabilityProfile = buildInnerAvailabilityProfile(params);
 
   for (const preset of INSERT_PRESETS) {
