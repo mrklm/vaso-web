@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.53] - 2026-06-09
+
+### 🎨 Modifié
+ - Remplace les nervures sous l'anneau du support tube à essai par des bras courbes qui s'evasent jusqu'a l'anneau
+
 ## [1.0.52] - 2026-06-09
 
 ### 🎨 Modifié

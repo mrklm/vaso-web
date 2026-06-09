@@ -32,12 +32,12 @@ const TEST_TUBE_GUIDE_HEIGHT_MM = 4;
 const TEST_TUBE_GUIDE_TOP_INSET_MM = 8;
 const TEST_TUBE_ARM_COUNT = 3;
 const TEST_TUBE_ARM_RADIUS_MM = 0.8;
+const TEST_TUBE_ARM_END_RADIUS_MM = 2.1;
+const TEST_TUBE_ARM_FLARE_START_RATIO = 0.55;
+const TEST_TUBE_ARM_CURVE_RAD = 0.22;
 const TEST_TUBE_ARM_SEGMENTS = 8;
 const TEST_TUBE_ARM_PATH_SAMPLES = 7;
 const TEST_TUBE_RING_SEGMENTS = 32;
-const TEST_TUBE_GUSSET_HEIGHT_MM = 8;
-const TEST_TUBE_GUSSET_THICKNESS_MM = 1.2;
-const TEST_TUBE_GUSSET_TOP_OVERLAP_MM = 0.35;
 const TEST_TUBE_SUPPORT_WALL_MARGIN_MM = 0.8;
 
 function hasActiveTexture(params: VaseParameters): boolean {
@@ -333,10 +333,13 @@ function addSweptTube(
   verts: number[],
   faces: number[],
   path: readonly TestTubeSupportPoint[],
-  radius: number,
+  radius: number | readonly number[],
   segments: number,
 ) {
-  if (radius <= 0 || path.length < 2 || segments < 3) {
+  const radiusAt = (pointIndex: number): number =>
+    typeof radius === "number" ? radius : (radius[pointIndex] ?? radius[radius.length - 1] ?? 0);
+
+  if (radiusAt(0) <= 0 || path.length < 2 || segments < 3) {
     return;
   }
 
@@ -364,14 +367,15 @@ function addSweptTube(
     );
 
     const ringStart = verts.length / 3;
+    const pointRadius = radiusAt(pointIndex);
     for (let segmentIndex = 0; segmentIndex < segments; segmentIndex++) {
       const angle = (segmentIndex / segments) * Math.PI * 2;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
       verts.push(
-        point.x + (tangentAroundZ.x * cos + cross.x * sin) * radius,
-        point.y + (tangentAroundZ.y * cos + cross.y * sin) * radius,
-        point.z + (tangentAroundZ.z * cos + cross.z * sin) * radius,
+        point.x + (tangentAroundZ.x * cos + cross.x * sin) * pointRadius,
+        point.y + (tangentAroundZ.y * cos + cross.y * sin) * pointRadius,
+        point.z + (tangentAroundZ.z * cos + cross.z * sin) * pointRadius,
       );
     }
     ringStarts.push(ringStart);
@@ -461,55 +465,6 @@ function addClosedRing(
   }
 }
 
-function addTestTubeRingGusset(
-  verts: number[],
-  faces: number[],
-  angle: number,
-  innerRadius: number,
-  outerRadius: number,
-  zBottom: number,
-  zInnerBottom: number,
-) {
-  const bottomZ = Math.max(
-    zInnerBottom + TEST_TUBE_ARM_RADIUS_MM,
-    zBottom - TEST_TUBE_GUSSET_HEIGHT_MM,
-  );
-  if (bottomZ >= zBottom - Number.EPSILON) {
-    return;
-  }
-
-  const centerRadius = (innerRadius + outerRadius) / 2;
-  const bottomRadius = centerRadius;
-  const topInnerRadius = Math.max(0, innerRadius - TEST_TUBE_GUSSET_TOP_OVERLAP_MM);
-  const topOuterRadius = outerRadius + TEST_TUBE_GUSSET_TOP_OVERLAP_MM;
-  const radial = { x: Math.cos(angle), y: Math.sin(angle) };
-  const tangent = { x: -Math.sin(angle), y: Math.cos(angle) };
-  const halfThickness = TEST_TUBE_GUSSET_THICKNESS_MM / 2;
-
-  const pushPoint = (radius: number, tangentOffset: number, z: number): number => {
-    const index = verts.length / 3;
-    verts.push(
-      radial.x * radius + tangent.x * tangentOffset,
-      radial.y * radius + tangent.y * tangentOffset,
-      z,
-    );
-    return index;
-  };
-
-  const bottomLeft = pushPoint(bottomRadius, -halfThickness, bottomZ);
-  const bottomRight = pushPoint(bottomRadius, halfThickness, bottomZ);
-  const topInnerLeft = pushPoint(topInnerRadius, -halfThickness, zBottom);
-  const topInnerRight = pushPoint(topInnerRadius, halfThickness, zBottom);
-  const topOuterLeft = pushPoint(topOuterRadius, -halfThickness, zBottom);
-  const topOuterRight = pushPoint(topOuterRadius, halfThickness, zBottom);
-
-  faces.push(bottomLeft, topInnerLeft, topOuterLeft);
-  faces.push(bottomRight, topOuterRight, topInnerRight);
-  faces.push(bottomLeft, bottomRight, topInnerLeft, bottomRight, topInnerRight, topInnerLeft);
-  faces.push(topInnerLeft, topInnerRight, topOuterLeft, topInnerRight, topOuterRight, topOuterLeft);
-  faces.push(bottomLeft, topOuterLeft, bottomRight, bottomRight, topOuterLeft, topOuterRight);
-}
-
 function canFitCenteredTestTubeSupport(
   params: VaseParameters,
   zValues: readonly number[],
@@ -570,21 +525,42 @@ function buildTestTubeSupportArmPath(
     guideOuterRadius + TEST_TUBE_ARM_RADIUS_MM,
     attachWallRadius - TEST_TUBE_ARM_RADIUS_MM * 0.55,
   );
-  const endRadius = guideOuterRadius - TEST_TUBE_ARM_RADIUS_MM * 0.3;
+  const endRadius = (TEST_TUBE_GUIDE_INNER_RADIUS_MM + TEST_TUBE_GUIDE_OUTER_RADIUS_MM) / 2;
   const path: TestTubeSupportPoint[] = [];
 
   for (let sampleIndex = 0; sampleIndex < TEST_TUBE_ARM_PATH_SAMPLES; sampleIndex++) {
     const ratio = sampleIndex / (TEST_TUBE_ARM_PATH_SAMPLES - 1);
     const radius = startRadius * (1 - ratio) + endRadius * ratio;
+    const curvedAngle = angle + Math.sin(Math.PI * ratio) * TEST_TUBE_ARM_CURVE_RAD;
     const z = attachZ * (1 - ratio) + guideBottomZ * ratio;
     path.push({
-      x: Math.cos(angle) * radius,
-      y: Math.sin(angle) * radius,
+      x: Math.cos(curvedAngle) * radius,
+      y: Math.sin(curvedAngle) * radius,
       z,
     });
   }
 
   return path;
+}
+
+function buildTestTubeSupportArmRadii(sampleCount: number): number[] {
+  const radii: number[] = [];
+  for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+    const ratio = sampleCount <= 1 ? 1 : sampleIndex / (sampleCount - 1);
+    const flareRatio = Math.max(
+      0,
+      Math.min(
+        1,
+        (ratio - TEST_TUBE_ARM_FLARE_START_RATIO) / (1 - TEST_TUBE_ARM_FLARE_START_RATIO),
+      ),
+    );
+    const easedFlare = flareRatio * flareRatio * (3 - 2 * flareRatio);
+    radii.push(
+      TEST_TUBE_ARM_RADIUS_MM * (1 - easedFlare) + TEST_TUBE_ARM_END_RADIUS_MM * easedFlare,
+    );
+  }
+
+  return radii;
 }
 
 function addTestTubeSupportIfNeeded(
@@ -622,7 +598,6 @@ function addTestTubeSupportIfNeeded(
   }
 
   const armPaths: TestTubeSupportPoint[][] = [];
-  const armAngles: number[] = [];
   for (let index = 0; index < TEST_TUBE_ARM_COUNT; index++) {
     const angle = (index / TEST_TUBE_ARM_COUNT) * Math.PI * 2;
     const path = buildTestTubeSupportArmPath(params, angle, guideBottomZ, zInnerBottom);
@@ -631,19 +606,6 @@ function addTestTubeSupportIfNeeded(
     }
 
     armPaths.push(path);
-    armAngles.push(angle);
-  }
-
-  for (const angle of armAngles) {
-    addTestTubeRingGusset(
-      verts,
-      faces,
-      angle,
-      TEST_TUBE_GUIDE_INNER_RADIUS_MM,
-      TEST_TUBE_GUIDE_OUTER_RADIUS_MM,
-      guideBottomZ,
-      zInnerBottom,
-    );
   }
 
   addClosedRing(
@@ -657,7 +619,13 @@ function addTestTubeSupportIfNeeded(
   );
 
   for (const path of armPaths) {
-    addSweptTube(verts, faces, path, TEST_TUBE_ARM_RADIUS_MM, TEST_TUBE_ARM_SEGMENTS);
+    addSweptTube(
+      verts,
+      faces,
+      path,
+      buildTestTubeSupportArmRadii(path.length),
+      TEST_TUBE_ARM_SEGMENTS,
+    );
   }
 }
 
