@@ -33,27 +33,27 @@ export const INSERT_PRESETS: readonly InsertPreset[] = [
     id: "eco-cup-50cl",
     label: "Eco-Cup 50 cl",
     type: "eco_cup",
-    heightMm: 166,
-    topDiameterMm: 88,
-    bottomDiameterMm: 67,
+    heightMm: 163,
+    topDiameterMm: 85,
+    bottomDiameterMm: 64,
     clearanceMm: 3,
   },
   {
     id: "eco-cup-25cl",
     label: "Eco-Cup 25 cl",
     type: "eco_cup",
-    heightMm: 118,
-    topDiameterMm: 76,
-    bottomDiameterMm: 58,
+    heightMm: 115,
+    topDiameterMm: 73,
+    bottomDiameterMm: 55,
     clearanceMm: 3,
   },
   {
     id: "eco-cup-12-5cl",
     label: "Eco-Cup 12,5 cl",
     type: "eco_cup",
-    heightMm: 98,
-    topDiameterMm: 67,
-    bottomDiameterMm: 53,
+    heightMm: 95,
+    topDiameterMm: 64,
+    bottomDiameterMm: 50,
     clearanceMm: 3,
   },
   {
@@ -61,8 +61,8 @@ export const INSERT_PRESETS: readonly InsertPreset[] = [
     label: "Tube à essai 75 × 12 mm",
     type: "test_tube",
     heightMm: 75,
-    topDiameterMm: 13.5,
-    bottomDiameterMm: 13.5,
+    topDiameterMm: 12,
+    bottomDiameterMm: 12,
     clearanceMm: 1.5,
   },
 ] as const;
@@ -352,11 +352,15 @@ function getInterpolatedAvailableDiameter(
 function getPresetDiameterAtDepth(preset: InsertPreset, depthFromTopMm: number): number {
   const bottomDiameterMm = preset.bottomDiameterMm ?? preset.topDiameterMm;
   if (preset.heightMm <= Number.EPSILON) {
-    return Math.max(preset.topDiameterMm, bottomDiameterMm);
+    return Math.max(preset.topDiameterMm, bottomDiameterMm) + preset.clearanceMm;
   }
 
   const ratio = Math.max(0, Math.min(1, depthFromTopMm / preset.heightMm));
-  return preset.topDiameterMm * (1 - ratio) + bottomDiameterMm * ratio;
+  return preset.topDiameterMm * (1 - ratio) + bottomDiameterMm * ratio + preset.clearanceMm;
+}
+
+function getPresetRequiredHeight(preset: InsertPreset): number {
+  return preset.type === "eco_cup" ? preset.heightMm + preset.clearanceMm : preset.heightMm;
 }
 
 function isPresetCompatible(
@@ -364,7 +368,8 @@ function isPresetCompatible(
   availabilityProfile: ReturnType<typeof buildInnerAvailabilityProfile>,
 ): boolean {
   const availableDepthMm = availabilityProfile.topZ - availabilityProfile.bottomZ;
-  if (availableDepthMm + INSERT_DIAMETER_TOLERANCE_MM < preset.heightMm) {
+  const requiredHeight = getPresetRequiredHeight(preset);
+  if (availableDepthMm + INSERT_DIAMETER_TOLERANCE_MM < requiredHeight) {
     return false;
   }
 
@@ -372,20 +377,20 @@ function isPresetCompatible(
     availabilityProfile.topZ,
     availabilityProfile,
   );
-  const largestPresetDiameter = Math.max(
-    preset.topDiameterMm,
-    preset.bottomDiameterMm ?? preset.topDiameterMm,
-  );
+  const largestPresetDiameter =
+    Math.max(preset.topDiameterMm, preset.bottomDiameterMm ?? preset.topDiameterMm) +
+    preset.clearanceMm;
   if (openingDiameter + INSERT_DIAMETER_TOLERANCE_MM < largestPresetDiameter) {
     return false;
   }
 
   for (let sampleIndex = 0; sampleIndex <= INSERT_FIT_SAMPLES; sampleIndex++) {
     const ratio = sampleIndex / INSERT_FIT_SAMPLES;
-    const depthFromTopMm = preset.heightMm * ratio;
+    const depthFromTopMm = requiredHeight * ratio;
     const zMm = availabilityProfile.topZ - depthFromTopMm;
     const availableDiameter = getInterpolatedAvailableDiameter(zMm, availabilityProfile);
-    const requiredDiameter = getPresetDiameterAtDepth(preset, depthFromTopMm);
+    const presetDepthFromTopMm = Math.min(preset.heightMm, depthFromTopMm);
+    const requiredDiameter = getPresetDiameterAtDepth(preset, presetDepthFromTopMm);
     if (availableDiameter + INSERT_DIAMETER_TOLERANCE_MM < requiredDiameter) {
       return false;
     }

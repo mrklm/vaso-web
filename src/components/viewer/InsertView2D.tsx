@@ -96,9 +96,7 @@ export function InsertView2D() {
 
   const dimensionsLabel =
     preset.type === "eco_cup"
-      ? `${preset.heightMm - 3} × ${preset.topDiameterMm - 3} / ${(
-          (preset.bottomDiameterMm ?? preset.topDiameterMm) - 3
-        ).toFixed(0)} mm`
+      ? `${preset.heightMm} × ${preset.topDiameterMm} / ${(preset.bottomDiameterMm ?? preset.topDiameterMm).toFixed(0)} mm`
       : "75 × 12 mm";
 
   return (

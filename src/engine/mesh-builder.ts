@@ -32,12 +32,14 @@ const TEST_TUBE_GUIDE_HEIGHT_MM = 4;
 const TEST_TUBE_GUIDE_TOP_INSET_MM = 8;
 const TEST_TUBE_ARM_COUNT = 3;
 const TEST_TUBE_ARM_RADIUS_MM = 0.8;
-const TEST_TUBE_ARM_END_RADIUS_MM = 2.1;
 const TEST_TUBE_ARM_FLARE_START_RATIO = 0.55;
 const TEST_TUBE_ARM_CURVE_RAD = 0.22;
-const TEST_TUBE_ARM_SEGMENTS = 8;
 const TEST_TUBE_ARM_PATH_SAMPLES = 7;
 const TEST_TUBE_RING_SEGMENTS = 32;
+const TEST_TUBE_WEB_THICKNESS_MM = 1.4;
+const TEST_TUBE_WEB_TOP_OVERLAP_MM = 0.45;
+const TEST_TUBE_WEB_FINAL_ARC_RATIO = 0.88;
+const TEST_TUBE_WEB_FINAL_RADIAL_OVERLAP_MM = 0.45;
 const TEST_TUBE_SUPPORT_WALL_MARGIN_MM = 0.8;
 
 function hasActiveTexture(params: VaseParameters): boolean {
@@ -320,93 +322,89 @@ interface TestTubeSupportPoint {
   z: number;
 }
 
-function normalizeVector(x: number, y: number, z: number): TestTubeSupportPoint {
-  const length = Math.hypot(x, y, z);
-  if (length <= Number.EPSILON) {
-    return { x: 1, y: 0, z: 0 };
-  }
-
-  return { x: x / length, y: y / length, z: z / length };
-}
-
-function addSweptTube(
+function addFlaredSupportWeb(
   verts: number[],
   faces: number[],
   path: readonly TestTubeSupportPoint[],
-  radius: number | readonly number[],
-  segments: number,
+  zInnerBottom: number,
 ) {
-  const radiusAt = (pointIndex: number): number =>
-    typeof radius === "number" ? radius : (radius[pointIndex] ?? radius[radius.length - 1] ?? 0);
-
-  if (radiusAt(0) <= 0 || path.length < 2 || segments < 3) {
+  if (path.length < 2) {
     return;
   }
 
-  const ringStarts: number[] = [];
+  const ringCenterRadius = (TEST_TUBE_GUIDE_INNER_RADIUS_MM + TEST_TUBE_GUIDE_OUTER_RADIUS_MM) / 2;
+  const finalHalfAngle = (Math.PI / TEST_TUBE_ARM_COUNT) * TEST_TUBE_WEB_FINAL_ARC_RATIO;
+  const finalHalfRadial =
+    (TEST_TUBE_GUIDE_OUTER_RADIUS_MM - TEST_TUBE_GUIDE_INNER_RADIUS_MM) / 2 +
+    TEST_TUBE_WEB_FINAL_RADIAL_OVERLAP_MM;
+  const sectionStarts: number[] = [];
 
   for (let pointIndex = 0; pointIndex < path.length; pointIndex++) {
     const point = path[pointIndex];
-    const previousPoint = path[Math.max(0, pointIndex - 1)];
-    const nextPoint = path[Math.min(path.length - 1, pointIndex + 1)];
-    const tangent = normalizeVector(
-      nextPoint.x - previousPoint.x,
-      nextPoint.y - previousPoint.y,
-      nextPoint.z - previousPoint.z,
+    const ratio = pointIndex / (path.length - 1);
+    const flareRatio = Math.max(
+      0,
+      Math.min(
+        1,
+        (ratio - TEST_TUBE_ARM_FLARE_START_RATIO) / (1 - TEST_TUBE_ARM_FLARE_START_RATIO),
+      ),
     );
-    const radialAngle = Math.atan2(point.y, point.x);
-    const tangentAroundZ = {
-      x: -Math.sin(radialAngle),
-      y: Math.cos(radialAngle),
-      z: 0,
-    };
-    const cross = normalizeVector(
-      tangent.y * tangentAroundZ.z - tangent.z * tangentAroundZ.y,
-      tangent.z * tangentAroundZ.x - tangent.x * tangentAroundZ.z,
-      tangent.x * tangentAroundZ.y - tangent.y * tangentAroundZ.x,
-    );
+    const easedFlare = flareRatio * flareRatio * (3 - 2 * flareRatio);
+    const centerRadius = Math.hypot(point.x, point.y);
+    const centerAngle = Math.atan2(point.y, point.x);
+    const halfAngle =
+      (TEST_TUBE_ARM_RADIUS_MM / Math.max(centerRadius, TEST_TUBE_ARM_RADIUS_MM)) *
+        (1 - easedFlare) +
+      finalHalfAngle * easedFlare;
+    const halfRadial = TEST_TUBE_ARM_RADIUS_MM * (1 - easedFlare) + finalHalfRadial * easedFlare;
+    const bottomZ = Math.max(zInnerBottom, point.z - TEST_TUBE_WEB_THICKNESS_MM / 2);
+    const topZ =
+      point.z + TEST_TUBE_WEB_THICKNESS_MM / 2 + TEST_TUBE_WEB_TOP_OVERLAP_MM * easedFlare;
+    const innerRadius = Math.max(0, centerRadius - halfRadial);
+    const outerRadius = Math.max(ringCenterRadius, centerRadius + halfRadial);
+    const leftAngle = centerAngle - halfAngle;
+    const rightAngle = centerAngle + halfAngle;
 
-    const ringStart = verts.length / 3;
-    const pointRadius = radiusAt(pointIndex);
-    for (let segmentIndex = 0; segmentIndex < segments; segmentIndex++) {
-      const angle = (segmentIndex / segments) * Math.PI * 2;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      verts.push(
-        point.x + (tangentAroundZ.x * cos + cross.x * sin) * pointRadius,
-        point.y + (tangentAroundZ.y * cos + cross.y * sin) * pointRadius,
-        point.z + (tangentAroundZ.z * cos + cross.z * sin) * pointRadius,
+    const pushPolar = (radius: number, angle: number, z: number) => {
+      verts.push(Math.cos(angle) * radius, Math.sin(angle) * radius, z);
+    };
+
+    const sectionStart = verts.length / 3;
+    pushPolar(innerRadius, leftAngle, bottomZ);
+    pushPolar(outerRadius, leftAngle, bottomZ);
+    pushPolar(outerRadius, rightAngle, bottomZ);
+    pushPolar(innerRadius, rightAngle, bottomZ);
+    pushPolar(innerRadius, rightAngle, topZ);
+    pushPolar(outerRadius, rightAngle, topZ);
+    pushPolar(outerRadius, leftAngle, topZ);
+    pushPolar(innerRadius, leftAngle, topZ);
+    sectionStarts.push(sectionStart);
+  }
+
+  for (let sectionIndex = 0; sectionIndex < sectionStarts.length - 1; sectionIndex++) {
+    const current = sectionStarts[sectionIndex];
+    const next = sectionStarts[sectionIndex + 1];
+    for (let vertexIndex = 0; vertexIndex < 8; vertexIndex++) {
+      const nextVertexIndex = (vertexIndex + 1) % 8;
+      faces.push(
+        current + vertexIndex,
+        current + nextVertexIndex,
+        next + vertexIndex,
+        current + nextVertexIndex,
+        next + nextVertexIndex,
+        next + vertexIndex,
       );
     }
-    ringStarts.push(ringStart);
   }
 
-  for (let ringIndex = 0; ringIndex < ringStarts.length - 1; ringIndex++) {
-    const currentRing = ringStarts[ringIndex];
-    const nextRing = ringStarts[ringIndex + 1];
-    for (let segmentIndex = 0; segmentIndex < segments; segmentIndex++) {
-      const nextSegmentIndex = (segmentIndex + 1) % segments;
-      const a = currentRing + segmentIndex;
-      const b = currentRing + nextSegmentIndex;
-      const c = nextRing + segmentIndex;
-      const d = nextRing + nextSegmentIndex;
-      faces.push(a, b, c, b, d, c);
-    }
+  const firstSection = sectionStarts[0];
+  for (let vertexIndex = 1; vertexIndex < 7; vertexIndex++) {
+    faces.push(firstSection, firstSection + vertexIndex, firstSection + vertexIndex + 1);
   }
 
-  const firstCenter = verts.length / 3;
-  verts.push(path[0].x, path[0].y, path[0].z);
-  const firstRing = ringStarts[0];
-  for (let segmentIndex = 0; segmentIndex < segments; segmentIndex++) {
-    faces.push(firstCenter, firstRing + segmentIndex, firstRing + ((segmentIndex + 1) % segments));
-  }
-
-  const lastCenter = verts.length / 3;
-  const lastPathPoint = path[path.length - 1];
-  verts.push(lastPathPoint.x, lastPathPoint.y, lastPathPoint.z);
-  const lastRing = ringStarts[ringStarts.length - 1];
-  for (let segmentIndex = 0; segmentIndex < segments; segmentIndex++) {
-    faces.push(lastCenter, lastRing + ((segmentIndex + 1) % segments), lastRing + segmentIndex);
+  const lastSection = sectionStarts[sectionStarts.length - 1];
+  for (let vertexIndex = 1; vertexIndex < 7; vertexIndex++) {
+    faces.push(lastSection, lastSection + vertexIndex + 1, lastSection + vertexIndex);
   }
 }
 
@@ -543,26 +541,6 @@ function buildTestTubeSupportArmPath(
   return path;
 }
 
-function buildTestTubeSupportArmRadii(sampleCount: number): number[] {
-  const radii: number[] = [];
-  for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
-    const ratio = sampleCount <= 1 ? 1 : sampleIndex / (sampleCount - 1);
-    const flareRatio = Math.max(
-      0,
-      Math.min(
-        1,
-        (ratio - TEST_TUBE_ARM_FLARE_START_RATIO) / (1 - TEST_TUBE_ARM_FLARE_START_RATIO),
-      ),
-    );
-    const easedFlare = flareRatio * flareRatio * (3 - 2 * flareRatio);
-    radii.push(
-      TEST_TUBE_ARM_RADIUS_MM * (1 - easedFlare) + TEST_TUBE_ARM_END_RADIUS_MM * easedFlare,
-    );
-  }
-
-  return radii;
-}
-
 function addTestTubeSupportIfNeeded(
   params: VaseParameters,
   verts: number[],
@@ -619,13 +597,7 @@ function addTestTubeSupportIfNeeded(
   );
 
   for (const path of armPaths) {
-    addSweptTube(
-      verts,
-      faces,
-      path,
-      buildTestTubeSupportArmRadii(path.length),
-      TEST_TUBE_ARM_SEGMENTS,
-    );
+    addFlaredSupportWeb(verts, faces, path, zInnerBottom);
   }
 }
 

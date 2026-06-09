@@ -7,6 +7,16 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.55] - 2026-06-09
+
+### 🎨 Modifié
+ - Rend explicite la marge de compatibilité des Eco-Cups et ajoute des tests de seuil
+
+## [1.0.54] - 2026-06-09
+
+### 🎨 Modifié
+ - Remplace les bras ponctuels du support tube à essai par trois secteurs évasés qui portent chacun environ un tiers de l'anneau
+
 ## [1.0.53] - 2026-06-09
 
 ### 🎨 Modifié

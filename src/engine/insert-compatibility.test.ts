@@ -50,6 +50,18 @@ describe("analyzeWaterproofInsertCompatibility", () => {
     ).toBe("Eco-Cup 12,5 cl");
   });
 
+  it("rejects an Eco-Cup 12,5 cl profile that only matches the cup dimensions without clearance", () => {
+    expect(analyzeWaterproofInsertCompatibility(createTwoProfileVase(98, 54.8, 68.8)).label).toBe(
+      "Tube à essai 75 × 12 mm",
+    );
+  });
+
+  it("requires clearance around the Eco-Cup 50 cl opening", () => {
+    expect(analyzeWaterproofInsertCompatibility(createTwoProfileVase(169, 71.8, 91.8)).label).toBe(
+      "Eco-Cup 25 cl",
+    );
+  });
+
   it("falls back below the 12,5 cl limit with margins applied", () => {
     expect(
       analyzeWaterproofInsertCompatibility(createTwoProfileVase(100.8, 57.6, 71.5)).label,
