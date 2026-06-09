@@ -35,6 +35,9 @@ const TEST_TUBE_ARM_RADIUS_MM = 0.8;
 const TEST_TUBE_ARM_SEGMENTS = 8;
 const TEST_TUBE_ARM_PATH_SAMPLES = 7;
 const TEST_TUBE_RING_SEGMENTS = 32;
+const TEST_TUBE_GUSSET_HEIGHT_MM = 8;
+const TEST_TUBE_GUSSET_THICKNESS_MM = 1.2;
+const TEST_TUBE_GUSSET_TOP_OVERLAP_MM = 0.35;
 const TEST_TUBE_SUPPORT_WALL_MARGIN_MM = 0.8;
 
 function hasActiveTexture(params: VaseParameters): boolean {
@@ -458,6 +461,55 @@ function addClosedRing(
   }
 }
 
+function addTestTubeRingGusset(
+  verts: number[],
+  faces: number[],
+  angle: number,
+  innerRadius: number,
+  outerRadius: number,
+  zBottom: number,
+  zInnerBottom: number,
+) {
+  const bottomZ = Math.max(
+    zInnerBottom + TEST_TUBE_ARM_RADIUS_MM,
+    zBottom - TEST_TUBE_GUSSET_HEIGHT_MM,
+  );
+  if (bottomZ >= zBottom - Number.EPSILON) {
+    return;
+  }
+
+  const centerRadius = (innerRadius + outerRadius) / 2;
+  const bottomRadius = centerRadius;
+  const topInnerRadius = Math.max(0, innerRadius - TEST_TUBE_GUSSET_TOP_OVERLAP_MM);
+  const topOuterRadius = outerRadius + TEST_TUBE_GUSSET_TOP_OVERLAP_MM;
+  const radial = { x: Math.cos(angle), y: Math.sin(angle) };
+  const tangent = { x: -Math.sin(angle), y: Math.cos(angle) };
+  const halfThickness = TEST_TUBE_GUSSET_THICKNESS_MM / 2;
+
+  const pushPoint = (radius: number, tangentOffset: number, z: number): number => {
+    const index = verts.length / 3;
+    verts.push(
+      radial.x * radius + tangent.x * tangentOffset,
+      radial.y * radius + tangent.y * tangentOffset,
+      z,
+    );
+    return index;
+  };
+
+  const bottomLeft = pushPoint(bottomRadius, -halfThickness, bottomZ);
+  const bottomRight = pushPoint(bottomRadius, halfThickness, bottomZ);
+  const topInnerLeft = pushPoint(topInnerRadius, -halfThickness, zBottom);
+  const topInnerRight = pushPoint(topInnerRadius, halfThickness, zBottom);
+  const topOuterLeft = pushPoint(topOuterRadius, -halfThickness, zBottom);
+  const topOuterRight = pushPoint(topOuterRadius, halfThickness, zBottom);
+
+  faces.push(bottomLeft, topInnerLeft, topOuterLeft);
+  faces.push(bottomRight, topOuterRight, topInnerRight);
+  faces.push(bottomLeft, bottomRight, topInnerLeft, bottomRight, topInnerRight, topInnerLeft);
+  faces.push(topInnerLeft, topInnerRight, topOuterLeft, topInnerRight, topOuterRight, topOuterLeft);
+  faces.push(bottomLeft, topOuterLeft, bottomRight, bottomRight, topOuterLeft, topOuterRight);
+}
+
 function canFitCenteredTestTubeSupport(
   params: VaseParameters,
   zValues: readonly number[],
@@ -570,6 +622,7 @@ function addTestTubeSupportIfNeeded(
   }
 
   const armPaths: TestTubeSupportPoint[][] = [];
+  const armAngles: number[] = [];
   for (let index = 0; index < TEST_TUBE_ARM_COUNT; index++) {
     const angle = (index / TEST_TUBE_ARM_COUNT) * Math.PI * 2;
     const path = buildTestTubeSupportArmPath(params, angle, guideBottomZ, zInnerBottom);
@@ -578,6 +631,19 @@ function addTestTubeSupportIfNeeded(
     }
 
     armPaths.push(path);
+    armAngles.push(angle);
+  }
+
+  for (const angle of armAngles) {
+    addTestTubeRingGusset(
+      verts,
+      faces,
+      angle,
+      TEST_TUBE_GUIDE_INNER_RADIUS_MM,
+      TEST_TUBE_GUIDE_OUTER_RADIUS_MM,
+      guideBottomZ,
+      zInnerBottom,
+    );
   }
 
   addClosedRing(

@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.52] - 2026-06-09
+
+### 🎨 Modifié
+ - Renforce l'anneau du support tube à essai avec des nervures imprimables sous les points d'accroche
+
 ## [1.0.51] - 2026-06-09
 
 ### 🎨 Ajouté
