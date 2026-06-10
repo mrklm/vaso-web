@@ -32,14 +32,14 @@ const TEST_TUBE_GUIDE_HEIGHT_MM = 4;
 const TEST_TUBE_GUIDE_TOP_INSET_MM = 8;
 const TEST_TUBE_ARM_COUNT = 3;
 const TEST_TUBE_ARM_RADIUS_MM = 0.8;
-const TEST_TUBE_ARM_FLARE_START_RATIO = 0.55;
+const TEST_TUBE_ARM_FLARE_START_RATIO = 0.18;
 const TEST_TUBE_ARM_CURVE_RAD = 0.22;
-const TEST_TUBE_ARM_PATH_SAMPLES = 7;
+const TEST_TUBE_ARM_PATH_SAMPLES = 9;
 const TEST_TUBE_RING_SEGMENTS = 32;
-const TEST_TUBE_WEB_THICKNESS_MM = 1.4;
-const TEST_TUBE_WEB_TOP_OVERLAP_MM = 0.45;
-const TEST_TUBE_WEB_FINAL_ARC_RATIO = 0.88;
-const TEST_TUBE_WEB_FINAL_RADIAL_OVERLAP_MM = 0.45;
+const TEST_TUBE_WEB_THICKNESS_MM = 1.8;
+const TEST_TUBE_WEB_TOP_OVERLAP_MM = 0.75;
+const TEST_TUBE_WEB_FINAL_ARC_RATIO = 1.08;
+const TEST_TUBE_WEB_FINAL_RADIAL_OVERLAP_MM = 0.85;
 const TEST_TUBE_SUPPORT_WALL_MARGIN_MM = 0.8;
 
 function hasActiveTexture(params: VaseParameters): boolean {
@@ -349,7 +349,7 @@ function addFlaredSupportWeb(
         (ratio - TEST_TUBE_ARM_FLARE_START_RATIO) / (1 - TEST_TUBE_ARM_FLARE_START_RATIO),
       ),
     );
-    const easedFlare = flareRatio * flareRatio * (3 - 2 * flareRatio);
+    const easedFlare = 1 - (1 - flareRatio) ** 3;
     const centerRadius = Math.hypot(point.x, point.y);
     const centerAngle = Math.atan2(point.y, point.x);
     const halfAngle =

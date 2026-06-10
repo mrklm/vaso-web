@@ -7,6 +7,11 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.56] - 2026-06-10
+
+### 🎨 Modifié
+ - Élargit plus tôt et plus fortement les secteurs du support tube à essai sous l'anneau
+
 ## [1.0.55] - 2026-06-09
 
 ### 🎨 Modifié
