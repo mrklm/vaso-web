@@ -4,7 +4,11 @@ import {
   generateOuterProfilePoints,
   generateTopOuterContour,
 } from "./mesh-builder";
-import { countBoundaryEdges, countConnectedMeshComponents } from "./mesh-cleanup";
+import {
+  countBoundaryEdges,
+  countConnectedMeshComponents,
+  countNonManifoldEdges,
+} from "./mesh-cleanup";
 import { defaultVaseParameters, createProfile, type VaseParameters } from "./types";
 
 function createTwoProfileVase(
@@ -127,16 +131,143 @@ describe("generateVaseMesh", () => {
     expect(countBoundaryEdges(mesh)).toBe(0);
   });
 
-  it("adds a closed minimal support when only a test tube fits", () => {
-    const params = createTwoProfileVase(120, 40, 30);
+  it.each([48, 72, 96])(
+    "adds a closed three-arm support when only a test tube fits at %i radial samples",
+    (radialSamples) => {
+      const params = createTwoProfileVase(120, 40, 30);
+      params.radialSamples = radialSamples;
+      const mesh = generateVaseMesh(params);
+
+      expect(hasTestTubeSupportVertices(mesh)).toBe(true);
+      expect(countConnectedMeshComponents(mesh)).toBe(1);
+      expect(countBoundaryEdges(mesh)).toBe(0);
+      expect(countNonManifoldEdges(mesh)).toBe(0);
+    },
+  );
+
+  it("keeps the test tube support visible in narrow test-tube vases", () => {
+    const params = createTwoProfileVase(120, 40, 23);
     const mesh = generateVaseMesh(params);
 
     expect(hasTestTubeSupportVertices(mesh)).toBe(true);
+    expect(mesh.vertices.length).toBeGreaterThan(0);
+    expect(mesh.indices.length).toBeGreaterThan(0);
+    expect(countConnectedMeshComponents(mesh)).toBe(1);
+    expect(countBoundaryEdges(mesh)).toBe(0);
+    expect(countNonManifoldEdges(mesh)).toBe(0);
+  });
+
+  it("keeps all sampled tube-only vase previews renderable", () => {
+    const cases: VaseParameters[] = [
+      createTwoProfileVase(82, 22, 18),
+      createTwoProfileVase(95, 28, 23),
+      createTwoProfileVase(120, 40, 23),
+      createTwoProfileVase(160, 44, 38),
+    ];
+
+    for (const params of cases) {
+      params.radialSamples = 72;
+      params.verticalSamples = 96;
+      const mesh = generateVaseMesh(params);
+      const vertexCount = mesh.vertices.length / 3;
+
+      expect(vertexCount).toBeGreaterThan(0);
+      expect(mesh.indices.length).toBeGreaterThan(0);
+      expect(mesh.indices.length % 3).toBe(0);
+      expect(Array.from(mesh.vertices).every(Number.isFinite)).toBe(true);
+      expect(Array.from(mesh.indices).every((index) => index < vertexCount)).toBe(true);
+    }
+  });
+
+  it("keeps generated test-tube fallback vases valid across faceted profiles", () => {
+    const cases: VaseParameters[] = [
+      {
+        ...createTwoProfileVase(120, 42, 30),
+        profiles: [
+          createProfile({ zRatio: 0, diameter: 42, sides: 5, rotationDeg: 0 }),
+          createProfile({ zRatio: 0.45, diameter: 34, sides: 5, rotationDeg: 18 }),
+          createProfile({ zRatio: 1, diameter: 30, sides: 5, rotationDeg: 34 }),
+        ],
+      },
+      {
+        ...createTwoProfileVase(145, 46, 32),
+        profiles: [
+          createProfile({ zRatio: 0, diameter: 46, sides: 6, rotationDeg: 0 }),
+          createProfile({ zRatio: 0.35, diameter: 38, sides: 6, rotationDeg: 28 }),
+          createProfile({ zRatio: 0.72, diameter: 35, sides: 6, rotationDeg: 40 }),
+          createProfile({ zRatio: 1, diameter: 32, sides: 6, rotationDeg: 52 }),
+        ],
+      },
+      {
+        ...createTwoProfileVase(130, 40, 34),
+        profiles: [
+          createProfile({ zRatio: 0, diameter: 40, sides: 8, rotationDeg: 0 }),
+          createProfile({ zRatio: 0.5, diameter: 30, sides: 8, rotationDeg: 8 }),
+          createProfile({ zRatio: 1, diameter: 34, sides: 8, rotationDeg: 16 }),
+        ],
+      },
+    ];
+
+    for (const params of cases) {
+      params.radialSamples = 72;
+      const mesh = generateVaseMesh(params);
+
+      expect(mesh.vertices.length).toBeGreaterThan(0);
+      expect(mesh.indices.length).toBeGreaterThan(0);
+      expect(countConnectedMeshComponents(mesh)).toBe(1);
+      expect(countBoundaryEdges(mesh)).toBe(0);
+      expect(countNonManifoldEdges(mesh)).toBe(0);
+      for (const coordinate of mesh.vertices) {
+        expect(Number.isFinite(coordinate)).toBe(true);
+      }
+    }
+  });
+
+  it("keeps the test tube insertion bore clear above the bottom", () => {
+    const params = createTwoProfileVase(120, 40, 30);
+    const mesh = generateVaseMesh(params);
+
+    for (let index = 0; index < mesh.vertices.length; index += 3) {
+      const x = mesh.vertices[index];
+      const y = mesh.vertices[index + 1];
+      const z = mesh.vertices[index + 2];
+      const radius = Math.hypot(x, y);
+      if (z > params.bottomThicknessMm + 1) {
+        expect(radius).toBeGreaterThanOrEqual(6.45);
+      }
+    }
+
+    for (let index = 0; index < mesh.indices.length; index += 3) {
+      let x = 0;
+      let y = 0;
+      let z = 0;
+      for (const vertexIndex of [
+        mesh.indices[index],
+        mesh.indices[index + 1],
+        mesh.indices[index + 2],
+      ]) {
+        x += mesh.vertices[vertexIndex * 3];
+        y += mesh.vertices[vertexIndex * 3 + 1];
+        z += mesh.vertices[vertexIndex * 3 + 2];
+      }
+      const radius = Math.hypot(x / 3, y / 3);
+      if (z / 3 > params.bottomThicknessMm + 1) {
+        expect(radius).toBeGreaterThanOrEqual(6.45);
+      }
+    }
+  });
+
+  it("can disable the test tube support geometry", () => {
+    const params = createTwoProfileVase(120, 40, 30);
+    const mesh = generateVaseMesh(params, { includeTestTubeSupport: false });
+
+    expect(hasTestTubeSupportVertices(mesh)).toBe(false);
+    expect(countConnectedMeshComponents(mesh)).toBe(1);
     expect(countBoundaryEdges(mesh)).toBe(0);
   });
 
   it("aligns inner and outer wall layers on the same body z slices", () => {
-    const params = defaultVaseParameters();
+    const params = createTwoProfileVase(180, 74, 96);
     params.radialSamples = 16;
     params.verticalSamples = 8;
     params.bottomThicknessMm = 3;

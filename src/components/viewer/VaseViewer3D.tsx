@@ -424,7 +424,7 @@ export function VaseViewer3D() {
           />
         )}
 
-        <EffectComposer>
+        <EffectComposer enableNormalPass>
           <SSAO radius={0.03} intensity={5} luminanceInfluence={0.3} />
           <ToneMapping mode={ToneMappingMode.AGX} />
         </EffectComposer>

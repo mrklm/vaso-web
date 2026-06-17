@@ -517,45 +517,6 @@
   cursor: not-allowed;
 }
 
-/* ── Presets grid ── */
-.presets-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-
-.preset-card {
-  display: flex;
-  flex-direction: column;
-  padding: 8px;
-  border: 1px solid color-mix(in srgb, var(--color-fg) 12%, transparent);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-field) 40%, var(--color-panel));
-  cursor: pointer;
-  transition: all 0.15s;
-  text-align: left;
-  color: var(--color-fg);
-}
-
-.preset-card:hover {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-panel));
-}
-
-.preset-name {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-accent);
-  margin-bottom: 2px;
-}
-
-.preset-desc {
-  font-size: 10px;
-  opacity: 0.6;
-  line-height: 1.3;
-}
-
 /* ── Color input ── */
 .color-input {
   display: flex;
@@ -737,9 +698,6 @@ kbd {
     text-align: center;
   }
 
-  .presets-grid {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 
 /* ══════════════════════════════════════════════════

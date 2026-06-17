@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useVaseStore } from "../../store/vase-store";
+import { useUIStore } from "../../store/ui-store";
 import {
   analyzeWaterproofInsertCompatibility,
   getInsertPresetById,
@@ -8,6 +9,7 @@ import { generateOuterProfilePoints } from "../../engine/mesh-builder";
 
 export function InsertView2D() {
   const params = useVaseStore((s) => s.params);
+  const showCompatibleInsert = useUIStore((s) => s.showCompatibleInsert);
 
   const insertData = useMemo(() => {
     try {
@@ -29,6 +31,10 @@ export function InsertView2D() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(params)]);
+
+  if (!showCompatibleInsert) {
+    return null;
+  }
 
   if (!insertData) {
     return <div className="view-2d placeholder">Contenant indisponible</div>;

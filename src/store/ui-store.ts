@@ -18,6 +18,8 @@ interface UIState {
   flatShading: boolean;
   autoRotate: boolean;
   showClipping: boolean;
+  showCompatibleInsert: boolean;
+  generateTestTubeSupport: boolean;
   rotationMode: "camera" | "vase";
   rotationSpeed: number;
   clippingHeight: number; // 0-100 percent
@@ -38,6 +40,8 @@ interface UIState {
   setFlatShading: (v: boolean) => void;
   setAutoRotate: (v: boolean) => void;
   setShowClipping: (v: boolean) => void;
+  setShowCompatibleInsert: (v: boolean) => void;
+  setGenerateTestTubeSupport: (v: boolean) => void;
   setRotationMode: (mode: "camera" | "vase") => void;
   setRotationSpeed: (v: number) => void;
   setClippingHeight: (v: number) => void;
@@ -71,9 +75,12 @@ const DEFAULT_PRINTER_PROFILES: PrinterProfile[] = [
 
 function mergeDefaultPrinterProfiles(savedProfiles: PrinterProfile[]): PrinterProfile[] {
   const savedByName = new Map(savedProfiles.map((profile) => [profile.name, profile]));
-  const mergedDefaults = DEFAULT_PRINTER_PROFILES.map((profile) => savedByName.get(profile.name) ?? profile);
+  const mergedDefaults = DEFAULT_PRINTER_PROFILES.map(
+    (profile) => savedByName.get(profile.name) ?? profile,
+  );
   const customProfiles = savedProfiles.filter(
-    (profile) => !DEFAULT_PRINTER_PROFILES.some((defaultProfile) => defaultProfile.name === profile.name),
+    (profile) =>
+      !DEFAULT_PRINTER_PROFILES.some((defaultProfile) => defaultProfile.name === profile.name),
   );
   return [...mergedDefaults, ...customProfiles];
 }
@@ -134,11 +141,24 @@ function loadSavedAdvancedStlUnlock(): boolean {
   return false;
 }
 
+function loadSavedBoolean(key: string, fallback: boolean): boolean {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved === null) return fallback;
+    return saved === "true";
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
 const initialTheme = loadSavedTheme();
 applyThemeToCSS(initialTheme);
 
 const initialPrinter = loadPrinterProfiles();
 const initialAdvancedStlUnlock = loadSavedAdvancedStlUnlock();
+const initialShowCompatibleInsert = loadSavedBoolean("vaso-show-compatible-insert", true);
+const initialGenerateTestTubeSupport = loadSavedBoolean("vaso-generate-test-tube-support", true);
 
 export const useUIStore = create<UIState>((set, get) => ({
   theme: initialTheme,
@@ -150,6 +170,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   flatShading: false,
   autoRotate: true,
   showClipping: false,
+  showCompatibleInsert: initialShowCompatibleInsert,
+  generateTestTubeSupport: initialGenerateTestTubeSupport,
   rotationMode: "camera",
   rotationSpeed: 0.5,
   clippingHeight: 50,
@@ -177,6 +199,22 @@ export const useUIStore = create<UIState>((set, get) => ({
   setFlatShading: (v) => set({ flatShading: v }),
   setAutoRotate: (v) => set({ autoRotate: v }),
   setShowClipping: (v) => set({ showClipping: v }),
+  setShowCompatibleInsert: (v) => {
+    try {
+      localStorage.setItem("vaso-show-compatible-insert", String(v));
+    } catch {
+      /* ignore */
+    }
+    set({ showCompatibleInsert: v });
+  },
+  setGenerateTestTubeSupport: (v) => {
+    try {
+      localStorage.setItem("vaso-generate-test-tube-support", String(v));
+    } catch {
+      /* ignore */
+    }
+    set({ generateTestTubeSupport: v });
+  },
   setRotationMode: (mode) => set({ rotationMode: mode }),
   setRotationSpeed: (v) => set({ rotationSpeed: v }),
   setClippingHeight: (v) => set({ clippingHeight: v }),
@@ -211,7 +249,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   deletePrinterProfile: (name) => {
     const profiles = get().printerProfiles.filter((p) => p.name !== name);
     if (profiles.length === 0) return;
-    const active = get().activePrinterProfile === name ? profiles[0].name : get().activePrinterProfile;
+    const active =
+      get().activePrinterProfile === name ? profiles[0].name : get().activePrinterProfile;
     set({ printerProfiles: profiles, activePrinterProfile: active });
     savePrinterProfiles(profiles, active, get().enforcePrinterVolume);
   },
@@ -220,6 +259,8 @@ export const useUIStore = create<UIState>((set, get) => ({
       localStorage.removeItem("vaso-printer-profiles");
       localStorage.removeItem("vaso-theme");
       localStorage.removeItem("vaso-advanced-stl-unlocked");
+      localStorage.removeItem("vaso-show-compatible-insert");
+      localStorage.removeItem("vaso-generate-test-tube-support");
     } catch {
       /* ignore */
     }
@@ -234,6 +275,8 @@ export const useUIStore = create<UIState>((set, get) => ({
       flatShading: false,
       autoRotate: true,
       showClipping: false,
+      showCompatibleInsert: true,
+      generateTestTubeSupport: true,
       rotationMode: "camera",
       rotationSpeed: 0.5,
       clippingHeight: 50,

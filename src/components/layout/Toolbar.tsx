@@ -67,16 +67,21 @@ export function Toolbar() {
   const activePrinterProfile = useUIStore((s) => s.activePrinterProfile);
   const enforcePrinterVolume = useUIStore((s) => s.enforcePrinterVolume);
   const captureViewerImage = useUIStore((s) => s.captureViewerImage);
+  const generateTestTubeSupport = useUIStore((s) => s.generateTestTubeSupport);
   const { undo, redo, pastStates, futureStates } = useVaseStore.temporal.getState();
   const showSeedModified = isSeedModified;
 
   const handleExport = async () => {
     try {
-      const activePrinter = printerProfiles.find((profile) => profile.name === activePrinterProfile) ?? printerProfiles[0];
+      const activePrinter =
+        printerProfiles.find((profile) => profile.name === activePrinterProfile) ??
+        printerProfiles[0];
       if (enforcePrinterVolume && activePrinter) {
         validateParamsAgainstBuildVolume(params, activePrinter);
       }
-      const mesh = await generateVaseMeshWithEngraving(params, seed, showSeedModified);
+      const mesh = await generateVaseMeshWithEngraving(params, seed, showSeedModified, {
+        includeTestTubeSupport: generateTestTubeSupport,
+      });
       await exportSTL(mesh, buildStlFilename(seed, showSeedModified));
       toast.success("STL exporte !");
     } catch (e) {

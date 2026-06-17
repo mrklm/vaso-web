@@ -7,10 +7,20 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
-## [1.0.56] - 2026-06-10
+## [1.0.57] - 2026-06-17
 
 ### 🎨 Modifié
- - Élargit plus tôt et plus fortement les secteurs du support tube à essai sous l'anneau
+ - Remonte les options de contenants en haut du panneau Options
+ - Supprime les presets de vases inutilisés
+
+## [1.0.56] - 2026-06-10
+
+### 🎨 Ajouté
+ - Ajoute les options pour afficher le contenant adapté et générer le support tube à essai
+
+### 🎨 Modifié
+ - Revoit le support tube à essai avec bras inclinés et épaule sous l'anneau
+ - Stabilise l'aperçu et l'export des modèles tube à essai
 
 ## [1.0.55] - 2026-06-09
 

@@ -3,44 +3,47 @@ import { useUIStore } from "../../store/ui-store";
 import { useVaseStore } from "../../store/vase-store";
 import { MAX_SEED } from "../../engine/engraving-text";
 import { THEMES } from "../../themes";
-import { PRESETS } from "../../data/presets";
 import { clampParamsToBuildVolume } from "../../engine/printer-volume";
 import { defaultVaseParameters } from "../../engine/types";
 import { NumberInput } from "../ui/NumberInput";
 
 export function SettingsPanel() {
-const {
-  theme,
-  setTheme,
-  showGrid,
-  setShowGrid,
-  vaseColor,
-  setVaseColor,
-  wireframe,
-  setWireframe,
-  flatShading,
-  setFlatShading,
-  autoRotate,
-  setAutoRotate,
-  showClipping,
-  setShowClipping,
-  clippingHeight,
-  setClippingHeight,
-  unlockAdvancedStlParams,
-  setUnlockAdvancedStlParams,
-  rotationMode,
-  setRotationMode,
-  rotationSpeed,
-  setRotationSpeed,
-  printerProfiles,
-  activePrinterProfile,
-  enforcePrinterVolume,
-  setEnforcePrinterVolume,
-  setActivePrinterProfile,
-  addPrinterProfile,
-  updatePrinterProfile,
-  deletePrinterProfile,
-} = useUIStore();
+  const {
+    theme,
+    setTheme,
+    showGrid,
+    setShowGrid,
+    vaseColor,
+    setVaseColor,
+    wireframe,
+    setWireframe,
+    flatShading,
+    setFlatShading,
+    autoRotate,
+    setAutoRotate,
+    showClipping,
+    setShowClipping,
+    showCompatibleInsert,
+    setShowCompatibleInsert,
+    generateTestTubeSupport,
+    setGenerateTestTubeSupport,
+    clippingHeight,
+    setClippingHeight,
+    unlockAdvancedStlParams,
+    setUnlockAdvancedStlParams,
+    rotationMode,
+    setRotationMode,
+    rotationSpeed,
+    setRotationSpeed,
+    printerProfiles,
+    activePrinterProfile,
+    enforcePrinterVolume,
+    setEnforcePrinterVolume,
+    setActivePrinterProfile,
+    addPrinterProfile,
+    updatePrinterProfile,
+    deletePrinterProfile,
+  } = useUIStore();
 
   const setParams = useVaseStore((s) => s.setParams);
   const resetVasoSettings = useUIStore((s) => s.resetVasoSettings);
@@ -49,7 +52,8 @@ const {
   const setBottomThickness = useVaseStore((s) => s.setBottomThickness);
   const setRadialSamples = useVaseStore((s) => s.setRadialSamples);
   const setVerticalSamples = useVaseStore((s) => s.setVerticalSamples);
-  const activeProfile = printerProfiles.find((p) => p.name === activePrinterProfile) ?? printerProfiles[0];
+  const activeProfile =
+    printerProfiles.find((p) => p.name === activePrinterProfile) ?? printerProfiles[0];
   const defaultParams = defaultVaseParameters();
 
   const [editWidth, setEditWidth] = useState(String(activeProfile?.width ?? 220));
@@ -129,7 +133,11 @@ const {
   };
 
   const handleResetVaso = () => {
-    if (!confirm("Réinitialiser Vaso ? Cela effacera les profils d'imprimante, le thème et les préférences locales.")) {
+    if (
+      !confirm(
+        "Réinitialiser Vaso ? Cela effacera les profils d'imprimante, le thème et les préférences locales.",
+      )
+    ) {
       return;
     }
     resetVasoSettings();
@@ -142,19 +150,26 @@ const {
 
   return (
     <div className="panel settings-panel">
-      <h3>Presets</h3>
-      <div className="presets-grid">
-        {PRESETS.map((preset) => (
-          <button
-            key={preset.name}
-            className="preset-card"
-            onClick={() => setParams(preset.params)}
-            title={preset.description}
-          >
-            <span className="preset-name">{preset.name}</span>
-            <span className="preset-desc">{preset.description}</span>
-          </button>
-        ))}
+      <h3>Contenants</h3>
+      <div className="checkbox-row">
+        <label>
+          <input
+            type="checkbox"
+            checked={showCompatibleInsert}
+            onChange={(e) => setShowCompatibleInsert(e.target.checked)}
+          />
+          Afficher le contenant adapté
+        </label>
+      </div>
+      <div className="checkbox-row">
+        <label>
+          <input
+            type="checkbox"
+            checked={generateTestTubeSupport}
+            onChange={(e) => setGenerateTestTubeSupport(e.target.checked)}
+          />
+          Générer le support tube à essai
+        </label>
       </div>
 
       <div className="separator" />
@@ -186,7 +201,10 @@ const {
       <h3>Vue 3D</h3>
       <div className="select-input">
         <label>Rotation : caméra / vase</label>
-        <select value={rotationMode} onChange={(e) => setRotationMode(e.target.value as "camera" | "vase")}>
+        <select
+          value={rotationMode}
+          onChange={(e) => setRotationMode(e.target.value as "camera" | "vase")}
+        >
           <option value="camera">caméra</option>
           <option value="vase">vase</option>
         </select>
@@ -194,7 +212,11 @@ const {
 
       <div className="checkbox-row">
         <label>
-          <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={showGrid}
+            onChange={(e) => setShowGrid(e.target.checked)}
+          />
           Grille
         </label>
       </div>
@@ -213,25 +235,41 @@ const {
       )}
       <div className="checkbox-row">
         <label>
-          <input type="checkbox" checked={wireframe} onChange={(e) => setWireframe(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={wireframe}
+            onChange={(e) => setWireframe(e.target.checked)}
+          />
           Fil de fer
         </label>
       </div>
       <div className="checkbox-row">
         <label>
-          <input type="checkbox" checked={flatShading} onChange={(e) => setFlatShading(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={flatShading}
+            onChange={(e) => setFlatShading(e.target.checked)}
+          />
           Facettes (flat shading)
         </label>
       </div>
       <div className="checkbox-row">
         <label>
-          <input type="checkbox" checked={autoRotate} onChange={(e) => setAutoRotate(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={autoRotate}
+            onChange={(e) => setAutoRotate(e.target.checked)}
+          />
           Rotation automatique
         </label>
       </div>
       <div className="checkbox-row">
         <label>
-          <input type="checkbox" checked={showClipping} onChange={(e) => setShowClipping(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={showClipping}
+            onChange={(e) => setShowClipping(e.target.checked)}
+          />
           Vue en coupe
         </label>
       </div>
@@ -274,15 +312,30 @@ const {
       <div className="printer-dims" style={{ opacity: enforcePrinterVolume ? 1 : 0.65 }}>
         <div className="number-input-inline">
           <label>Largeur max (mm)</label>
-          <input type="number" value={editWidth} onChange={(e) => setEditWidth(e.target.value)} onBlur={handleSave} />
+          <input
+            type="number"
+            value={editWidth}
+            onChange={(e) => setEditWidth(e.target.value)}
+            onBlur={handleSave}
+          />
         </div>
         <div className="number-input-inline">
           <label>Profondeur max (mm)</label>
-          <input type="number" value={editDepth} onChange={(e) => setEditDepth(e.target.value)} onBlur={handleSave} />
+          <input
+            type="number"
+            value={editDepth}
+            onChange={(e) => setEditDepth(e.target.value)}
+            onBlur={handleSave}
+          />
         </div>
         <div className="number-input-inline">
           <label>Hauteur max (mm)</label>
-          <input type="number" value={editHeight} onChange={(e) => setEditHeight(e.target.value)} onBlur={handleSave} />
+          <input
+            type="number"
+            value={editHeight}
+            onChange={(e) => setEditHeight(e.target.value)}
+            onBlur={handleSave}
+          />
         </div>
       </div>
 
@@ -290,7 +343,11 @@ const {
         <button className="btn-small" onClick={handleNew}>
           Nouveau
         </button>
-        <button className="btn-small btn-danger" onClick={handleDelete} disabled={printerProfiles.length <= 1}>
+        <button
+          className="btn-small btn-danger"
+          onClick={handleDelete}
+          disabled={printerProfiles.length <= 1}
+        >
           Supprimer
         </button>
       </div>
