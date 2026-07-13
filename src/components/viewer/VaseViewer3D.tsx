@@ -29,6 +29,7 @@ const PREVIEW_TEXT_SIGNATURE_HEIGHT_FACTOR = 0.92;
 const PREVIEW_TEXT_SIDE_MARGIN_PX = 29;
 const PREVIEW_TEST_TUBE_SUPPORT_OUTER_RADIUS_MM = 9.5;
 const PREVIEW_TEST_TUBE_SUPPORT_TEXT_CLEARANCE_MM = 4;
+const PREVIEW_SUPPORT_TEXT_SCALE = 0.68;
 
 function fitPreviewText(
   context: CanvasRenderingContext2D,
@@ -106,8 +107,16 @@ function PreviewEngravingOverlay(
       supportLines.forEach((line, index) => {
         const baseFontSize =
           PREVIEW_TEXT_BASE_FONT_SIZES[index] ?? PREVIEW_TEXT_BASE_FONT_SIZES[0];
-        const fittedWidthSize = fitPreviewText(context, line, baseFontSize, canvas.width * 0.78);
-        let fontSize = Math.min(fittedWidthSize, availableBandHeight * 0.68);
+        const fittedWidthSize = fitPreviewText(
+          context,
+          line,
+          baseFontSize,
+          canvas.width * 0.78 * PREVIEW_SUPPORT_TEXT_SCALE,
+        );
+        let fontSize = Math.min(
+          fittedWidthSize,
+          availableBandHeight * 0.68 * PREVIEW_SUPPORT_TEXT_SCALE,
+        );
         const direction = index === 0 ? -1 : 1;
         let lineCenterY = canvas.height * 0.5 + direction * (supportRadiusPx + fontSize * 0.72);
 
@@ -116,7 +125,8 @@ function PreviewEngravingOverlay(
         const halfChordFactor = Math.sqrt(Math.max(0, 1 - (dy / previewRadiusY) ** 2));
         const allowedWidth = Math.max(
           0,
-          canvas.width * 0.84 * halfChordFactor - PREVIEW_TEXT_SIDE_MARGIN_PX * 2,
+          canvas.width * 0.84 * PREVIEW_SUPPORT_TEXT_SCALE * halfChordFactor -
+            PREVIEW_TEXT_SIDE_MARGIN_PX * 2,
         );
         if (allowedWidth > 0) {
           context.font = `700 ${fontSize}px Arial`;

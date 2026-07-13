@@ -31,6 +31,7 @@ const TEXT_MAX_HEIGHT_FACTOR = 0.78;
 const TEXT_LINE_GAP_FACTOR = 1.85;
 const TEXT_SIDE_MARGIN_MM = 1.44;
 const TEXT_RESERVED_CENTER_CLEARANCE_MM = 2.5;
+const TEXT_RESERVED_LAYOUT_SCALE = 0.68;
 const TEXT_CURVE_SEGMENTS = 10;
 const PLANAR_TEXT_SIMPLIFICATION_MM = 0.05;
 
@@ -322,8 +323,8 @@ function buildTextGeometry(
     const unusedGeometries = rawGeometries.filter(
       (geometry) => !placedGeometries.includes(geometry),
     );
-    scaleGeometryToMaxHeight(topGeometry, availableHeight);
-    scaleGeometryToMaxHeight(lowerGeometry, availableHeight);
+    scaleGeometryToMaxHeight(topGeometry, availableHeight * TEXT_RESERVED_LAYOUT_SCALE);
+    scaleGeometryToMaxHeight(lowerGeometry, availableHeight * TEXT_RESERVED_LAYOUT_SCALE);
 
     const placements: Array<{ geometry: THREE.BufferGeometry; centerY: number }> = [];
     const topHeight = getLineSize(topGeometry, lineResults[0]?.rawSize ?? FONT_LINE_HEIGHT).height;
@@ -345,7 +346,8 @@ function buildTextGeometry(
       const halfChord = Math.sqrt(
         Math.max(0, fitRadius * fitRadius - placement.centerY * placement.centerY),
       );
-      const allowedWidth = Math.max(0, halfChord * 2 - TEXT_SIDE_MARGIN_MM * 2);
+      const allowedWidth =
+        Math.max(0, halfChord * 2 - TEXT_SIDE_MARGIN_MM * 2) * TEXT_RESERVED_LAYOUT_SCALE;
       if (allowedWidth <= 0) {
         return null;
       }
