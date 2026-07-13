@@ -30,27 +30,17 @@ const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "tes
 const ENGRAVING_PIPELINE_MARKER = `Vaso Engraving ${APP_VERSION}`;
 const FACETED_SEAM_MAX_PROFILE_SIDES = 12;
 const SEAM_BACK_ANGLE_RAD = -Math.PI / 2;
-const TEST_TUBE_GUIDE_INNER_RADIUS_MM = 6.5;
-const TEST_TUBE_GUIDE_OUTER_RADIUS_MM = 8;
-const TEST_TUBE_GUIDE_HEIGHT_MM = 4;
-const TEST_TUBE_GUIDE_TOP_INSET_MM = 8;
-const TEST_TUBE_ARM_COUNT = 3;
-const TEST_TUBE_ARM_PATH_SAMPLES = 9;
-const TEST_TUBE_RING_SEGMENTS = 36;
-const TEST_TUBE_ARM_THICKNESS_MM = 1.8;
-const TEST_TUBE_ARM_START_WIDTH_MM = 2.2;
-const TEST_TUBE_ARM_END_WIDTH_MM = 12.4;
-const TEST_TUBE_ARM_RING_OVERLAP_MM = 0.45;
-const TEST_TUBE_ARM_WALL_ARC_SEGMENTS = 3;
-const TEST_TUBE_ARM_RING_ARC_SEGMENTS = 7;
-const TEST_TUBE_ARM_SECTION_POINTS = 7;
-const TEST_TUBE_ARM_MIN_DROP_MM = 14;
-const TEST_TUBE_ARM_MAX_DROP_MM = 28;
-const TEST_TUBE_ARM_PRINTABLE_SLOPE_RATIO = 1.25;
-const TEST_TUBE_ARM_MAX_RADIAL_SPAN_MM = 13;
-const TEST_TUBE_RING_UNDER_SUPPORT_DROP_MM = 1.8;
+const TEST_TUBE_SUPPORT_INNER_RADIUS_MM = 7.5;
+const TEST_TUBE_SUPPORT_THICKNESS_MM = 2;
+const TEST_TUBE_SUPPORT_OUTER_RADIUS_MM =
+  TEST_TUBE_SUPPORT_INNER_RADIUS_MM + TEST_TUBE_SUPPORT_THICKNESS_MM;
+const TEST_TUBE_SUPPORT_TOP_INSET_MM = 12;
+const TEST_TUBE_SUPPORT_MIN_HEIGHT_MM = 38;
+const TEST_TUBE_SUPPORT_SLOT_COUNT = 3;
+const TEST_TUBE_SUPPORT_SLOT_ANGLE_RAD = Math.PI / 9;
+const TEST_TUBE_SUPPORT_SEGMENTS_PER_SECTION = 18;
 const TEST_TUBE_SUPPORT_WALL_MARGIN_MM = 0.8;
-const TEST_TUBE_GUIDE_WALL_MARGIN_MM = 0.25;
+const TEST_TUBE_SUPPORT_ENGRAVING_CLEARANCE_MM = 2.5;
 
 interface GenerateVaseMeshOptions {
   includeTestTubeSupport?: boolean;
@@ -188,38 +178,6 @@ function distanceFromOriginToContourEdges(contour: Float64Array): number {
   return minimumDistance;
 }
 
-function cross2D(ax: number, ay: number, bx: number, by: number): number {
-  return ax * by - ay * bx;
-}
-
-function findRayContourRadius(contour: Float64Array, angle: number): number | null {
-  const directionX = Math.cos(angle);
-  const directionY = Math.sin(angle);
-  const count = contour.length / 2;
-  let bestRadius = Number.POSITIVE_INFINITY;
-
-  for (let index = 0; index < count; index++) {
-    const nextIndex = (index + 1) % count;
-    const ax = contour[index * 2];
-    const ay = contour[index * 2 + 1];
-    const segmentX = contour[nextIndex * 2] - ax;
-    const segmentY = contour[nextIndex * 2 + 1] - ay;
-    const denominator = cross2D(directionX, directionY, segmentX, segmentY);
-
-    if (Math.abs(denominator) <= Number.EPSILON) {
-      continue;
-    }
-
-    const rayDistance = cross2D(ax, ay, segmentX, segmentY) / denominator;
-    const segmentRatio = cross2D(ax, ay, directionX, directionY) / denominator;
-    if (rayDistance >= 0 && segmentRatio >= 0 && segmentRatio <= 1) {
-      bestRadius = Math.min(bestRadius, rayDistance);
-    }
-  }
-
-  return Number.isFinite(bestRadius) ? bestRadius : null;
-}
-
 function interpolatedOuterContour(params: VaseParameters, zMm: number): Float64Array {
   const profiles = [...params.profiles].sort((a, b) => a.zRatio - b.zRatio);
   const zPositions = profiles.map((p) => p.zRatio * params.heightMm);
@@ -330,70 +288,76 @@ function buildInnerWallSourceContours(
   return { zInner, sourceContours };
 }
 
-interface TestTubeSupportConfig {
-  guideBottomZ: number;
-  guideTopZ: number;
-}
-
-interface TestTubeSupportPoint {
-  x: number;
-  y: number;
-  z: number;
-}
-
-function addClosedRing(
+function addSegmentedTubeSupport(
   verts: number[],
   faces: number[],
   innerRadius: number,
   outerRadius: number,
   zBottom: number,
   zTop: number,
-  segments: number,
-  includeBottomFace = true,
-): { outerBottomStart: number; innerBottomStart: number } | null {
-  if (innerRadius <= 0 || outerRadius <= innerRadius || zTop <= zBottom || segments < 3) {
-    return null;
+  slotCount: number,
+  slotAngleRad: number,
+  segmentsPerSection: number,
+) {
+  if (
+    innerRadius <= 0 ||
+    outerRadius <= innerRadius ||
+    zTop <= zBottom ||
+    slotCount < 1 ||
+    slotAngleRad <= 0 ||
+    segmentsPerSection < 1
+  ) {
+    return;
   }
 
-  const outerBottomStart = verts.length / 3;
-  for (let index = 0; index < segments; index++) {
-    const angle = (index / segments) * Math.PI * 2;
-    verts.push(Math.cos(angle) * outerRadius, Math.sin(angle) * outerRadius, zBottom);
+  const sectionAngle = (Math.PI * 2) / slotCount;
+  const arcAngle = sectionAngle - slotAngleRad;
+  if (arcAngle <= 0) {
+    return;
   }
 
-  const outerTopStart = verts.length / 3;
-  for (let index = 0; index < segments; index++) {
-    const angle = (index / segments) * Math.PI * 2;
-    verts.push(Math.cos(angle) * outerRadius, Math.sin(angle) * outerRadius, zTop);
-  }
+  for (let sectionIndex = 0; sectionIndex < slotCount; sectionIndex += 1) {
+    const sectionCenterAngle = sectionIndex * sectionAngle;
+    const startAngle = sectionCenterAngle - arcAngle / 2;
+    const angleStep = arcAngle / segmentsPerSection;
+    const outerBottomStart = verts.length / 3;
 
-  const innerBottomStart = verts.length / 3;
-  for (let index = 0; index < segments; index++) {
-    const angle = (index / segments) * Math.PI * 2;
-    verts.push(Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius, zBottom);
-  }
+    for (let index = 0; index <= segmentsPerSection; index += 1) {
+      const angle = startAngle + angleStep * index;
+      verts.push(Math.cos(angle) * outerRadius, Math.sin(angle) * outerRadius, zBottom);
+    }
 
-  const innerTopStart = verts.length / 3;
-  for (let index = 0; index < segments; index++) {
-    const angle = (index / segments) * Math.PI * 2;
-    verts.push(Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius, zTop);
-  }
+    const outerTopStart = verts.length / 3;
+    for (let index = 0; index <= segmentsPerSection; index += 1) {
+      const angle = startAngle + angleStep * index;
+      verts.push(Math.cos(angle) * outerRadius, Math.sin(angle) * outerRadius, zTop);
+    }
 
-  for (let index = 0; index < segments; index++) {
-    const nextIndex = (index + 1) % segments;
-    const outerBottomA = outerBottomStart + index;
-    const outerBottomB = outerBottomStart + nextIndex;
-    const outerTopA = outerTopStart + index;
-    const outerTopB = outerTopStart + nextIndex;
-    const innerBottomA = innerBottomStart + index;
-    const innerBottomB = innerBottomStart + nextIndex;
-    const innerTopA = innerTopStart + index;
-    const innerTopB = innerTopStart + nextIndex;
+    const innerBottomStart = verts.length / 3;
+    for (let index = 0; index <= segmentsPerSection; index += 1) {
+      const angle = startAngle + angleStep * index;
+      verts.push(Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius, zBottom);
+    }
 
-    faces.push(outerBottomA, outerBottomB, outerTopA, outerBottomB, outerTopB, outerTopA);
-    faces.push(innerBottomA, innerTopA, innerBottomB, innerBottomB, innerTopA, innerTopB);
-    faces.push(outerTopA, outerTopB, innerTopA, outerTopB, innerTopB, innerTopA);
-    if (includeBottomFace) {
+    const innerTopStart = verts.length / 3;
+    for (let index = 0; index <= segmentsPerSection; index += 1) {
+      const angle = startAngle + angleStep * index;
+      verts.push(Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius, zTop);
+    }
+
+    for (let index = 0; index < segmentsPerSection; index += 1) {
+      const outerBottomA = outerBottomStart + index;
+      const outerBottomB = outerBottomStart + index + 1;
+      const outerTopA = outerTopStart + index;
+      const outerTopB = outerTopStart + index + 1;
+      const innerBottomA = innerBottomStart + index;
+      const innerBottomB = innerBottomStart + index + 1;
+      const innerTopA = innerTopStart + index;
+      const innerTopB = innerTopStart + index + 1;
+
+      faces.push(outerBottomA, outerBottomB, outerTopA, outerBottomB, outerTopB, outerTopA);
+      faces.push(innerBottomA, innerTopA, innerBottomB, innerBottomB, innerTopA, innerTopB);
+      faces.push(outerTopA, outerTopB, innerTopA, outerTopB, innerTopB, innerTopA);
       faces.push(
         outerBottomA,
         innerBottomA,
@@ -403,41 +367,32 @@ function addClosedRing(
         innerBottomB,
       );
     }
-  }
 
-  return { outerBottomStart, innerBottomStart };
-}
-
-function addRingUnderSupport(
-  verts: number[],
-  faces: number[],
-  ringStarts: { outerBottomStart: number; innerBottomStart: number },
-  segments: number,
-  zBottom: number,
-) {
-  const lowerInnerStart = verts.length / 3;
-  const lowerZ = zBottom - TEST_TUBE_RING_UNDER_SUPPORT_DROP_MM;
-
-  for (let index = 0; index < segments; index++) {
-    const angle = (index / segments) * Math.PI * 2;
-    verts.push(
-      Math.cos(angle) * TEST_TUBE_GUIDE_INNER_RADIUS_MM,
-      Math.sin(angle) * TEST_TUBE_GUIDE_INNER_RADIUS_MM,
-      lowerZ,
+    const startOuterBottom = outerBottomStart;
+    const startOuterTop = outerTopStart;
+    const startInnerBottom = innerBottomStart;
+    const startInnerTop = innerTopStart;
+    faces.push(
+      startOuterBottom,
+      startOuterTop,
+      startInnerBottom,
+      startInnerBottom,
+      startOuterTop,
+      startInnerTop,
     );
-  }
 
-  for (let index = 0; index < segments; index++) {
-    const nextIndex = (index + 1) % segments;
-    const lowerA = lowerInnerStart + index;
-    const lowerB = lowerInnerStart + nextIndex;
-    const innerA = ringStarts.innerBottomStart + index;
-    const innerB = ringStarts.innerBottomStart + nextIndex;
-    const outerA = ringStarts.outerBottomStart + index;
-    const outerB = ringStarts.outerBottomStart + nextIndex;
-
-    faces.push(lowerA, innerA, lowerB, lowerB, innerA, innerB);
-    faces.push(lowerA, lowerB, outerA, lowerB, outerB, outerA);
+    const endOuterBottom = outerBottomStart + segmentsPerSection;
+    const endOuterTop = outerTopStart + segmentsPerSection;
+    const endInnerBottom = innerBottomStart + segmentsPerSection;
+    const endInnerTop = innerTopStart + segmentsPerSection;
+    faces.push(
+      endOuterBottom,
+      endInnerBottom,
+      endOuterTop,
+      endInnerBottom,
+      endInnerTop,
+      endOuterTop,
+    );
   }
 }
 
@@ -455,7 +410,7 @@ function canFitCenteredTestTubeSupport(
 
     if (
       distanceFromOriginToContourEdges(innerContour) <
-      requiredRadius + TEST_TUBE_GUIDE_WALL_MARGIN_MM
+      requiredRadius + TEST_TUBE_SUPPORT_WALL_MARGIN_MM
     ) {
       return false;
     }
@@ -464,473 +419,56 @@ function canFitCenteredTestTubeSupport(
   return true;
 }
 
-function buildTestTubeSupportConfig(
+function addTestTubeSupportIfNeeded(
   params: VaseParameters,
+  verts: number[],
+  faces: number[],
   zInnerBottom: number,
-): TestTubeSupportConfig | null {
+  options: GenerateVaseMeshOptions = {},
+) {
+  if (options.includeTestTubeSupport === false) {
+    return;
+  }
+
   const compatibility = analyzeWaterproofInsertCompatibility(params);
   if (compatibility.type !== "test_tube") {
-    return null;
+    return;
   }
 
-  const guideTopZ = Math.min(
+  const supportBottomZ = zInnerBottom;
+  const supportTopZ = Math.min(
     params.heightMm - 1,
     Math.max(
-      zInnerBottom + TEST_TUBE_GUIDE_HEIGHT_MM + 1,
-      params.heightMm - TEST_TUBE_GUIDE_TOP_INSET_MM,
+      supportBottomZ + TEST_TUBE_SUPPORT_MIN_HEIGHT_MM,
+      params.heightMm - TEST_TUBE_SUPPORT_TOP_INSET_MM,
     ),
   );
-  const guideBottomZ = guideTopZ - TEST_TUBE_GUIDE_HEIGHT_MM;
 
-  if (guideBottomZ <= zInnerBottom) {
-    return null;
-  }
-
-  if (
-    !canFitCenteredTestTubeSupport(
-      params,
-      [guideBottomZ, guideTopZ],
-      TEST_TUBE_GUIDE_OUTER_RADIUS_MM,
-    )
-  ) {
-    return null;
-  }
-
-  return {
-    guideBottomZ,
-    guideTopZ,
-  };
-}
-
-function buildTestTubeSupportArmPath(
-  params: VaseParameters,
-  rootPoint: TestTubeSupportPoint,
-  angle: number,
-  guideBottomZ: number,
-): TestTubeSupportPoint[] | null {
-  if (guideBottomZ <= rootPoint.z) {
-    return null;
-  }
-
-  const endRadius = TEST_TUBE_GUIDE_OUTER_RADIUS_MM + TEST_TUBE_ARM_RING_OVERLAP_MM;
-  const rawStartRadius = Math.hypot(rootPoint.x, rootPoint.y);
-  const startHalfWidth = TEST_TUBE_ARM_START_WIDTH_MM / 2;
-  const startAvailableRadius = Math.max(0, rawStartRadius - TEST_TUBE_SUPPORT_WALL_MARGIN_MM);
-  const wallSafeStartRadius = Math.sqrt(
-    Math.max(0, startAvailableRadius * startAvailableRadius - startHalfWidth * startHalfWidth),
-  );
-  const startRadius = Math.min(
-    wallSafeStartRadius,
-    TEST_TUBE_GUIDE_OUTER_RADIUS_MM + TEST_TUBE_ARM_MAX_RADIAL_SPAN_MM,
-  );
-  const span = startRadius - endRadius;
-  if (span <= Number.EPSILON) {
-    return null;
-  }
-
-  let spanScale = 1;
-  for (let sampleIndex = 1; sampleIndex <= TEST_TUBE_ARM_PATH_SAMPLES; sampleIndex++) {
-    const ratio = sampleIndex / TEST_TUBE_ARM_PATH_SAMPLES;
-    const z = rootPoint.z * (1 - ratio) + guideBottomZ * ratio;
-    const innerContour = computeInnerContour(
-      interpolatedOuterContour(params, z),
-      params.wallThicknessMm,
-    );
-    const wallRadius = findRayContourRadius(innerContour, angle);
-    if (wallRadius === null) {
-      return null;
-    }
-
-    const halfWidth =
-      (TEST_TUBE_ARM_START_WIDTH_MM * (1 - ratio) + TEST_TUBE_ARM_END_WIDTH_MM * ratio) / 2;
-    const availableCornerRadius = wallRadius - TEST_TUBE_SUPPORT_WALL_MARGIN_MM;
-    const allowedRadius = Math.sqrt(
-      Math.max(0, availableCornerRadius * availableCornerRadius - halfWidth * halfWidth),
-    );
-    const availableSpan = allowedRadius - endRadius;
-    if (availableSpan < -Number.EPSILON) {
-      return null;
-    }
-    if (ratio < 1) {
-      spanScale = Math.min(spanScale, Math.max(0, availableSpan) / (span * (1 - ratio)));
-    }
-  }
-
-  const path: TestTubeSupportPoint[] = [];
-
-  for (let sampleIndex = 1; sampleIndex <= TEST_TUBE_ARM_PATH_SAMPLES; sampleIndex++) {
-    const ratio = sampleIndex / TEST_TUBE_ARM_PATH_SAMPLES;
-    const z = rootPoint.z * (1 - ratio) + guideBottomZ * ratio;
-    const radius = endRadius + span * spanScale * (1 - ratio);
-
-    path.push({
-      x: Math.cos(angle) * radius,
-      y: Math.sin(angle) * radius,
-      z,
-    });
-  }
-
-  return path;
-}
-
-function addFlaredTestTubeArm(
-  verts: number[],
-  faces: number[],
-  path: readonly TestTubeSupportPoint[],
-  angle: number,
-  startArc: readonly TestTubeSupportPoint[],
-  endArc: readonly TestTubeSupportPoint[],
-) {
-  if (path.length < 2 || startArc.length < 2 || endArc.length < 2) {
+  if (supportTopZ <= supportBottomZ) {
     return;
   }
 
-  const sectionStarts: number[] = [];
-  const tangentX = -Math.sin(angle);
-  const tangentY = Math.cos(angle);
-  const sectionVertexCount = TEST_TUBE_ARM_SECTION_POINTS * 2;
-  const sections: Array<
-    | { kind: "path"; point: TestTubeSupportPoint; ratio: number }
-    | { kind: "ring"; points: readonly TestTubeSupportPoint[]; ratio: number }
-  > = [
-    { kind: "ring", points: startArc, ratio: 0 },
-    ...path.map((point, index) => ({
-      kind: "path" as const,
-      point,
-      ratio: index / Math.max(1, path.length - 1),
-    })),
-    { kind: "ring", points: endArc, ratio: 1 },
+  const fitSamples = [
+    supportBottomZ + 0.5,
+    supportBottomZ + (supportTopZ - supportBottomZ) * 0.33,
+    supportBottomZ + (supportTopZ - supportBottomZ) * 0.66,
+    supportTopZ,
   ];
-
-  for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
-    const section = sections[sectionIndex];
-    const ratio = section.ratio;
-    const point =
-      section.kind === "path"
-        ? section.point
-        : (section.points[Math.floor(section.points.length / 2)] ?? path[0]);
-    const flareRatio = 1 - (1 - ratio) ** 2;
-    const halfWidth =
-      (TEST_TUBE_ARM_START_WIDTH_MM * (1 - flareRatio) + TEST_TUBE_ARM_END_WIDTH_MM * flareRatio) /
-      2;
-    const topZ = point.z - (section.kind === "ring" && ratio === 1 ? 0.05 : 0);
-    const bottomZ = topZ - TEST_TUBE_ARM_THICKNESS_MM;
-    const sectionStart = verts.length / 3;
-    for (let pointIndex = 0; pointIndex < TEST_TUBE_ARM_SECTION_POINTS; pointIndex++) {
-      const sectionRatio =
-        TEST_TUBE_ARM_SECTION_POINTS <= 1 ? 0.5 : pointIndex / (TEST_TUBE_ARM_SECTION_POINTS - 1);
-      const lateral = (sectionRatio * 2 - 1) * halfWidth;
-      const sourcePoint =
-        section.kind === "ring"
-          ? (section.points[
-              Math.min(
-                section.points.length - 1,
-                Math.round(sectionRatio * Math.max(0, section.points.length - 1)),
-              )
-            ] ?? point)
-          : {
-              x: point.x + tangentX * lateral,
-              y: point.y + tangentY * lateral,
-              z: point.z,
-            };
-      verts.push(sourcePoint.x, sourcePoint.y, bottomZ);
-    }
-
-    for (let pointIndex = 0; pointIndex < TEST_TUBE_ARM_SECTION_POINTS; pointIndex++) {
-      const bottomVertexOffset = sectionStart + pointIndex;
-      verts.push(verts[bottomVertexOffset * 3], verts[bottomVertexOffset * 3 + 1], topZ);
-    }
-    sectionStarts.push(sectionStart);
+  if (!canFitCenteredTestTubeSupport(params, fitSamples, TEST_TUBE_SUPPORT_OUTER_RADIUS_MM)) {
+    return;
   }
 
-  for (let sectionIndex = 0; sectionIndex < sectionStarts.length - 1; sectionIndex++) {
-    const current = sectionStarts[sectionIndex];
-    const next = sectionStarts[sectionIndex + 1];
-
-    for (let pointIndex = 0; pointIndex < TEST_TUBE_ARM_SECTION_POINTS - 1; pointIndex++) {
-      const currentA = current + pointIndex;
-      const currentB = current + pointIndex + 1;
-      const nextA = next + pointIndex;
-      const nextB = next + pointIndex + 1;
-      faces.push(currentA, currentB, nextA, currentB, nextB, nextA);
-    }
-
-    for (let pointIndex = 0; pointIndex < TEST_TUBE_ARM_SECTION_POINTS - 1; pointIndex++) {
-      const currentA = current + TEST_TUBE_ARM_SECTION_POINTS + pointIndex;
-      const currentB = current + TEST_TUBE_ARM_SECTION_POINTS + pointIndex + 1;
-      const nextA = next + TEST_TUBE_ARM_SECTION_POINTS + pointIndex;
-      const nextB = next + TEST_TUBE_ARM_SECTION_POINTS + pointIndex + 1;
-      faces.push(currentA, nextA, currentB, currentB, nextA, nextB);
-    }
-
-    faces.push(
-      current,
-      next,
-      current + TEST_TUBE_ARM_SECTION_POINTS,
-      current + TEST_TUBE_ARM_SECTION_POINTS,
-      next,
-      next + TEST_TUBE_ARM_SECTION_POINTS,
-    );
-
-    const currentRight = current + TEST_TUBE_ARM_SECTION_POINTS - 1;
-    const nextRight = next + TEST_TUBE_ARM_SECTION_POINTS - 1;
-    faces.push(
-      currentRight,
-      currentRight + TEST_TUBE_ARM_SECTION_POINTS,
-      nextRight,
-      currentRight + TEST_TUBE_ARM_SECTION_POINTS,
-      nextRight + TEST_TUBE_ARM_SECTION_POINTS,
-      nextRight,
-    );
-  }
-
-  const first = sectionStarts[0];
-  const firstPathPoint = path[0];
-  const firstCapAnchor = verts.length / 3;
-  verts.push(firstPathPoint.x, firstPathPoint.y, firstPathPoint.z);
-  const firstPolygon = [
-    ...Array.from({ length: TEST_TUBE_ARM_SECTION_POINTS }, (_, index) => first + index),
-    ...Array.from(
-      { length: TEST_TUBE_ARM_SECTION_POINTS },
-      (_, index) => first + sectionVertexCount - 1 - index,
-    ),
-  ];
-  for (let index = 0; index < firstPolygon.length; index++) {
-    faces.push(
-      firstCapAnchor,
-      firstPolygon[index],
-      firstPolygon[(index + 1) % firstPolygon.length],
-    );
-  }
-
-  const last = sectionStarts[sectionStarts.length - 1];
-  for (let index = 0; index < TEST_TUBE_ARM_SECTION_POINTS - 1; index++) {
-    faces.push(
-      last + index,
-      last + TEST_TUBE_ARM_SECTION_POINTS + index,
-      last + index + 1,
-      last + index + 1,
-      last + TEST_TUBE_ARM_SECTION_POINTS + index,
-      last + TEST_TUBE_ARM_SECTION_POINTS + index + 1,
-    );
-  }
-}
-
-function addRingContactPin(
-  verts: number[],
-  faces: number[],
-  angle: number,
-  ringPoint: TestTubeSupportPoint,
-) {
-  const tangentX = -Math.sin(angle);
-  const tangentY = Math.cos(angle);
-  const radialX = Math.cos(angle);
-  const radialY = Math.sin(angle);
-  const baseZ = ringPoint.z - 0.05;
-  const apex = verts.length / 3;
-  const baseCenter = apex + 1;
-  const baseLeft = apex + 2;
-  const baseRight = apex + 3;
-
-  verts.push(ringPoint.x, ringPoint.y, ringPoint.z);
-  verts.push(ringPoint.x, ringPoint.y, baseZ);
-  verts.push(
-    ringPoint.x - radialX * 0.35 + tangentX * 0.28,
-    ringPoint.y - radialY * 0.35 + tangentY * 0.28,
-    baseZ,
-  );
-  verts.push(
-    ringPoint.x - radialX * 0.35 - tangentX * 0.28,
-    ringPoint.y - radialY * 0.35 - tangentY * 0.28,
-    baseZ,
-  );
-
-  faces.push(apex, baseLeft, baseCenter);
-  faces.push(apex, baseCenter, baseRight);
-  faces.push(apex, baseRight, baseLeft);
-  faces.push(baseCenter, baseLeft, baseRight);
-}
-
-function buildRingArcPoints(
-  verts: readonly number[],
-  ringStart: number,
-  segments: number,
-  angle: number,
-  arcSegments: number,
-): TestTubeSupportPoint[] {
-  const centerIndex = findNearestRingVertexByAngle(verts, ringStart, segments, angle) - ringStart;
-  const halfSpan = Math.floor(arcSegments / 2);
-  const points: TestTubeSupportPoint[] = [];
-
-  for (let offset = -halfSpan; offset <= halfSpan; offset++) {
-    const ringIndex = ringStart + ((centerIndex + offset + segments) % segments);
-    const vertexOffset = ringIndex * 3;
-    points.push({
-      x: verts[vertexOffset],
-      y: verts[vertexOffset + 1],
-      z: verts[vertexOffset + 2],
-    });
-  }
-
-  return points;
-}
-
-function findNearestRingVertexByAngle(
-  verts: readonly number[],
-  ringStart: number,
-  segments: number,
-  angle: number,
-): number {
-  let bestIndex = ringStart;
-  let bestDistance = Number.POSITIVE_INFINITY;
-
-  for (let index = 0; index < segments; index++) {
-    const vertexIndex = ringStart + index;
-    const x = verts[vertexIndex * 3];
-    const y = verts[vertexIndex * 3 + 1];
-    const distance = Math.abs(
-      Math.atan2(Math.sin(Math.atan2(y, x) - angle), Math.cos(Math.atan2(y, x) - angle)),
-    );
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestIndex = vertexIndex;
-    }
-  }
-
-  return bestIndex;
-}
-
-function findSupportRootLayerIndex(
-  zValues: readonly number[],
-  targetZ: number,
-  fallbackZ: number,
-): number {
-  let bestIndex = 0;
-  let bestDistance = Number.POSITIVE_INFINITY;
-
-  for (let index = 0; index < zValues.length; index++) {
-    const z = zValues[index];
-    if (z > targetZ + Number.EPSILON) {
-      continue;
-    }
-
-    const distance = Math.abs(z - targetZ);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestIndex = index;
-    }
-  }
-
-  if (bestDistance < Number.POSITIVE_INFINITY) {
-    return bestIndex;
-  }
-
-  for (let index = 0; index < zValues.length; index++) {
-    const distance = Math.abs(zValues[index] - fallbackZ);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestIndex = index;
-    }
-  }
-
-  return bestIndex;
-}
-
-function addTestTubeThreeArmSupport(
-  params: VaseParameters,
-  verts: number[],
-  faces: number[],
-  config: TestTubeSupportConfig,
-  innerRingStarts: readonly number[],
-  zInner: readonly number[],
-  zInnerBottom: number,
-) {
-  const guideInnerContour = computeInnerContour(
-    interpolatedOuterContour(params, config.guideBottomZ),
-    params.wallThicknessMm,
-  );
-  const guideWallRadius = distanceFromOriginToContourEdges(guideInnerContour);
-  const radialSpan = Math.max(0, guideWallRadius - TEST_TUBE_GUIDE_OUTER_RADIUS_MM);
-  const drop = Math.max(
-    TEST_TUBE_ARM_MIN_DROP_MM,
-    Math.min(TEST_TUBE_ARM_MAX_DROP_MM, radialSpan * TEST_TUBE_ARM_PRINTABLE_SLOPE_RATIO),
-  );
-  const rootLayerIndex = findSupportRootLayerIndex(
-    zInner,
-    config.guideBottomZ - drop,
-    Math.max(zInnerBottom, config.guideBottomZ - TEST_TUBE_ARM_MIN_DROP_MM),
-  );
-  const rootRingStart = innerRingStarts[rootLayerIndex];
-  const rootZ = zInner[rootLayerIndex] ?? zInnerBottom;
-
-  const armPaths: TestTubeSupportPoint[][] = [];
-  const armRootArcs: TestTubeSupportPoint[][] = [];
-  for (let index = 0; index < TEST_TUBE_ARM_COUNT; index++) {
-    const angle = (index / TEST_TUBE_ARM_COUNT) * Math.PI * 2;
-    const rootIndex = findNearestRingVertexByAngle(
-      verts,
-      rootRingStart,
-      params.radialSamples,
-      angle,
-    );
-    const rootOffset = rootIndex * 3;
-    const path = buildTestTubeSupportArmPath(
-      params,
-      {
-        x: verts[rootOffset],
-        y: verts[rootOffset + 1],
-        z: rootZ,
-      },
-      angle,
-      config.guideBottomZ,
-    );
-    if (!path) {
-      return;
-    }
-
-    armPaths.push(path);
-    armRootArcs.push(
-      buildRingArcPoints(
-        verts,
-        rootRingStart,
-        params.radialSamples,
-        angle,
-        TEST_TUBE_ARM_WALL_ARC_SEGMENTS,
-      ),
-    );
-  }
-
-  const ringStarts = addClosedRing(
+  addSegmentedTubeSupport(
     verts,
     faces,
-    TEST_TUBE_GUIDE_INNER_RADIUS_MM,
-    TEST_TUBE_GUIDE_OUTER_RADIUS_MM,
-    config.guideBottomZ,
-    config.guideTopZ,
-    TEST_TUBE_RING_SEGMENTS,
-    false,
+    TEST_TUBE_SUPPORT_INNER_RADIUS_MM,
+    TEST_TUBE_SUPPORT_OUTER_RADIUS_MM,
+    supportBottomZ,
+    supportTopZ,
+    TEST_TUBE_SUPPORT_SLOT_COUNT,
+    TEST_TUBE_SUPPORT_SLOT_ANGLE_RAD,
+    TEST_TUBE_SUPPORT_SEGMENTS_PER_SECTION,
   );
-  if (!ringStarts) {
-    return;
-  }
-  addRingUnderSupport(verts, faces, ringStarts, TEST_TUBE_RING_SEGMENTS, config.guideBottomZ);
-
-  for (let index = 0; index < armPaths.length; index++) {
-    const angle = (index / TEST_TUBE_ARM_COUNT) * Math.PI * 2;
-    const path = armPaths[index];
-    const ringArc = buildRingArcPoints(
-      verts,
-      ringStarts.outerBottomStart,
-      TEST_TUBE_RING_SEGMENTS,
-      angle,
-      TEST_TUBE_ARM_RING_ARC_SEGMENTS,
-    );
-    addFlaredTestTubeArm(verts, faces, path, angle, armRootArcs[index], ringArc);
-    const ringPoint = ringArc[Math.floor(ringArc.length / 2)];
-    if (ringPoint) {
-      addRingContactPin(verts, faces, angle, ringPoint);
-    }
-  }
 }
 
 function addFlatInnerBottomCap(
@@ -954,30 +492,11 @@ function addInnerBottomCap(
   verts: number[],
   faces: number[],
   innerBottomStart: number,
-  innerRingStarts: readonly number[],
-  zInner: readonly number[],
   zInnerBottom: number,
   options: GenerateVaseMeshOptions,
 ) {
-  const supportConfig =
-    options.includeTestTubeSupport === false
-      ? null
-      : buildTestTubeSupportConfig(params, zInnerBottom);
-  if (!supportConfig) {
-    addFlatInnerBottomCap(verts, faces, innerBottomStart, params.radialSamples, zInnerBottom);
-    return;
-  }
-
   addFlatInnerBottomCap(verts, faces, innerBottomStart, params.radialSamples, zInnerBottom);
-  addTestTubeThreeArmSupport(
-    params,
-    verts,
-    faces,
-    supportConfig,
-    innerRingStarts,
-    zInner,
-    zInnerBottom,
-  );
+  addTestTubeSupportIfNeeded(params, verts, faces, zInnerBottom, options);
 }
 
 /**
@@ -1092,8 +611,6 @@ function generateVaseMeshInternal(
       verts,
       faces,
       innerBottom,
-      innerRingStarts,
-      zInner,
       zInnerBottom,
       options,
     );
@@ -1123,12 +640,18 @@ export async function generateVaseMeshWithEngraving(
     appendPipelineTrace(
       `[mesh-builder] base mesh:v=${mesh.vertices.length / 3},t=${mesh.indices.length / 3}`,
     );
+    const shouldReserveSupportCenter =
+      options.includeTestTubeSupport !== false &&
+      analyzeWaterproofInsertCompatibility(params).type === "test_tube";
     const engravedMesh = await engraveBaseText(
       mesh,
       params,
       outerContours[0],
       seed,
       isSeedModified,
+      shouldReserveSupportCenter
+        ? TEST_TUBE_SUPPORT_OUTER_RADIUS_MM + TEST_TUBE_SUPPORT_ENGRAVING_CLEARANCE_MM
+        : 0,
     );
     const difference = getMeshDifferenceDiagnostics(mesh, engravedMesh);
     appendPipelineTrace(

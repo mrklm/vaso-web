@@ -11,12 +11,14 @@ import { useUIStore } from "../../store/ui-store";
 import { useVaseMesh } from "../../hooks/useVaseMesh";
 import { buildProfileContour } from "../../engine/geometry";
 import { formatEngravingLines } from "../../engine/engraving-text";
+import { analyzeWaterproofInsertCompatibility } from "../../engine/insert-compatibility";
 import type { VaseParameters } from "../../engine/types";
 
 const ROTATE_SPEED = 0.05;
 const PREVIEW_TEXT_FIT_MARGIN_MM = 4;
 const PREVIEW_TEXT_WIDTH_FACTOR = 1.9;
 const PREVIEW_TEXT_HEIGHT_FACTOR = 0.78;
+const PREVIEW_SUPPORT_TEXT_SIZE_FACTOR = 1.9;
 const PREVIEW_TEXT_CANVAS_WIDTH = 1536;
 const PREVIEW_TEXT_CANVAS_HEIGHT = 512;
 const PREVIEW_TEXT_Y_OFFSET = 0.08;
@@ -25,6 +27,8 @@ const PREVIEW_TEXT_BASE_FONT_SIZES = [108, 96, 96] as const;
 const PREVIEW_TEXT_LINE_WIDTH_FACTORS = [0.98, 0.98] as const;
 const PREVIEW_TEXT_SIGNATURE_HEIGHT_FACTOR = 0.92;
 const PREVIEW_TEXT_SIDE_MARGIN_PX = 29;
+const PREVIEW_TEST_TUBE_SUPPORT_OUTER_RADIUS_MM = 9.5;
+const PREVIEW_TEST_TUBE_SUPPORT_TEXT_CLEARANCE_MM = 4;
 
 function fitPreviewText(
   context: CanvasRenderingContext2D,
@@ -56,7 +60,17 @@ function computePreviewBottomFitRadius(params: VaseParameters): number {
 }
 
 function PreviewEngravingOverlay(
-  { params, seed, isSeedModified }: { params: VaseParameters; seed: number; isSeedModified: boolean },
+  {
+    params,
+    seed,
+    isSeedModified,
+    placement = "bottom",
+  }: {
+    params: VaseParameters;
+    seed: number;
+    isSeedModified: boolean;
+    placement?: "bottom" | "support";
+  },
 ) {
   const lines = useMemo(() => formatEngravingLines(seed, isSeedModified), [isSeedModified, seed]);
   const fitRadius = useMemo(() => computePreviewBottomFitRadius(params), [params]);
@@ -78,6 +92,53 @@ function PreviewEngravingOverlay(
     context.fillStyle = "rgba(28,28,28,0.45)";
 
     const centerX = canvas.width / 2;
+
+    if (placement === "support") {
+      const supportLines = lines.slice(0, 2);
+      const heightMm = fitRadius * PREVIEW_SUPPORT_TEXT_SIZE_FACTOR;
+      const supportRadiusPx =
+        (PREVIEW_TEST_TUBE_SUPPORT_OUTER_RADIUS_MM +
+          PREVIEW_TEST_TUBE_SUPPORT_TEXT_CLEARANCE_MM) *
+        (canvas.height / heightMm);
+      const availableBandHeight = Math.max(0, canvas.height * 0.5 - supportRadiusPx - 18);
+      if (availableBandHeight <= 20) return null;
+
+      supportLines.forEach((line, index) => {
+        const baseFontSize =
+          PREVIEW_TEXT_BASE_FONT_SIZES[index] ?? PREVIEW_TEXT_BASE_FONT_SIZES[0];
+        const fittedWidthSize = fitPreviewText(context, line, baseFontSize, canvas.width * 0.78);
+        let fontSize = Math.min(fittedWidthSize, availableBandHeight * 0.68);
+        const direction = index === 0 ? -1 : 1;
+        let lineCenterY = canvas.height * 0.5 + direction * (supportRadiusPx + fontSize * 0.72);
+
+        const previewRadiusY = canvas.height * 0.41;
+        const dy = lineCenterY - canvas.height * 0.5;
+        const halfChordFactor = Math.sqrt(Math.max(0, 1 - (dy / previewRadiusY) ** 2));
+        const allowedWidth = Math.max(
+          0,
+          canvas.width * 0.84 * halfChordFactor - PREVIEW_TEXT_SIDE_MARGIN_PX * 2,
+        );
+        if (allowedWidth > 0) {
+          context.font = `700 ${fontSize}px Arial`;
+          const measuredWidth = context.measureText(line).width;
+          if (measuredWidth > allowedWidth) {
+            fontSize *= allowedWidth / measuredWidth;
+            lineCenterY = canvas.height * 0.5 + direction * (supportRadiusPx + fontSize * 0.72);
+          }
+        }
+
+        context.font = `700 ${fontSize}px Arial`;
+        context.lineWidth = Math.max(4, fontSize * 0.09);
+        context.strokeText(line, centerX, lineCenterY);
+        context.fillText(line, centerX, lineCenterY);
+      });
+
+      const nextTexture = new THREE.CanvasTexture(canvas);
+      nextTexture.colorSpace = THREE.SRGBColorSpace;
+      nextTexture.needsUpdate = true;
+      return nextTexture;
+    }
+
     const lineFontSizes = lines.map((line, index) => {
       const widthFactor = PREVIEW_TEXT_LINE_WIDTH_FACTORS[index];
       if (widthFactor === undefined) {
@@ -152,14 +213,18 @@ function PreviewEngravingOverlay(
     nextTexture.colorSpace = THREE.SRGBColorSpace;
     nextTexture.needsUpdate = true;
     return nextTexture;
-  }, [fitRadius, lines, params.closeBottom]);
+  }, [fitRadius, lines, params.closeBottom, placement]);
 
   useEffect(() => () => texture?.dispose(), [texture]);
 
   if (!texture || !params.closeBottom || fitRadius <= 8) return null;
 
-  const width = fitRadius * PREVIEW_TEXT_WIDTH_FACTOR;
-  const height = fitRadius * PREVIEW_TEXT_HEIGHT_FACTOR;
+  const width =
+    fitRadius *
+    (placement === "support" ? PREVIEW_SUPPORT_TEXT_SIZE_FACTOR : PREVIEW_TEXT_WIDTH_FACTOR);
+  const height =
+    fitRadius *
+    (placement === "support" ? PREVIEW_SUPPORT_TEXT_SIZE_FACTOR : PREVIEW_TEXT_HEIGHT_FACTOR);
   const y = params.bottomThicknessMm - params.heightMm / 2 + PREVIEW_TEXT_Y_OFFSET;
 
   return (
@@ -340,6 +405,10 @@ export function VaseViewer3D() {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const lastTapRef = useRef(0);
   const paramsKey = JSON.stringify(params);
+  const hasTestTubeSupport = useMemo(
+    () => analyzeWaterproofInsertCompatibility(params).type === "test_tube",
+    [params],
+  );
 
   const handleDoubleTap = useCallback(
     (e: React.TouchEvent) => {
@@ -392,7 +461,12 @@ export function VaseViewer3D() {
           />
         )}
 
-        <PreviewEngravingOverlay params={params} seed={seed} isSeedModified={showSeedModified} />
+        <PreviewEngravingOverlay
+          params={params}
+          seed={seed}
+          isSeedModified={showSeedModified}
+          placement={hasTestTubeSupport ? "support" : "bottom"}
+        />
 
         <mesh
           rotation={[-Math.PI / 2, 0, 0]}

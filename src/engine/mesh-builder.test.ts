@@ -30,17 +30,27 @@ function createTwoProfileVase(
 }
 
 function hasTestTubeSupportVertices(mesh: ReturnType<typeof generateVaseMesh>): boolean {
+  return getTestTubeSupportZRange(mesh) !== null;
+}
+
+function getTestTubeSupportZRange(
+  mesh: ReturnType<typeof generateVaseMesh>,
+): { minZ: number; maxZ: number } | null {
+  let minZ = Number.POSITIVE_INFINITY;
+  let maxZ = Number.NEGATIVE_INFINITY;
+
   for (let index = 0; index < mesh.vertices.length; index += 3) {
     const x = mesh.vertices[index];
     const y = mesh.vertices[index + 1];
     const z = mesh.vertices[index + 2];
     const radius = Math.hypot(x, y);
-    if (radius >= 6.8 && radius <= 9.1 && z > 4) {
-      return true;
+    if (radius >= 7.3 && radius <= 9.7 && z > 2.5) {
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
     }
   }
 
-  return false;
+  return Number.isFinite(minZ) && Number.isFinite(maxZ) ? { minZ, maxZ } : null;
 }
 
 describe("generateVaseMesh", () => {
@@ -132,14 +142,16 @@ describe("generateVaseMesh", () => {
   });
 
   it.each([48, 72, 96])(
-    "adds a closed three-arm support when only a test tube fits at %i radial samples",
+    "adds a closed segmented support when only a test tube fits at %i radial samples",
     (radialSamples) => {
       const params = createTwoProfileVase(120, 40, 30);
       params.radialSamples = radialSamples;
       const mesh = generateVaseMesh(params);
+      const supportRange = getTestTubeSupportZRange(mesh);
 
-      expect(hasTestTubeSupportVertices(mesh)).toBe(true);
-      expect(countConnectedMeshComponents(mesh)).toBe(1);
+      expect(supportRange).not.toBeNull();
+      expect(supportRange?.minZ).toBeCloseTo(params.bottomThicknessMm, 0);
+      expect(supportRange?.maxZ).toBeGreaterThan(params.heightMm - 14);
       expect(countBoundaryEdges(mesh)).toBe(0);
       expect(countNonManifoldEdges(mesh)).toBe(0);
     },

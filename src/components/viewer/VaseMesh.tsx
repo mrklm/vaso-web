@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { MeshData } from "../../engine/types";
@@ -23,8 +23,24 @@ export function VaseMesh({
   rotationSpeed,
 }: VaseMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const geometryRef = useRef<THREE.BufferGeometry>(null);
   const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const geometry = useMemo(() => {
+    const nextGeometry = new THREE.BufferGeometry();
+    nextGeometry.setAttribute("position", new THREE.Float32BufferAttribute(meshData.vertices, 3));
+    nextGeometry.setIndex(new THREE.Uint32BufferAttribute(meshData.indices, 1));
+    nextGeometry.computeVertexNormals();
+
+    // Center the mesh
+    nextGeometry.computeBoundingBox();
+    if (nextGeometry.boundingBox) {
+      const center = new THREE.Vector3();
+      nextGeometry.boundingBox.getCenter(center);
+      nextGeometry.translate(-center.x, -center.y, -center.z);
+    }
+    nextGeometry.computeBoundingBox();
+    nextGeometry.computeBoundingSphere();
+    return nextGeometry;
+  }, [meshData]);
 
   useFrame((_, delta) => {
     if (!meshRef.current) return;
@@ -35,23 +51,8 @@ export function VaseMesh({
   });
 
   useEffect(() => {
-    if (!geometryRef.current) return;
-    const geo = geometryRef.current;
-
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(meshData.vertices, 3));
-    geo.setIndex(new THREE.Uint32BufferAttribute(meshData.indices, 1));
-    geo.computeVertexNormals();
-
-    // Center the mesh
-    geo.computeBoundingBox();
-    if (geo.boundingBox) {
-      const center = new THREE.Vector3();
-      geo.boundingBox.getCenter(center);
-      geo.translate(-center.x, -center.y, -center.z);
-    }
-    geo.computeBoundingBox();
-    geo.computeBoundingSphere();
-  }, [meshData]);
+    return () => geometry.dispose();
+  }, [geometry]);
 
   useEffect(() => {
     if (!materialRef.current) return;
@@ -62,8 +63,13 @@ export function VaseMesh({
   const metalness = (shading / 100) * 0.3;
 
   return (
-    <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
-      <bufferGeometry ref={geometryRef} />
+    <mesh
+      ref={meshRef}
+      geometry={geometry}
+      rotation={[-Math.PI / 2, 0, 0]}
+      castShadow
+      receiveShadow
+    >
       <meshStandardMaterial
         ref={materialRef}
         color={color}

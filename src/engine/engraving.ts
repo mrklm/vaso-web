@@ -28,8 +28,9 @@ const RAW_LINE_SIZES = [8.6, 7.8, 7.2] as const;
 const TEXT_LINE_WIDTH_FACTORS = [1.9, 1.9] as const;
 const TEXT_SIGNATURE_HEIGHT_FACTOR = 0.92;
 const TEXT_MAX_HEIGHT_FACTOR = 0.78;
-const TEXT_LINE_GAP_FACTOR = 0.55;
+const TEXT_LINE_GAP_FACTOR = 1.85;
 const TEXT_SIDE_MARGIN_MM = 1.44;
+const TEXT_RESERVED_CENTER_CLEARANCE_MM = 2.5;
 const TEXT_CURVE_SEGMENTS = 10;
 const PLANAR_TEXT_SIMPLIFICATION_MM = 0.05;
 
@@ -222,6 +223,28 @@ function buildPrintableLineGeometry(
   return { geometry, removedContours, removedHoles };
 }
 
+function scaleGeometryToMaxHeight(geometry: THREE.BufferGeometry, maxHeight: number): void {
+  geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox;
+  if (!bounds || maxHeight <= 0) return;
+
+  const height = bounds.max.y - bounds.min.y;
+  if (height > maxHeight && height > 0) {
+    const scale = maxHeight / height;
+    geometry.scale(scale, scale, 1);
+  }
+}
+
+function centerGeometryAt(geometry: THREE.BufferGeometry, centerY: number): void {
+  geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox;
+  if (!bounds) return;
+
+  const centerX = (bounds.min.x + bounds.max.x) * 0.5;
+  const currentCenterY = (bounds.min.y + bounds.max.y) * 0.5;
+  geometry.translate(-centerX, centerY - currentCenterY, 0);
+}
+
 function buildTextGeometry(
   font: Font,
   seed: number,
@@ -229,6 +252,7 @@ function buildTextGeometry(
   fitRadius: number,
   printSafeScale = 1,
   printSafe = false,
+  reservedCenterRadius = 0,
 ): THREE.BufferGeometry | null {
   const lines = formatEngravingLines(seed, isSeedModified);
   const lineResults = lines.map((line, index) => ({
@@ -279,6 +303,78 @@ function buildTextGeometry(
       geometry.scale(scale, scale, 1);
     }
   });
+
+  const buildLayoutAroundReservedCenter = (): THREE.BufferGeometry | null => {
+    const clearance = Math.min(
+      TEXT_RESERVED_CENTER_CLEARANCE_MM,
+      Math.max(0.6, fitRadius - reservedCenterRadius - TEXT_SIDE_MARGIN_MM - 1),
+    );
+    const availableHeight = fitRadius - reservedCenterRadius - clearance - TEXT_SIDE_MARGIN_MM;
+    if (availableHeight <= 0 || rawGeometries.length < 2) {
+      return null;
+    }
+
+    const topGeometry = rawGeometries[0];
+    const lowerGeometry = rawGeometries[1];
+    if (!topGeometry || !lowerGeometry) return null;
+
+    const placedGeometries = [topGeometry, lowerGeometry];
+    const unusedGeometries = rawGeometries.filter(
+      (geometry) => !placedGeometries.includes(geometry),
+    );
+    scaleGeometryToMaxHeight(topGeometry, availableHeight);
+    scaleGeometryToMaxHeight(lowerGeometry, availableHeight);
+
+    const placements: Array<{ geometry: THREE.BufferGeometry; centerY: number }> = [];
+    const topHeight = getLineSize(topGeometry, lineResults[0]?.rawSize ?? FONT_LINE_HEIGHT).height;
+    placements.push({
+      geometry: topGeometry,
+      centerY: reservedCenterRadius + clearance + topHeight * 0.5,
+    });
+    const lowerHeight = getLineSize(
+      lowerGeometry,
+      lineResults[1]?.rawSize ?? FONT_LINE_HEIGHT,
+    ).height;
+    placements.push({
+      geometry: lowerGeometry,
+      centerY: -(reservedCenterRadius + clearance + lowerHeight * 0.5),
+    });
+
+    for (const placement of placements) {
+      const { width } = getLineSize(placement.geometry, FONT_LINE_HEIGHT);
+      const halfChord = Math.sqrt(
+        Math.max(0, fitRadius * fitRadius - placement.centerY * placement.centerY),
+      );
+      const allowedWidth = Math.max(0, halfChord * 2 - TEXT_SIDE_MARGIN_MM * 2);
+      if (allowedWidth <= 0) {
+        return null;
+      }
+      if (width > allowedWidth) {
+        const scale = allowedWidth / width;
+        placement.geometry.scale(scale, scale, 1);
+      }
+      centerGeometryAt(placement.geometry, placement.centerY);
+    }
+
+    unusedGeometries.forEach((geometry) => geometry.dispose());
+
+    const merged = mergeGeometries(placedGeometries, false);
+    if (!merged) return null;
+    placedGeometries.forEach((geometry) => geometry.dispose());
+    appendPipelineTrace(
+      `[engraving] reserved center layout:radius=${reservedCenterRadius.toFixed(3)}mm,available=${availableHeight.toFixed(3)}mm`,
+    );
+    merged.clearGroups();
+    return merged;
+  };
+
+  if (reservedCenterRadius > 0) {
+    const reservedLayout = buildLayoutAroundReservedCenter();
+    if (reservedLayout) {
+      return reservedLayout;
+    }
+    appendPipelineTrace("[engraving] reserved center layout fallback=standard");
+  }
 
   const computeLayout = () => {
     const lineHeights = rawGeometries.map((geometry, index) =>
@@ -338,6 +434,7 @@ function buildTextGeometry(
   }
   const center = centeredBounds.getCenter(new THREE.Vector3());
   merged.translate(-center.x, -center.y, 0);
+
   merged.clearGroups();
   return merged;
 }
@@ -456,6 +553,7 @@ function buildAdditiveTextGeometry(
   bottomOuterContour: Float64Array,
   seed: number,
   isSeedModified: boolean,
+  reservedCenterRadius = 0,
 ): THREE.BufferGeometry | null {
   if (!params.closeBottom) {
     appendPipelineTrace("[engraving] skipped: closeBottom=0");
@@ -500,6 +598,7 @@ function buildAdditiveTextGeometry(
     fitRadius,
     compensatedScale,
     params.printSafeEngraving,
+    reservedCenterRadius,
   );
   if (!merged) return null;
 
@@ -552,6 +651,7 @@ export async function engraveBaseText(
   bottomOuterContour: Float64Array,
   seed: number,
   isSeedModified = false,
+  reservedCenterRadius = 0,
 ): Promise<MeshData> {
   const comparisonTimeline: ComparisonStage[] = [];
   const engravingLines = formatEngravingLines(seed, isSeedModified);
@@ -562,7 +662,14 @@ export async function engraveBaseText(
   traceMesh("[engraving] input mesh", meshData, PLANAR_PATCH_TOLERANCE_MM);
   traceMeshComparison("[engraving] compare input vs base", meshData, meshData, PLANAR_PATCH_TOLERANCE_MM, comparisonTimeline);
   const font = await loadRobotoFont();
-  const additiveTextGeometry = buildAdditiveTextGeometry(font, params, bottomOuterContour, seed, isSeedModified);
+  const additiveTextGeometry = buildAdditiveTextGeometry(
+    font,
+    params,
+    bottomOuterContour,
+    seed,
+    isSeedModified,
+    reservedCenterRadius,
+  );
   if (!additiveTextGeometry) return meshData;
 
   const refinedBaseMesh = subdivideBottomCapTriangles(meshData);
