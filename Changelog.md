@@ -7,6 +7,13 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.60] - 2026-08-10
+
+### 🎨 Modifié
+ - Passe les tubes à essai au diamètre 25,4 mm avec formats 100 mm et 120 mm selon la hauteur du vase.
+ - Ajoute une compensation de hauteur pour les grands vases avec support tube à essai afin de garder le tube environ 20 mm sous le haut.
+ - Prend en compte les textures réelles dans le calcul de compatibilité des contenants pour éviter les insertions impossibles.
+
 ## [1.0.59] - 2026-07-13
 
 ### 🎨 Modifié

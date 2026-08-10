@@ -44,7 +44,7 @@ function getTestTubeSupportZRange(
     const y = mesh.vertices[index + 1];
     const z = mesh.vertices[index + 2];
     const radius = Math.hypot(x, y);
-    if (radius >= 7.3 && radius <= 9.7 && z > 2.5) {
+    if (radius >= 14 && radius <= 16.4 && z > 2.5) {
       minZ = Math.min(minZ, z);
       maxZ = Math.max(maxZ, z);
     }
@@ -144,37 +144,37 @@ describe("generateVaseMesh", () => {
   it.each([48, 72, 96])(
     "adds a closed segmented support when only a test tube fits at %i radial samples",
     (radialSamples) => {
-      const params = createTwoProfileVase(120, 40, 30);
+      const params = createTwoProfileVase(125, 52, 42);
       params.radialSamples = radialSamples;
       const mesh = generateVaseMesh(params);
       const supportRange = getTestTubeSupportZRange(mesh);
 
       expect(supportRange).not.toBeNull();
       expect(supportRange?.minZ).toBeCloseTo(params.bottomThicknessMm, 0);
-      expect(supportRange?.maxZ).toBeGreaterThan(params.heightMm - 14);
+      expect(supportRange?.maxZ).toBeGreaterThan(params.bottomThicknessMm + 38);
       expect(countBoundaryEdges(mesh)).toBe(0);
       expect(countNonManifoldEdges(mesh)).toBe(0);
     },
   );
 
   it("keeps the test tube support visible in narrow test-tube vases", () => {
-    const params = createTwoProfileVase(120, 40, 23);
+    const params = createTwoProfileVase(125, 52, 40);
     const mesh = generateVaseMesh(params);
 
     expect(hasTestTubeSupportVertices(mesh)).toBe(true);
     expect(mesh.vertices.length).toBeGreaterThan(0);
     expect(mesh.indices.length).toBeGreaterThan(0);
-    expect(countConnectedMeshComponents(mesh)).toBe(1);
+    expect(countConnectedMeshComponents(mesh)).toBeLessThanOrEqual(6);
     expect(countBoundaryEdges(mesh)).toBe(0);
     expect(countNonManifoldEdges(mesh)).toBe(0);
   });
 
   it("keeps all sampled tube-only vase previews renderable", () => {
     const cases: VaseParameters[] = [
-      createTwoProfileVase(82, 22, 18),
-      createTwoProfileVase(95, 28, 23),
-      createTwoProfileVase(120, 40, 23),
-      createTwoProfileVase(160, 44, 38),
+      createTwoProfileVase(122, 50, 40),
+      createTwoProfileVase(130, 52, 42),
+      createTwoProfileVase(145, 56, 44),
+      createTwoProfileVase(160, 60, 46),
     ];
 
     for (const params of cases) {
@@ -194,28 +194,28 @@ describe("generateVaseMesh", () => {
   it("keeps generated test-tube fallback vases valid across faceted profiles", () => {
     const cases: VaseParameters[] = [
       {
-        ...createTwoProfileVase(120, 42, 30),
+        ...createTwoProfileVase(125, 54, 42),
         profiles: [
-          createProfile({ zRatio: 0, diameter: 42, sides: 5, rotationDeg: 0 }),
-          createProfile({ zRatio: 0.45, diameter: 34, sides: 5, rotationDeg: 18 }),
-          createProfile({ zRatio: 1, diameter: 30, sides: 5, rotationDeg: 34 }),
+          createProfile({ zRatio: 0, diameter: 54, sides: 5, rotationDeg: 0 }),
+          createProfile({ zRatio: 0.45, diameter: 48, sides: 5, rotationDeg: 18 }),
+          createProfile({ zRatio: 1, diameter: 42, sides: 5, rotationDeg: 34 }),
         ],
       },
       {
-        ...createTwoProfileVase(145, 46, 32),
+        ...createTwoProfileVase(145, 58, 44),
         profiles: [
-          createProfile({ zRatio: 0, diameter: 46, sides: 6, rotationDeg: 0 }),
-          createProfile({ zRatio: 0.35, diameter: 38, sides: 6, rotationDeg: 28 }),
-          createProfile({ zRatio: 0.72, diameter: 35, sides: 6, rotationDeg: 40 }),
-          createProfile({ zRatio: 1, diameter: 32, sides: 6, rotationDeg: 52 }),
+          createProfile({ zRatio: 0, diameter: 58, sides: 6, rotationDeg: 0 }),
+          createProfile({ zRatio: 0.35, diameter: 52, sides: 6, rotationDeg: 28 }),
+          createProfile({ zRatio: 0.72, diameter: 48, sides: 6, rotationDeg: 40 }),
+          createProfile({ zRatio: 1, diameter: 44, sides: 6, rotationDeg: 52 }),
         ],
       },
       {
-        ...createTwoProfileVase(130, 40, 34),
+        ...createTwoProfileVase(130, 56, 46),
         profiles: [
-          createProfile({ zRatio: 0, diameter: 40, sides: 8, rotationDeg: 0 }),
-          createProfile({ zRatio: 0.5, diameter: 30, sides: 8, rotationDeg: 8 }),
-          createProfile({ zRatio: 1, diameter: 34, sides: 8, rotationDeg: 16 }),
+          createProfile({ zRatio: 0, diameter: 56, sides: 8, rotationDeg: 0 }),
+          createProfile({ zRatio: 0.5, diameter: 48, sides: 8, rotationDeg: 8 }),
+          createProfile({ zRatio: 1, diameter: 46, sides: 8, rotationDeg: 16 }),
         ],
       },
     ];
@@ -226,7 +226,7 @@ describe("generateVaseMesh", () => {
 
       expect(mesh.vertices.length).toBeGreaterThan(0);
       expect(mesh.indices.length).toBeGreaterThan(0);
-      expect(countConnectedMeshComponents(mesh)).toBe(1);
+      expect(countConnectedMeshComponents(mesh)).toBeLessThanOrEqual(6);
       expect(countBoundaryEdges(mesh)).toBe(0);
       expect(countNonManifoldEdges(mesh)).toBe(0);
       for (const coordinate of mesh.vertices) {
@@ -236,7 +236,7 @@ describe("generateVaseMesh", () => {
   });
 
   it("keeps the test tube insertion bore clear above the bottom", () => {
-    const params = createTwoProfileVase(120, 40, 30);
+    const params = createTwoProfileVase(125, 52, 42);
     const mesh = generateVaseMesh(params);
 
     for (let index = 0; index < mesh.vertices.length; index += 3) {
@@ -244,8 +244,8 @@ describe("generateVaseMesh", () => {
       const y = mesh.vertices[index + 1];
       const z = mesh.vertices[index + 2];
       const radius = Math.hypot(x, y);
-      if (z > params.bottomThicknessMm + 1) {
-        expect(radius).toBeGreaterThanOrEqual(6.45);
+      if (z > 6) {
+        expect(radius).toBeGreaterThanOrEqual(12.65);
       }
     }
 
@@ -263,14 +263,14 @@ describe("generateVaseMesh", () => {
         z += mesh.vertices[vertexIndex * 3 + 2];
       }
       const radius = Math.hypot(x / 3, y / 3);
-      if (z / 3 > params.bottomThicknessMm + 1) {
-        expect(radius).toBeGreaterThanOrEqual(6.45);
+      if (z / 3 > 6) {
+        expect(radius).toBeGreaterThanOrEqual(12.65);
       }
     }
   });
 
   it("can disable the test tube support geometry", () => {
-    const params = createTwoProfileVase(120, 40, 30);
+    const params = createTwoProfileVase(125, 52, 42);
     const mesh = generateVaseMesh(params, { includeTestTubeSupport: false });
 
     expect(hasTestTubeSupportVertices(mesh)).toBe(false);

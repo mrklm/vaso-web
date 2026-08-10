@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { temporal } from "zundo";
 import { MAX_SEED } from "../engine/engraving-text";
+import { MIN_TEST_TUBE_VASE_HEIGHT_MM } from "../engine/insert-compatibility";
 import { clampParamsToBuildVolume, type BuildVolume } from "../engine/printer-volume";
 import type {
   VaseParameters,
@@ -107,7 +108,7 @@ function randomizeParams(
     sidesMax = 10;
   let rotMin = 0,
     rotMax = 60;
-  let heightMin = 100,
+  let heightMin = MIN_TEST_TUBE_VASE_HEIGHT_MM,
     heightMax = 250;
 
   switch (style) {
@@ -279,10 +280,18 @@ function getActiveBuildVolume(): BuildVolume {
 }
 
 function constrainToActiveBuildVolume(params: VaseParameters): VaseParameters {
+  const heightConstrainedParams = {
+    ...params,
+    heightMm: Math.max(MIN_TEST_TUBE_VASE_HEIGHT_MM, params.heightMm),
+  };
   if (!useUIStore.getState().enforcePrinterVolume) {
-    return params;
+    return heightConstrainedParams;
   }
-  return clampParamsToBuildVolume(params, getActiveBuildVolume());
+  const clamped = clampParamsToBuildVolume(heightConstrainedParams, getActiveBuildVolume());
+  return {
+    ...clamped,
+    heightMm: Math.max(MIN_TEST_TUBE_VASE_HEIGHT_MM, clamped.heightMm),
+  };
 }
 
 const INITIAL_SEED = Math.floor(Math.random() * (MAX_SEED + 1));

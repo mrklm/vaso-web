@@ -4,6 +4,7 @@ import { useUIStore } from "../../store/ui-store";
 import {
   analyzeWaterproofInsertCompatibility,
   getInsertPresetById,
+  getTestTubePlacement,
 } from "../../engine/insert-compatibility";
 import { generateOuterProfilePoints } from "../../engine/mesh-builder";
 
@@ -61,13 +62,14 @@ export function InsertView2D() {
   }
 
   const innerBottomZ = Math.min(params.bottomThicknessMm, params.heightMm);
+  const testTubePlacement = preset.type === "test_tube" ? getTestTubePlacement(params, preset) : null;
   const insertTopZ =
     preset.type === "test_tube"
-      ? Math.max(innerBottomZ, params.heightMm - 5)
+      ? (testTubePlacement?.tubeTopZ ?? innerBottomZ)
       : Math.min(params.heightMm, innerBottomZ + preset.heightMm);
   const insertBottomZ =
     preset.type === "test_tube"
-      ? Math.max(innerBottomZ, insertTopZ - preset.heightMm)
+      ? (testTubePlacement?.tubeBottomZ ?? innerBottomZ)
       : innerBottomZ;
   const insertBottomRadius = (preset.bottomDiameterMm ?? preset.topDiameterMm) / 2;
   const insertTopRadius = preset.topDiameterMm / 2;
@@ -79,19 +81,13 @@ export function InsertView2D() {
   const insertTopY = h - margin - (insertTopZ / maxZ) * plotH;
   const insertPath =
     preset.type === "test_tube"
-      ? (() => {
-          const roundedBottomRadiusMm = Math.min(insertTopRadius, (insertTopZ - insertBottomZ) / 2);
-          const roundedBottomTopZ = insertBottomZ + roundedBottomRadiusMm;
-          const roundedBottomTopY = h - margin - (roundedBottomTopZ / maxZ) * plotH;
-
-          return [
-            `M${insertLeftTopX.toFixed(1)},${insertTopY.toFixed(1)}`,
-            `L${insertLeftBottomX.toFixed(1)},${roundedBottomTopY.toFixed(1)}`,
-            `Q${(w / 2).toFixed(1)},${insertBottomY.toFixed(1)} ${insertRightBottomX.toFixed(1)},${roundedBottomTopY.toFixed(1)}`,
-            `L${insertRightTopX.toFixed(1)},${insertTopY.toFixed(1)}`,
-            "Z",
-          ].join(" ");
-        })()
+      ? [
+          `M${insertLeftBottomX.toFixed(1)},${insertBottomY.toFixed(1)}`,
+          `L${insertLeftTopX.toFixed(1)},${insertTopY.toFixed(1)}`,
+          `L${insertRightTopX.toFixed(1)},${insertTopY.toFixed(1)}`,
+          `L${insertRightBottomX.toFixed(1)},${insertBottomY.toFixed(1)}`,
+          "Z",
+        ].join(" ")
       : [
           `M${insertLeftBottomX.toFixed(1)},${insertBottomY.toFixed(1)}`,
           `L${insertLeftTopX.toFixed(1)},${insertTopY.toFixed(1)}`,
@@ -103,7 +99,7 @@ export function InsertView2D() {
   const dimensionsLabel =
     preset.type === "eco_cup"
       ? `${preset.heightMm} × ${preset.topDiameterMm} / ${(preset.bottomDiameterMm ?? preset.topDiameterMm).toFixed(0)} mm`
-      : "75 × 12 mm";
+      : `${preset.heightMm} × ${preset.topDiameterMm.toLocaleString("fr-FR")} mm`;
 
   return (
     <div className="view-2d view-2d-insert">

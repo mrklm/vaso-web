@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { MAX_SEED } from "../../engine/engraving-text";
+import { MIN_TEST_TUBE_VASE_HEIGHT_MM } from "../../engine/insert-compatibility";
 import { useVaseStore } from "../../store/vase-store";
 import { useUIStore } from "../../store/ui-store";
 import { NumberInput } from "../ui/NumberInput";
@@ -45,7 +46,7 @@ export function GeneralParams() {
         label="Hauteur (mm)"
         value={p.heightMm}
         onChange={store.setHeight}
-        min={10}
+        min={MIN_TEST_TUBE_VASE_HEIGHT_MM}
         max={maxPrintableHeight}
         step={5}
       />
