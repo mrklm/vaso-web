@@ -89,12 +89,12 @@ describe("engraving planar contour cleanup", () => {
     expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(8.7);
   });
 
-  it("formats the engraved text with version, seed, and signature line", () => {
+  it("formats the engraved text with version, seed, and vase number line", () => {
     const [line1, line2, line3] = formatEngravingLines(1234);
 
     expect(line1).toBe("VASO vtest");
     expect(line2).toBe("00001234");
-    expect(line3).toBe("K l m");
+    expect(line3).toBe("N° 00001234");
   });
 
   it("adds an M suffix when the seed was manually modified", () => {

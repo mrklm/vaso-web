@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
+import robotoFontJson from "../../public/fonts/Roboto.json?raw";
 import {
   generateVaseMesh,
+  generateVaseMeshWithEngraving,
   generateOuterProfilePoints,
   generateTopOuterContour,
 } from "./mesh-builder";
@@ -186,6 +188,42 @@ describe("generateVaseMesh", () => {
     expect(supportRange?.maxZ).toBeCloseTo(placement.tubeBottomZ + 40, 0);
     expect(countBoundaryEdges(mesh)).toBe(0);
     expect(countNonManifoldEdges(mesh)).toBe(0);
+  });
+
+  it("keeps engraved text readable around the test tube support", async () => {
+    const params = createTwoProfileVase(125, 52, 42);
+    params.radialSamples = 72;
+    const fontJson = JSON.parse(robotoFontJson);
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify(fontJson), { status: 200 });
+
+    let mesh: Awaited<ReturnType<typeof generateVaseMeshWithEngraving>>;
+    try {
+      mesh = await generateVaseMeshWithEngraving(params, 12345678);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    const engravingOuterPoints: Array<{ x: number; y: number }> = [];
+
+    for (let index = 0; index < mesh.vertices.length; index += 3) {
+      const x = mesh.vertices[index];
+      const y = mesh.vertices[index + 1];
+      const z = mesh.vertices[index + 2];
+      const radius = Math.hypot(x, y);
+      if (
+        z > params.bottomThicknessMm + 0.05 &&
+        z < params.bottomThicknessMm + 1.2 &&
+        radius > 16.8
+      ) {
+        engravingOuterPoints.push({ x, y });
+      }
+    }
+
+    const xs = engravingOuterPoints.map((point) => point.x);
+    const ys = engravingOuterPoints.map((point) => point.y);
+    expect(engravingOuterPoints.length).toBeGreaterThan(100);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(30);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(30);
   });
 
   it("keeps all sampled tube-only vase previews renderable", () => {

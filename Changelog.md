@@ -7,11 +7,17 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.62] - 2026-08-11
+
+### 🎨 Modifié
+ - Remplace la signature de gravure par le N° de vase.
+ - Améliore les gravures des vases avec support tube à essai en plaçant la version au-dessus, le N° de vase en dessous, et en masquant les caractères situés sous le support.
+
 ## [1.0.61] - 2026-08-10
 
 ### 🎨 Modifié
  - Corrige les supports tube à essai compensés pour qu'ils partent toujours de la base du vase.
- - Gère les inscriptions sur la base des vases avec support tube à essai en les plaçant en arc autour de la zone centrale.
+ - Gère les inscriptions sur la base des vases avec support tube à essai en conservant un texte central lisible et en décalant localement les lettres qui croisent le support.
 
 ## [1.0.60] - 2026-08-10
 

@@ -29,14 +29,13 @@ const TEXT_LINE_WIDTH_FACTORS = [1.9, 1.9] as const;
 const TEXT_SIGNATURE_HEIGHT_FACTOR = 0.92;
 const TEXT_MAX_HEIGHT_FACTOR = 0.78;
 const TEXT_LINE_GAP_FACTOR = 1.85;
-const TEXT_SIDE_MARGIN_MM = 1.44;
-const TEXT_RESERVED_CENTER_CLEARANCE_MM = 2.5;
-const TEXT_RESERVED_LAYOUT_SCALE = 0.86;
-const TEXT_ARC_MAX_SPANS_RAD = [2.15, 2.35, 1.35] as const;
-const TEXT_ARC_RADIAL_FACTORS = [0.77, 0.49, 0.24] as const;
-const TEXT_ARC_HEIGHT_FACTORS = [0.22, 0.24, 0.15] as const;
-const TEXT_ARC_ANGLE_CENTERS_RAD = [Math.PI / 2, -Math.PI / 2, 0] as const;
-const TEXT_ARC_DIRECTIONS = [1, -1, 1] as const;
+const SUPPORT_TEXT_MAX_HEIGHT_FACTOR = 1.62;
+const SUPPORT_TEXT_LINE_GAP_FACTOR = 0.58;
+const TEXT_SIDE_MARGIN_MM = 0.8;
+const TEXT_RESERVED_CENTER_CLEARANCE_MM = 0.2;
+const TEXT_SUPPORT_BAR_HALF_WIDTH_MM = 2.1;
+const TEXT_SUPPORT_RING_INNER_OFFSET_MM = 2.4;
+const TEXT_SUPPORT_RING_TOUCH_MARGIN_MM = 0.35;
 const TEXT_CURVE_SEGMENTS = 10;
 const PLANAR_TEXT_SIMPLIFICATION_MM = 0.05;
 
@@ -240,47 +239,146 @@ function getGeometrySize(
   return { width: size.x, height: size.y };
 }
 
-function scaleGeometryToFitBox(
-  geometry: THREE.BufferGeometry,
-  maxWidth: number,
-  maxHeight: number,
-  fallbackSize: number,
-): void {
-  const { width, height } = getGeometrySize(geometry, fallbackSize);
-  const widthScale = width > 0 ? maxWidth / width : 1;
-  const heightScale = height > 0 ? maxHeight / height : 1;
-  const scale = Math.min(1, widthScale, heightScale);
-  if (scale > 0 && scale < 1) {
-    geometry.scale(scale, scale, 1);
-  }
+function getGeometryBounds(geometry: THREE.BufferGeometry): THREE.Box3 | null {
+  geometry.computeBoundingBox();
+  return geometry.boundingBox?.clone() ?? null;
 }
 
-function bendGeometryToArc(
-  geometry: THREE.BufferGeometry,
-  radiusMm: number,
-  angleCenterRad: number,
-  direction: number,
-): void {
-  geometry.computeBoundingBox();
-  const bounds = geometry.boundingBox;
-  const position = geometry.getAttribute("position");
-  if (!bounds || !position || radiusMm <= 0) return;
-
+function boundsIntersectsSupport(bounds: THREE.Box3, supportRadius: number): boolean {
   const centerX = (bounds.min.x + bounds.max.x) * 0.5;
   const centerY = (bounds.min.y + bounds.max.y) * 0.5;
+  const halfX = (bounds.max.x - bounds.min.x) * 0.5;
+  const halfY = (bounds.max.y - bounds.min.y) * 0.5;
+  const centerRadius = Math.hypot(centerX, centerY);
+  const halfDiagonal = Math.hypot(halfX, halfY);
+  const radialMin = Math.max(0, centerRadius - halfDiagonal);
+  const radialMax = centerRadius + halfDiagonal;
+  const ringInnerRadius = Math.max(0, supportRadius - TEXT_SUPPORT_RING_INNER_OFFSET_MM);
+  const ringOuterRadius = supportRadius + TEXT_SUPPORT_RING_TOUCH_MARGIN_MM;
+  const overlapsRing = radialMin <= ringOuterRadius && radialMax >= ringInnerRadius;
+  const overlapsVerticalBar =
+    Math.abs(centerX) <= TEXT_SUPPORT_BAR_HALF_WIDTH_MM + halfX &&
+    Math.abs(centerY) <= supportRadius + halfY;
+  const overlapsHorizontalBar =
+    Math.abs(centerY) <= TEXT_SUPPORT_BAR_HALF_WIDTH_MM + halfY &&
+    Math.abs(centerX) <= supportRadius + halfX;
+  return overlapsRing || overlapsVerticalBar || overlapsHorizontalBar;
+}
 
-  for (let index = 0; index < position.count; index++) {
-    const localX = position.getX(index) - centerX;
-    const localY = position.getY(index) - centerY;
-    const angle = angleCenterRad + (direction * localX) / radiusMm;
-    const radius = Math.max(0.1, radiusMm + localY);
-    position.setX(index, Math.cos(angle) * radius);
-    position.setY(index, Math.sin(angle) * radius);
+function buildSupportAwareTextGeometry(
+  font: Font,
+  seed: number,
+  isSeedModified: boolean,
+  fitRadius: number,
+  printSafeScale: number,
+  printSafe: boolean,
+  supportRadius: number,
+): THREE.BufferGeometry | null {
+  const lines = formatEngravingLines(seed, isSeedModified);
+  const lineCharacters = lines.map((line, lineIndex) => {
+    const rawSize = RAW_LINE_SIZES[lineIndex] ?? RAW_LINE_SIZES[RAW_LINE_SIZES.length - 1];
+    return Array.from(line).map((character) => {
+      if (character === " ") {
+        return {
+          geometry: null,
+          width: rawSize * printSafeScale * 0.38,
+          rawSize,
+        };
+      }
+
+      const result = buildPrintableLineGeometry(font, character, rawSize, printSafeScale, printSafe);
+      const geometry = result.geometry;
+      const width = geometry
+        ? getGeometrySize(geometry, rawSize).width
+        : rawSize * printSafeScale * 0.5;
+      return { geometry, width, rawSize };
+    });
+  });
+
+  const lineWidths = lineCharacters.map((characters) =>
+    characters.reduce((sum, character) => sum + character.width, 0));
+  const lineScales = lineWidths.map((width, index) => {
+    const widthFactor = TEXT_LINE_WIDTH_FACTORS[index];
+    if (widthFactor === undefined || width <= 0) return 1;
+    return (fitRadius * widthFactor) / width;
+  });
+
+  const referenceScale = lineScales[Math.min(1, lineScales.length - 1)] ?? 1;
+  for (let index = TEXT_LINE_WIDTH_FACTORS.length; index < lineScales.length; index++) {
+    const width = lineWidths[index] ?? 0;
+    const targetLineWidth = fitRadius * TEXT_LINE_WIDTH_FACTORS[TEXT_LINE_WIDTH_FACTORS.length - 1];
+    const widthScale = width > 0 ? targetLineWidth / width : referenceScale;
+    lineScales[index] = Math.min(referenceScale * TEXT_SIGNATURE_HEIGHT_FACTOR, widthScale);
   }
 
-  position.needsUpdate = true;
-  geometry.computeBoundingBox();
-  geometry.computeVertexNormals();
+  const computeLineHeights = () => lineCharacters.map((characters, index) => {
+    const scale = lineScales[index] ?? 1;
+    return characters.reduce((height, character) => {
+      if (!character.geometry) return height;
+      return Math.max(height, getGeometrySize(character.geometry, character.rawSize).height * scale);
+    }, FONT_LINE_HEIGHT * scale);
+  });
+
+  let lineHeights = computeLineHeights();
+  let maxLineHeight = lineHeights.length > 0 ? Math.max(...lineHeights) : FONT_LINE_HEIGHT;
+  let lineGap = Math.max(0.8, maxLineHeight * SUPPORT_TEXT_LINE_GAP_FACTOR);
+  let totalHeight =
+    lineHeights.reduce((sum, height) => sum + height, 0) +
+    lineGap * Math.max(0, lineHeights.length - 1);
+
+  const maxTextHeight = fitRadius * SUPPORT_TEXT_MAX_HEIGHT_FACTOR;
+  if (totalHeight > maxTextHeight && totalHeight > 0) {
+    const heightScale = maxTextHeight / totalHeight;
+    for (let index = 0; index < lineScales.length; index += 1) {
+      lineScales[index] = (lineScales[index] ?? 1) * heightScale;
+    }
+    lineHeights = computeLineHeights();
+    maxLineHeight = lineHeights.length > 0 ? Math.max(...lineHeights) : FONT_LINE_HEIGHT;
+    lineGap = Math.max(0.8, maxLineHeight * SUPPORT_TEXT_LINE_GAP_FACTOR);
+    totalHeight =
+      lineHeights.reduce((sum, height) => sum + height, 0) +
+      lineGap * Math.max(0, lineHeights.length - 1);
+  }
+  let currentTop = totalHeight * 0.5;
+  const lineCenters = lineHeights.map((lineHeight) => {
+    const centerY = currentTop - lineHeight * 0.5;
+    currentTop -= lineHeight + lineGap;
+    return centerY;
+  });
+
+  const characterGeometries: THREE.BufferGeometry[] = [];
+  lineCharacters.forEach((characters, lineIndex) => {
+    const scale = lineScales[lineIndex] ?? 1;
+    const lineWidth = (lineWidths[lineIndex] ?? 0) * scale;
+    let cursorX = -lineWidth * 0.5;
+
+    characters.forEach((character) => {
+      const width = character.width * scale;
+      const centerX = cursorX + width * 0.5;
+      cursorX += width;
+      if (!character.geometry) return;
+
+      character.geometry.scale(scale, scale, 1);
+      character.geometry.translate(centerX, lineCenters[lineIndex] ?? 0, 0);
+      const bounds = getGeometryBounds(character.geometry);
+      if (bounds && boundsIntersectsSupport(bounds, supportRadius)) {
+        character.geometry.dispose();
+        return;
+      }
+      characterGeometries.push(character.geometry);
+    });
+  });
+
+  if (characterGeometries.length === 0) return null;
+  const merged = mergeGeometries(characterGeometries, false);
+  characterGeometries.forEach((geometry) => geometry.dispose());
+  if (!merged) return null;
+
+  appendPipelineTrace(
+    `[engraving] reserved center character layout:support=${supportRadius.toFixed(3)}mm,fit=${fitRadius.toFixed(3)}mm`,
+  );
+  merged.clearGroups();
+  return merged;
 }
 
 function buildTextGeometry(
@@ -339,57 +437,21 @@ function buildTextGeometry(
       TEXT_RESERVED_CENTER_CLEARANCE_MM,
       Math.max(0.6, fitRadius - reservedCenterRadius - TEXT_SIDE_MARGIN_MM - 1),
     );
-    const innerRadius = reservedCenterRadius + clearance;
-    const outerRadius = fitRadius - TEXT_SIDE_MARGIN_MM;
-    const availableBand = outerRadius - innerRadius;
-    if (availableBand <= 4 || rawGeometries.length < 2) {
-      return null;
-    }
-
-    const placedGeometries = rawGeometries.slice(0, Math.min(3, rawGeometries.length));
-    const unusedGeometries = rawGeometries.filter((geometry) => !placedGeometries.includes(geometry));
-
-    for (let index = 0; index < placedGeometries.length; index++) {
-      const geometry = placedGeometries[index];
-      if (!geometry) return null;
-      const radius = innerRadius + availableBand * (TEXT_ARC_RADIAL_FACTORS[index] ?? 0.5);
-      const maxArcWidth =
-        radius * (TEXT_ARC_MAX_SPANS_RAD[index] ?? Math.PI * 0.6) * TEXT_RESERVED_LAYOUT_SCALE;
-      const maxHeight =
-        availableBand * (TEXT_ARC_HEIGHT_FACTORS[index] ?? 0.18) * TEXT_RESERVED_LAYOUT_SCALE;
-      if (maxArcWidth <= 0 || maxHeight <= 0) {
-        return null;
-      }
-
-      scaleGeometryToFitBox(
-        geometry,
-        maxArcWidth,
-        maxHeight,
-        lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT,
-      );
-      bendGeometryToArc(
-        geometry,
-        radius,
-        TEXT_ARC_ANGLE_CENTERS_RAD[index] ?? 0,
-        TEXT_ARC_DIRECTIONS[index] ?? 1,
-      );
-    }
-
-    unusedGeometries.forEach((geometry) => geometry.dispose());
-
-    const merged = mergeGeometries(placedGeometries, false);
-    if (!merged) return null;
-    placedGeometries.forEach((geometry) => geometry.dispose());
-    appendPipelineTrace(
-      `[engraving] reserved center arc layout:inner=${innerRadius.toFixed(3)}mm,outer=${outerRadius.toFixed(3)}mm,band=${availableBand.toFixed(3)}mm`,
+    return buildSupportAwareTextGeometry(
+      font,
+      seed,
+      isSeedModified,
+      fitRadius,
+      printSafeScale,
+      printSafe,
+      reservedCenterRadius + clearance,
     );
-    merged.clearGroups();
-    return merged;
   };
 
   if (reservedCenterRadius > 0) {
     const reservedLayout = buildLayoutAroundReservedCenter();
     if (reservedLayout) {
+      rawGeometries.forEach((geometry) => geometry.dispose());
       return reservedLayout;
     }
     appendPipelineTrace("[engraving] reserved center layout fallback=standard");

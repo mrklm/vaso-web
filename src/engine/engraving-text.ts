@@ -9,5 +9,6 @@ export function formatSeedLabel(seed: number, isSeedModified = false): string {
 
 export function formatEngravingLines(seed: number, isSeedModified = false): readonly [string, string, string] {
   const version = `v${APP_VERSION}`;
-  return [`VASO ${version}`, formatSeedLabel(seed, isSeedModified), "K l m"];
+  const vaseNumber = formatSeedLabel(seed, isSeedModified);
+  return [`VASO ${version}`, vaseNumber, `N° ${vaseNumber}`];
 }
