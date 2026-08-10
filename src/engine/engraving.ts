@@ -31,7 +31,12 @@ const TEXT_MAX_HEIGHT_FACTOR = 0.78;
 const TEXT_LINE_GAP_FACTOR = 1.85;
 const TEXT_SIDE_MARGIN_MM = 1.44;
 const TEXT_RESERVED_CENTER_CLEARANCE_MM = 2.5;
-const TEXT_RESERVED_LAYOUT_SCALE = 0.68;
+const TEXT_RESERVED_LAYOUT_SCALE = 0.86;
+const TEXT_ARC_MAX_SPANS_RAD = [2.15, 2.35, 1.35] as const;
+const TEXT_ARC_RADIAL_FACTORS = [0.77, 0.49, 0.24] as const;
+const TEXT_ARC_HEIGHT_FACTORS = [0.22, 0.24, 0.15] as const;
+const TEXT_ARC_ANGLE_CENTERS_RAD = [Math.PI / 2, -Math.PI / 2, 0] as const;
+const TEXT_ARC_DIRECTIONS = [1, -1, 1] as const;
 const TEXT_CURVE_SEGMENTS = 10;
 const PLANAR_TEXT_SIMPLIFICATION_MM = 0.05;
 
@@ -224,26 +229,58 @@ function buildPrintableLineGeometry(
   return { geometry, removedContours, removedHoles };
 }
 
-function scaleGeometryToMaxHeight(geometry: THREE.BufferGeometry, maxHeight: number): void {
+function getGeometrySize(
+  geometry: THREE.BufferGeometry,
+  fallbackSize: number,
+): { width: number; height: number } {
   geometry.computeBoundingBox();
   const bounds = geometry.boundingBox;
-  if (!bounds || maxHeight <= 0) return;
+  if (!bounds) return { width: fallbackSize, height: fallbackSize };
+  const size = bounds.getSize(new THREE.Vector3());
+  return { width: size.x, height: size.y };
+}
 
-  const height = bounds.max.y - bounds.min.y;
-  if (height > maxHeight && height > 0) {
-    const scale = maxHeight / height;
+function scaleGeometryToFitBox(
+  geometry: THREE.BufferGeometry,
+  maxWidth: number,
+  maxHeight: number,
+  fallbackSize: number,
+): void {
+  const { width, height } = getGeometrySize(geometry, fallbackSize);
+  const widthScale = width > 0 ? maxWidth / width : 1;
+  const heightScale = height > 0 ? maxHeight / height : 1;
+  const scale = Math.min(1, widthScale, heightScale);
+  if (scale > 0 && scale < 1) {
     geometry.scale(scale, scale, 1);
   }
 }
 
-function centerGeometryAt(geometry: THREE.BufferGeometry, centerY: number): void {
+function bendGeometryToArc(
+  geometry: THREE.BufferGeometry,
+  radiusMm: number,
+  angleCenterRad: number,
+  direction: number,
+): void {
   geometry.computeBoundingBox();
   const bounds = geometry.boundingBox;
-  if (!bounds) return;
+  const position = geometry.getAttribute("position");
+  if (!bounds || !position || radiusMm <= 0) return;
 
   const centerX = (bounds.min.x + bounds.max.x) * 0.5;
-  const currentCenterY = (bounds.min.y + bounds.max.y) * 0.5;
-  geometry.translate(-centerX, centerY - currentCenterY, 0);
+  const centerY = (bounds.min.y + bounds.max.y) * 0.5;
+
+  for (let index = 0; index < position.count; index++) {
+    const localX = position.getX(index) - centerX;
+    const localY = position.getY(index) - centerY;
+    const angle = angleCenterRad + (direction * localX) / radiusMm;
+    const radius = Math.max(0.1, radiusMm + localY);
+    position.setX(index, Math.cos(angle) * radius);
+    position.setY(index, Math.sin(angle) * radius);
+  }
+
+  position.needsUpdate = true;
+  geometry.computeBoundingBox();
+  geometry.computeVertexNormals();
 }
 
 function buildTextGeometry(
@@ -274,19 +311,11 @@ function buildTextGeometry(
   appendPipelineTrace(`[engraving] removed contours=${removedContours},removed holes=${removedHoles}`);
   if (rawGeometries.length === 0) return null;
 
-  const getLineSize = (geometry: THREE.BufferGeometry, fallbackSize: number) => {
-    geometry.computeBoundingBox();
-    const bounds = geometry.boundingBox;
-    if (!bounds) return { width: fallbackSize, height: fallbackSize };
-    const size = bounds.getSize(new THREE.Vector3());
-    return { width: size.x, height: size.y };
-  };
-
   rawGeometries.forEach((geometry, index) => {
     const widthFactor = TEXT_LINE_WIDTH_FACTORS[index];
     if (widthFactor === undefined) return;
     const targetLineWidth = fitRadius * widthFactor;
-    const { width } = getLineSize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT);
+    const { width } = getGeometrySize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT);
     if (width > 0) {
       const scale = targetLineWidth / width;
       geometry.scale(scale, scale, 1);
@@ -294,10 +323,10 @@ function buildTextGeometry(
   });
 
   const referenceLineHeight =
-    getLineSize(rawGeometries[Math.min(1, rawGeometries.length - 1)], lineResults[Math.min(1, lineResults.length - 1)]?.rawSize ?? FONT_LINE_HEIGHT).height;
+    getGeometrySize(rawGeometries[Math.min(1, rawGeometries.length - 1)], lineResults[Math.min(1, lineResults.length - 1)]?.rawSize ?? FONT_LINE_HEIGHT).height;
   rawGeometries.forEach((geometry, index) => {
     if (index < TEXT_LINE_WIDTH_FACTORS.length) return;
-    const { height } = getLineSize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT);
+    const { height } = getGeometrySize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT);
     const targetHeight = referenceLineHeight * TEXT_SIGNATURE_HEIGHT_FACTOR;
     if (height > 0 && targetHeight > 0) {
       const scale = targetHeight / height;
@@ -310,52 +339,40 @@ function buildTextGeometry(
       TEXT_RESERVED_CENTER_CLEARANCE_MM,
       Math.max(0.6, fitRadius - reservedCenterRadius - TEXT_SIDE_MARGIN_MM - 1),
     );
-    const availableHeight = fitRadius - reservedCenterRadius - clearance - TEXT_SIDE_MARGIN_MM;
-    if (availableHeight <= 0 || rawGeometries.length < 2) {
+    const innerRadius = reservedCenterRadius + clearance;
+    const outerRadius = fitRadius - TEXT_SIDE_MARGIN_MM;
+    const availableBand = outerRadius - innerRadius;
+    if (availableBand <= 4 || rawGeometries.length < 2) {
       return null;
     }
 
-    const topGeometry = rawGeometries[0];
-    const lowerGeometry = rawGeometries[1];
-    if (!topGeometry || !lowerGeometry) return null;
+    const placedGeometries = rawGeometries.slice(0, Math.min(3, rawGeometries.length));
+    const unusedGeometries = rawGeometries.filter((geometry) => !placedGeometries.includes(geometry));
 
-    const placedGeometries = [topGeometry, lowerGeometry];
-    const unusedGeometries = rawGeometries.filter(
-      (geometry) => !placedGeometries.includes(geometry),
-    );
-    scaleGeometryToMaxHeight(topGeometry, availableHeight * TEXT_RESERVED_LAYOUT_SCALE);
-    scaleGeometryToMaxHeight(lowerGeometry, availableHeight * TEXT_RESERVED_LAYOUT_SCALE);
-
-    const placements: Array<{ geometry: THREE.BufferGeometry; centerY: number }> = [];
-    const topHeight = getLineSize(topGeometry, lineResults[0]?.rawSize ?? FONT_LINE_HEIGHT).height;
-    placements.push({
-      geometry: topGeometry,
-      centerY: reservedCenterRadius + clearance + topHeight * 0.5,
-    });
-    const lowerHeight = getLineSize(
-      lowerGeometry,
-      lineResults[1]?.rawSize ?? FONT_LINE_HEIGHT,
-    ).height;
-    placements.push({
-      geometry: lowerGeometry,
-      centerY: -(reservedCenterRadius + clearance + lowerHeight * 0.5),
-    });
-
-    for (const placement of placements) {
-      const { width } = getLineSize(placement.geometry, FONT_LINE_HEIGHT);
-      const halfChord = Math.sqrt(
-        Math.max(0, fitRadius * fitRadius - placement.centerY * placement.centerY),
-      );
-      const allowedWidth =
-        Math.max(0, halfChord * 2 - TEXT_SIDE_MARGIN_MM * 2) * TEXT_RESERVED_LAYOUT_SCALE;
-      if (allowedWidth <= 0) {
+    for (let index = 0; index < placedGeometries.length; index++) {
+      const geometry = placedGeometries[index];
+      if (!geometry) return null;
+      const radius = innerRadius + availableBand * (TEXT_ARC_RADIAL_FACTORS[index] ?? 0.5);
+      const maxArcWidth =
+        radius * (TEXT_ARC_MAX_SPANS_RAD[index] ?? Math.PI * 0.6) * TEXT_RESERVED_LAYOUT_SCALE;
+      const maxHeight =
+        availableBand * (TEXT_ARC_HEIGHT_FACTORS[index] ?? 0.18) * TEXT_RESERVED_LAYOUT_SCALE;
+      if (maxArcWidth <= 0 || maxHeight <= 0) {
         return null;
       }
-      if (width > allowedWidth) {
-        const scale = allowedWidth / width;
-        placement.geometry.scale(scale, scale, 1);
-      }
-      centerGeometryAt(placement.geometry, placement.centerY);
+
+      scaleGeometryToFitBox(
+        geometry,
+        maxArcWidth,
+        maxHeight,
+        lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT,
+      );
+      bendGeometryToArc(
+        geometry,
+        radius,
+        TEXT_ARC_ANGLE_CENTERS_RAD[index] ?? 0,
+        TEXT_ARC_DIRECTIONS[index] ?? 1,
+      );
     }
 
     unusedGeometries.forEach((geometry) => geometry.dispose());
@@ -364,7 +381,7 @@ function buildTextGeometry(
     if (!merged) return null;
     placedGeometries.forEach((geometry) => geometry.dispose());
     appendPipelineTrace(
-      `[engraving] reserved center layout:radius=${reservedCenterRadius.toFixed(3)}mm,available=${availableHeight.toFixed(3)}mm`,
+      `[engraving] reserved center arc layout:inner=${innerRadius.toFixed(3)}mm,outer=${outerRadius.toFixed(3)}mm,band=${availableBand.toFixed(3)}mm`,
     );
     merged.clearGroups();
     return merged;
@@ -380,7 +397,7 @@ function buildTextGeometry(
 
   const computeLayout = () => {
     const lineHeights = rawGeometries.map((geometry, index) =>
-      getLineSize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT).height);
+      getGeometrySize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT).height);
     const maxLineHeight = lineHeights.length > 0 ? Math.max(...lineHeights) : FONT_LINE_HEIGHT;
     const lineGap = Math.max(0.8, maxLineHeight * TEXT_LINE_GAP_FACTOR);
     const totalHeight = lineHeights.reduce((sum, height) => sum + height, 0) + lineGap * Math.max(0, lineHeights.length - 1);
@@ -396,7 +413,7 @@ function buildTextGeometry(
   const firstLayout = computeLayout();
   rawGeometries.forEach((geometry, index) => {
     const centerY = firstLayout.lineCenters[index] ?? 0;
-    const { width } = getLineSize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT);
+    const { width } = getGeometrySize(geometry, lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT);
     const halfChord = Math.sqrt(Math.max(0, fitRadius * fitRadius - centerY * centerY));
     const allowedWidth = Math.max(0, halfChord * 2 - TEXT_SIDE_MARGIN_MM * 2);
     if (width > 0 && allowedWidth > 0 && width > allowedWidth) {

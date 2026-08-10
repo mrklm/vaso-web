@@ -29,7 +29,12 @@ const PREVIEW_TEXT_SIGNATURE_HEIGHT_FACTOR = 0.92;
 const PREVIEW_TEXT_SIDE_MARGIN_PX = 29;
 const PREVIEW_TEST_TUBE_SUPPORT_OUTER_RADIUS_MM = 16.2;
 const PREVIEW_TEST_TUBE_SUPPORT_TEXT_CLEARANCE_MM = 4;
-const PREVIEW_SUPPORT_TEXT_SCALE = 0.68;
+const PREVIEW_SUPPORT_TEXT_SCALE = 0.86;
+const PREVIEW_SUPPORT_ARC_SPANS_RAD = [2.15, 2.35, 1.35] as const;
+const PREVIEW_SUPPORT_ARC_RADIUS_FACTORS = [0.77, 0.49, 0.24] as const;
+const PREVIEW_SUPPORT_ARC_HEIGHT_FACTORS = [0.22, 0.24, 0.15] as const;
+const PREVIEW_SUPPORT_ARC_CENTERS_RAD = [-Math.PI / 2, Math.PI / 2, 0] as const;
+const PREVIEW_SUPPORT_ARC_DIRECTIONS = [1, -1, 1] as const;
 
 function fitPreviewText(
   context: CanvasRenderingContext2D,
@@ -41,6 +46,44 @@ function fitPreviewText(
   const measuredWidth = context.measureText(text).width;
   if (measuredWidth <= 0) return baseFontSize;
   return (baseFontSize * targetWidth) / measuredWidth;
+}
+
+function drawPreviewTextOnArc(
+  context: CanvasRenderingContext2D,
+  text: string,
+  centerX: number,
+  centerY: number,
+  radiusPx: number,
+  angleCenterRad: number,
+  direction: number,
+  fontSize: number,
+) {
+  context.font = `700 ${fontSize}px Arial`;
+  context.lineWidth = Math.max(4, fontSize * 0.09);
+
+  const chars = Array.from(text);
+  const widths = chars.map((char) => context.measureText(char).width);
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0);
+  let traveled = -totalWidth * 0.5;
+
+  chars.forEach((char, index) => {
+    const charWidth = widths[index] ?? fontSize * 0.5;
+    const angle = angleCenterRad + direction * ((traveled + charWidth * 0.5) / radiusPx);
+    const x = centerX + Math.cos(angle) * radiusPx;
+    const y = centerY + Math.sin(angle) * radiusPx;
+
+    context.save();
+    context.translate(x, y);
+    context.rotate(angle + Math.PI / 2);
+    if (direction < 0) {
+      context.rotate(Math.PI);
+    }
+    context.strokeText(char, 0, 0);
+    context.fillText(char, 0, 0);
+    context.restore();
+
+    traveled += charWidth;
+  });
 }
 
 function computePreviewBottomFitRadius(params: VaseParameters): number {
@@ -93,54 +136,50 @@ function PreviewEngravingOverlay(
     context.fillStyle = "rgba(28,28,28,0.45)";
 
     const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
 
     if (placement === "support") {
-      const supportLines = lines.slice(0, 2);
       const heightMm = fitRadius * PREVIEW_SUPPORT_TEXT_SIZE_FACTOR;
+      const pxPerMm = canvas.height / heightMm;
       const supportRadiusPx =
         (PREVIEW_TEST_TUBE_SUPPORT_OUTER_RADIUS_MM +
           PREVIEW_TEST_TUBE_SUPPORT_TEXT_CLEARANCE_MM) *
-        (canvas.height / heightMm);
-      const availableBandHeight = Math.max(0, canvas.height * 0.5 - supportRadiusPx - 18);
-      if (availableBandHeight <= 20) return null;
+        pxPerMm;
+      const outerRadiusPx = canvas.height * 0.5 - PREVIEW_TEXT_SIDE_MARGIN_PX;
+      const availableBandRadius = outerRadiusPx - supportRadiusPx;
+      if (availableBandRadius <= 20) return null;
 
-      supportLines.forEach((line, index) => {
+      lines.forEach((line, index) => {
+        const radiusPx =
+          supportRadiusPx +
+          availableBandRadius * (PREVIEW_SUPPORT_ARC_RADIUS_FACTORS[index] ?? 0.5);
+        const arcSpan = PREVIEW_SUPPORT_ARC_SPANS_RAD[index] ?? Math.PI * 0.6;
+        const maxWidth = radiusPx * arcSpan * PREVIEW_SUPPORT_TEXT_SCALE;
+        const maxHeight =
+          availableBandRadius *
+          (PREVIEW_SUPPORT_ARC_HEIGHT_FACTORS[index] ?? 0.18) *
+          PREVIEW_SUPPORT_TEXT_SCALE;
         const baseFontSize =
           PREVIEW_TEXT_BASE_FONT_SIZES[index] ?? PREVIEW_TEXT_BASE_FONT_SIZES[0];
-        const fittedWidthSize = fitPreviewText(
+        const fontSize = Math.min(
+          fitPreviewText(
+            context,
+            line,
+            baseFontSize,
+            maxWidth,
+          ),
+          maxHeight,
+        );
+        drawPreviewTextOnArc(
           context,
           line,
-          baseFontSize,
-          canvas.width * 0.78 * PREVIEW_SUPPORT_TEXT_SCALE,
+          centerX,
+          centerY,
+          radiusPx,
+          PREVIEW_SUPPORT_ARC_CENTERS_RAD[index] ?? 0,
+          PREVIEW_SUPPORT_ARC_DIRECTIONS[index] ?? 1,
+          fontSize,
         );
-        let fontSize = Math.min(
-          fittedWidthSize,
-          availableBandHeight * 0.68 * PREVIEW_SUPPORT_TEXT_SCALE,
-        );
-        const direction = index === 0 ? -1 : 1;
-        let lineCenterY = canvas.height * 0.5 + direction * (supportRadiusPx + fontSize * 0.72);
-
-        const previewRadiusY = canvas.height * 0.41;
-        const dy = lineCenterY - canvas.height * 0.5;
-        const halfChordFactor = Math.sqrt(Math.max(0, 1 - (dy / previewRadiusY) ** 2));
-        const allowedWidth = Math.max(
-          0,
-          canvas.width * 0.84 * PREVIEW_SUPPORT_TEXT_SCALE * halfChordFactor -
-            PREVIEW_TEXT_SIDE_MARGIN_PX * 2,
-        );
-        if (allowedWidth > 0) {
-          context.font = `700 ${fontSize}px Arial`;
-          const measuredWidth = context.measureText(line).width;
-          if (measuredWidth > allowedWidth) {
-            fontSize *= allowedWidth / measuredWidth;
-            lineCenterY = canvas.height * 0.5 + direction * (supportRadiusPx + fontSize * 0.72);
-          }
-        }
-
-        context.font = `700 ${fontSize}px Arial`;
-        context.lineWidth = Math.max(4, fontSize * 0.09);
-        context.strokeText(line, centerX, lineCenterY);
-        context.fillText(line, centerX, lineCenterY);
       });
 
       const nextTexture = new THREE.CanvasTexture(canvas);
