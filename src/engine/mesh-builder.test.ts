@@ -5,6 +5,10 @@ import {
   generateTopOuterContour,
 } from "./mesh-builder";
 import {
+  getPreferredTestTubePreset,
+  getTestTubePlacement,
+} from "./insert-compatibility";
+import {
   countBoundaryEdges,
   countConnectedMeshComponents,
   countNonManifoldEdges,
@@ -165,6 +169,21 @@ describe("generateVaseMesh", () => {
     expect(mesh.vertices.length).toBeGreaterThan(0);
     expect(mesh.indices.length).toBeGreaterThan(0);
     expect(countConnectedMeshComponents(mesh)).toBeLessThanOrEqual(6);
+    expect(countBoundaryEdges(mesh)).toBe(0);
+    expect(countNonManifoldEdges(mesh)).toBe(0);
+  });
+
+  it("keeps compensated test tube supports connected from the inner base", () => {
+    const params = createTwoProfileVase(180, 60, 42);
+    const preset = getPreferredTestTubePreset(params.heightMm);
+    const placement = getTestTubePlacement(params, preset);
+    const mesh = generateVaseMesh(params);
+    const supportRange = getTestTubeSupportZRange(mesh);
+
+    expect(placement.tubeBottomZ).toBeGreaterThan(params.bottomThicknessMm);
+    expect(supportRange).not.toBeNull();
+    expect(supportRange?.minZ).toBeCloseTo(params.bottomThicknessMm, 0);
+    expect(supportRange?.maxZ).toBeCloseTo(placement.tubeBottomZ + 40, 0);
     expect(countBoundaryEdges(mesh)).toBe(0);
     expect(countNonManifoldEdges(mesh)).toBe(0);
   });

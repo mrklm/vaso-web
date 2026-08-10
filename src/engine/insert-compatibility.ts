@@ -106,10 +106,10 @@ export function getTestTubePlacement(params: VaseParameters, preset: InsertPrese
   const targetTopZ = params.heightMm - TEST_TUBE_TOP_CLEARANCE_MM;
   const tubeBottomZ = Math.max(innerBottomZ, targetTopZ - preset.heightMm);
   const tubeTopZ = tubeBottomZ + preset.heightMm;
-  const supportBottomZ = tubeBottomZ;
+  const supportBottomZ = innerBottomZ;
   const supportTopZ = Math.min(
     params.heightMm - 1,
-    supportBottomZ + TEST_TUBE_SUPPORT_HEIGHT_MM,
+    tubeBottomZ + TEST_TUBE_SUPPORT_HEIGHT_MM,
     tubeTopZ,
   );
 
