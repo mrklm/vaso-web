@@ -27,8 +27,9 @@ function isRenderableMesh(mesh: MeshData): boolean {
 function generateRenderableMesh(
   params: VaseParameters,
   includeTestTubeSupport: boolean,
+  forceTestTubeSupport: boolean,
 ): MeshData | null {
-  const mesh = generateVaseMesh(params, { includeTestTubeSupport });
+  const mesh = generateVaseMesh(params, { includeTestTubeSupport, forceTestTubeSupport });
   return isRenderableMesh(mesh) ? mesh : null;
 }
 
@@ -38,6 +39,7 @@ function generateRenderableMesh(
  */
 export function useVaseMesh(params: VaseParameters, seed: number): MeshData | null {
   const generateTestTubeSupport = useUIStore((s) => s.generateTestTubeSupport);
+  const forceTestTubeSupport = useUIStore((s) => s.forceTestTubeSupport);
 
   return useMemo(() => {
     void seed;
@@ -48,14 +50,18 @@ export function useVaseMesh(params: VaseParameters, seed: number): MeshData | nu
     };
 
     try {
-      const mesh = generateRenderableMesh(previewParams, generateTestTubeSupport);
+      const mesh = generateRenderableMesh(
+        previewParams,
+        generateTestTubeSupport,
+        forceTestTubeSupport,
+      );
       if (mesh) return mesh;
     } catch (e) {
       console.warn("Mesh generation failed:", e);
     }
 
     try {
-      const mesh = generateRenderableMesh(previewParams, false);
+      const mesh = generateRenderableMesh(previewParams, false, false);
       if (mesh) return mesh;
     } catch (fallbackError) {
       console.warn("Fallback mesh generation failed:", fallbackError);
@@ -71,6 +77,7 @@ export function useVaseMesh(params: VaseParameters, seed: number): MeshData | nu
           radialSamples: Math.min(previewParams.radialSamples, 48),
           verticalSamples: Math.min(previewParams.verticalSamples, 64),
         },
+        false,
         false,
       );
       if (mesh) return mesh;
@@ -94,6 +101,7 @@ export function useVaseMesh(params: VaseParameters, seed: number): MeshData | nu
             sides: Math.max(6, Math.min(profile.sides, 24)),
           })),
         },
+        false,
         false,
       );
       if (mesh) return mesh;
@@ -119,5 +127,6 @@ export function useVaseMesh(params: VaseParameters, seed: number): MeshData | nu
     // eslint-disable-next-line react-hooks/exhaustive-deps
     JSON.stringify(params.profiles),
     generateTestTubeSupport,
+    forceTestTubeSupport,
   ]);
 }

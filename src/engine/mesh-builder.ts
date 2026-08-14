@@ -27,6 +27,7 @@ import {
 import {
   analyzeWaterproofInsertCompatibility,
   getInsertPresetById,
+  getPreferredTestTubePreset,
   getTestTubePlacement,
 } from "./insert-compatibility";
 
@@ -47,6 +48,7 @@ const TEST_TUBE_PEDESTAL_BAR_THICKNESS_MM = 2.4;
 
 interface GenerateVaseMeshOptions {
   includeTestTubeSupport?: boolean;
+  forceTestTubeSupport?: boolean;
 }
 
 function hasActiveTexture(params: VaseParameters): boolean {
@@ -527,10 +529,12 @@ function addTestTubeSupportIfNeeded(
   }
 
   const compatibility = analyzeWaterproofInsertCompatibility(params);
-  if (compatibility.type !== "test_tube") {
+  if (!options.forceTestTubeSupport && compatibility.type !== "test_tube") {
     return;
   }
-  const preset = getInsertPresetById(compatibility.presetId);
+  const preset = options.forceTestTubeSupport
+    ? getPreferredTestTubePreset(params.heightMm)
+    : getInsertPresetById(compatibility.presetId);
   if (!preset) {
     return;
   }
@@ -745,7 +749,8 @@ export async function generateVaseMeshWithEngraving(
     );
     const shouldReserveSupportCenter =
       options.includeTestTubeSupport !== false &&
-      analyzeWaterproofInsertCompatibility(params).type === "test_tube";
+      (options.forceTestTubeSupport ||
+        analyzeWaterproofInsertCompatibility(params).type === "test_tube");
     const engravedMesh = await engraveBaseText(
       mesh,
       params,

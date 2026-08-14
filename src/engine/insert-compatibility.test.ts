@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { analyzeWaterproofInsertCompatibility } from "./insert-compatibility";
+import {
+  analyzeWaterproofInsertCompatibility,
+  enforceMinimumTestTubeCompatibility,
+  MIN_TEST_TUBE_VASE_HEIGHT_MM,
+} from "./insert-compatibility";
 import {
   createProfile,
   defaultVaseParameters,
@@ -107,4 +111,13 @@ describe("analyzeWaterproofInsertCompatibility", () => {
       expect(compatibility.label.length).toBeGreaterThan(0);
     },
   );
+
+  it("raises undersized params to the minimum test tube-compatible envelope", () => {
+    const params = createTwoProfileVase(90, 20, 20);
+    const safeParams = enforceMinimumTestTubeCompatibility(params);
+    const compatibility = analyzeWaterproofInsertCompatibility(safeParams);
+
+    expect(safeParams.heightMm).toBe(MIN_TEST_TUBE_VASE_HEIGHT_MM);
+    expect(compatibility.type).toBe("test_tube");
+  });
 });

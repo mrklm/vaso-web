@@ -68,6 +68,7 @@ export function Toolbar() {
   const enforcePrinterVolume = useUIStore((s) => s.enforcePrinterVolume);
   const captureViewerImage = useUIStore((s) => s.captureViewerImage);
   const generateTestTubeSupport = useUIStore((s) => s.generateTestTubeSupport);
+  const forceTestTubeSupport = useUIStore((s) => s.forceTestTubeSupport);
   const { undo, redo, pastStates, futureStates } = useVaseStore.temporal.getState();
   const showSeedModified = isSeedModified;
 
@@ -81,6 +82,7 @@ export function Toolbar() {
       }
       const mesh = await generateVaseMeshWithEngraving(params, seed, showSeedModified, {
         includeTestTubeSupport: generateTestTubeSupport,
+        forceTestTubeSupport,
       });
       await exportSTL(mesh, buildStlFilename(seed, showSeedModified));
       toast.success("STL exporte !");

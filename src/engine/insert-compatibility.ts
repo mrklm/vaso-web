@@ -10,8 +10,8 @@ import {
   interpolateContours,
   regularPolygonVertices,
 } from "./geometry";
-import { applyTexture } from "./textures";
-import type { VaseParameters } from "./types";
+import { applyTexture, getMaxInwardTextureOffsetMm } from "./textures";
+import type { Profile, VaseParameters } from "./types";
 
 const FACETED_SEAM_MAX_PROFILE_SIDES = 12;
 const INSERT_SECTION_SAMPLES = 96;
@@ -21,6 +21,7 @@ export const MIN_TEST_TUBE_VASE_HEIGHT_MM = 115;
 export const TEST_TUBE_LONG_VASE_HEIGHT_MM = 140;
 export const TEST_TUBE_TOP_CLEARANCE_MM = 20;
 export const TEST_TUBE_SUPPORT_HEIGHT_MM = 40;
+export const MIN_TEST_TUBE_TOP_OPENING_INNER_DIAMETER_MM = 29;
 
 export type InsertPreset = {
   id: string;
@@ -99,6 +100,39 @@ export function getPreferredTestTubePreset(heightMm: number): InsertPreset {
     INSERT_PRESETS.find((preset) => preset.id === preferredId) ??
     INSERT_PRESETS[INSERT_PRESETS.length - 1]
   );
+}
+
+export function getMinimumTestTubeProfileDiameterMm(
+  profile: Pick<Profile, "sides" | "scaleX" | "scaleY">,
+  wallThicknessMm: number,
+  textureInsetMm = 0,
+): number {
+  const sides = Math.max(3, Math.round(profile.sides));
+  const minScale = Math.max(0.1, Math.min(Math.abs(profile.scaleX), Math.abs(profile.scaleY)));
+  const apothemRatio = Math.cos(Math.PI / sides);
+  const requiredOuterApothemMm =
+    MIN_TEST_TUBE_TOP_OPENING_INNER_DIAMETER_MM / 2 +
+    Math.max(0, textureInsetMm) +
+    Math.max(0, wallThicknessMm);
+
+  return (requiredOuterApothemMm / apothemRatio / minScale) * 2;
+}
+
+export function enforceMinimumTestTubeCompatibility(params: VaseParameters): VaseParameters {
+  const wallThicknessMm = Math.max(0, params.wallThicknessMm);
+  const textureInsetMm = getMaxInwardTextureOffsetMm(params);
+
+  return {
+    ...params,
+    heightMm: Math.max(MIN_TEST_TUBE_VASE_HEIGHT_MM, params.heightMm),
+    profiles: params.profiles.map((profile) => ({
+      ...profile,
+      diameter: Math.max(
+        profile.diameter,
+        getMinimumTestTubeProfileDiameterMm(profile, wallThicknessMm, textureInsetMm),
+      ),
+    })),
+  };
 }
 
 export function getTestTubePlacement(params: VaseParameters, preset: InsertPreset) {

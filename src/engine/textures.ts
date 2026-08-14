@@ -12,6 +12,28 @@ function textureZoomToParams(zoom: TextureZoom): [number, number] {
   return mapping[zoom] ?? mapping["Moyen"];
 }
 
+function getTextureAmplitudeMm(textureType: TextureType, textureZoom: TextureZoom): number {
+  if (textureType === "Aucune") return 0;
+  return textureZoomToParams(textureZoom)[0];
+}
+
+export function getMaxInwardTextureOffsetMm(params: VaseParameters): number {
+  if (params.textureMode === "Pas de texture") return 0;
+
+  if (params.textureMode === "Texture aléatoire" || params.textureMode === "Texture imposée") {
+    return getTextureAmplitudeMm(params.textureType, params.textureZoom);
+  }
+
+  if (params.textureMode === "Double texture") {
+    return Math.max(
+      getTextureAmplitudeMm(params.textureType, params.textureZoom),
+      getTextureAmplitudeMm(params.textureType2, params.textureZoom2),
+    );
+  }
+
+  return 0;
+}
+
 function staggeredVerticalWave(
   angle: number,
   angularFrequency: number,

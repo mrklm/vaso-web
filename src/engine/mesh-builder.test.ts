@@ -335,6 +335,14 @@ describe("generateVaseMesh", () => {
     expect(countBoundaryEdges(mesh)).toBe(0);
   });
 
+  it("can force test tube support geometry on an Eco-Cup-compatible vase", () => {
+    const params = createTwoProfileVase(180, 74, 96);
+    const mesh = generateVaseMesh(params, { forceTestTubeSupport: true });
+
+    expect(hasTestTubeSupportVertices(mesh)).toBe(true);
+    expect(countBoundaryEdges(mesh)).toBe(0);
+  });
+
   it("aligns inner and outer wall layers on the same body z slices", () => {
     const params = createTwoProfileVase(180, 74, 96);
     params.radialSamples = 16;

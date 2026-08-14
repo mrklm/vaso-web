@@ -20,6 +20,7 @@ interface UIState {
   showClipping: boolean;
   showCompatibleInsert: boolean;
   generateTestTubeSupport: boolean;
+  forceTestTubeSupport: boolean;
   rotationMode: "camera" | "vase";
   rotationSpeed: number;
   clippingHeight: number; // 0-100 percent
@@ -42,6 +43,7 @@ interface UIState {
   setShowClipping: (v: boolean) => void;
   setShowCompatibleInsert: (v: boolean) => void;
   setGenerateTestTubeSupport: (v: boolean) => void;
+  setForceTestTubeSupport: (v: boolean) => void;
   setRotationMode: (mode: "camera" | "vase") => void;
   setRotationSpeed: (v: number) => void;
   setClippingHeight: (v: number) => void;
@@ -159,6 +161,7 @@ const initialPrinter = loadPrinterProfiles();
 const initialAdvancedStlUnlock = loadSavedAdvancedStlUnlock();
 const initialShowCompatibleInsert = loadSavedBoolean("vaso-show-compatible-insert", true);
 const initialGenerateTestTubeSupport = loadSavedBoolean("vaso-generate-test-tube-support", true);
+const initialForceTestTubeSupport = loadSavedBoolean("vaso-force-test-tube-support", false);
 
 export const useUIStore = create<UIState>((set, get) => ({
   theme: initialTheme,
@@ -172,6 +175,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   showClipping: false,
   showCompatibleInsert: initialShowCompatibleInsert,
   generateTestTubeSupport: initialGenerateTestTubeSupport,
+  forceTestTubeSupport: initialForceTestTubeSupport,
   rotationMode: "camera",
   rotationSpeed: 0.5,
   clippingHeight: 50,
@@ -214,6 +218,14 @@ export const useUIStore = create<UIState>((set, get) => ({
       /* ignore */
     }
     set({ generateTestTubeSupport: v });
+  },
+  setForceTestTubeSupport: (v) => {
+    try {
+      localStorage.setItem("vaso-force-test-tube-support", String(v));
+    } catch {
+      /* ignore */
+    }
+    set({ forceTestTubeSupport: v });
   },
   setRotationMode: (mode) => set({ rotationMode: mode }),
   setRotationSpeed: (v) => set({ rotationSpeed: v }),
@@ -261,6 +273,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       localStorage.removeItem("vaso-advanced-stl-unlocked");
       localStorage.removeItem("vaso-show-compatible-insert");
       localStorage.removeItem("vaso-generate-test-tube-support");
+      localStorage.removeItem("vaso-force-test-tube-support");
     } catch {
       /* ignore */
     }
@@ -277,6 +290,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       showClipping: false,
       showCompatibleInsert: true,
       generateTestTubeSupport: true,
+      forceTestTubeSupport: false,
       rotationMode: "camera",
       rotationSpeed: 0.5,
       clippingHeight: 50,

@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import {
+  analyzeWaterproofInsertCompatibility,
+  MIN_TEST_TUBE_VASE_HEIGHT_MM,
+} from "../engine/insert-compatibility";
 import { useVaseStore } from "./vase-store";
 import { useUIStore } from "./ui-store";
 
@@ -20,8 +24,10 @@ describe("vaseStore", () => {
     expect(params.heightMm).toBeGreaterThan(0);
     expect(params.profiles.length).toBeGreaterThanOrEqual(2);
     expect(params.profiles.length).toBeLessThanOrEqual(10);
+    expect(params.heightMm).toBeGreaterThanOrEqual(MIN_TEST_TUBE_VASE_HEIGHT_MM);
     expect(params.profiles[0].zRatio).toBe(0);
     expect(params.profiles[params.profiles.length - 1].zRatio).toBe(1);
+    expect(analyzeWaterproofInsertCompatibility(params).type).not.toBe("none");
   });
 
   it("initial seed reproduces the initial vase when reapplied", () => {
@@ -36,6 +42,11 @@ describe("vaseStore", () => {
     useVaseStore.getState().setHeight(200);
     expect(useVaseStore.getState().params.heightMm).toBe(180);
     expect(useVaseStore.getState().isSeedModified).toBe(true);
+  });
+
+  it("does not allow manual height below the test tube-compatible minimum", () => {
+    useVaseStore.getState().setHeight(80);
+    expect(useVaseStore.getState().params.heightMm).toBe(MIN_TEST_TUBE_VASE_HEIGHT_MM);
   });
 
   it("setProfileCount adds profiles", () => {
@@ -124,4 +135,14 @@ describe("vaseStore", () => {
     expect(useVaseStore.getState().params.heightMm).toBe(300);
     expect(useVaseStore.getState().params.profiles[0].diameter).toBe(260);
   });
+
+  it("keeps every generated vase compatible with at least a test tube", () => {
+    useUIStore.setState({ enforcePrinterVolume: false });
+    for (let index = 0; index < 30; index += 1) {
+      useVaseStore.getState().randomize();
+      const { params, seed } = useVaseStore.getState();
+      expect(params.heightMm, `seed ${seed}`).toBeGreaterThanOrEqual(MIN_TEST_TUBE_VASE_HEIGHT_MM);
+      expect(analyzeWaterproofInsertCompatibility(params).type, `seed ${seed}`).not.toBe("none");
+    }
+  }, 10000);
 });

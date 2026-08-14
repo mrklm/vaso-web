@@ -27,6 +27,8 @@ export function SettingsPanel() {
     setShowCompatibleInsert,
     generateTestTubeSupport,
     setGenerateTestTubeSupport,
+    forceTestTubeSupport,
+    setForceTestTubeSupport,
     clippingHeight,
     setClippingHeight,
     unlockAdvancedStlParams,
@@ -169,6 +171,17 @@ export function SettingsPanel() {
             onChange={(e) => setGenerateTestTubeSupport(e.target.checked)}
           />
           Générer le support tube à essai
+        </label>
+      </div>
+      <div className="checkbox-row">
+        <label>
+          <input
+            type="checkbox"
+            checked={forceTestTubeSupport}
+            disabled={!generateTestTubeSupport}
+            onChange={(e) => setForceTestTubeSupport(e.target.checked)}
+          />
+          Forcer Tube à Essais
         </label>
       </div>
 

@@ -7,6 +7,17 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.64] - 2026-08-14
+
+### 🎨 Modifié
+ - Ajoute l'option "Forcer Tube à Essais" dans les réglages de contenants pour générer un support tube même sur un vase Eco-Cup compatible.
+
+## [1.0.63] - 2026-08-14
+
+### 🎨 Modifié
+ - Garantit une compatibilité minimale tube à essai pour les vases générés et réglés manuellement.
+ - Calibre l'ouverture haute minimale à 29 mm pour un tube de 25 mm et compense les textures rentrantes.
+
 ## [1.0.62] - 2026-08-11
 
 ### 🎨 Modifié
