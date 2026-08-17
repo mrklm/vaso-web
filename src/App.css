@@ -1,4 +1,538 @@
 /* ── Layout ── */
+.workshop-shell {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 28rem),
+    linear-gradient(135deg, #101010 0%, var(--color-bg) 48%, #1b1711 100%);
+  color: var(--color-fg);
+  font-family: Inter, 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+}
+
+.workshop-home-shell {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(71, 191, 255, 0.08), transparent 28rem),
+    #000000;
+}
+
+.workshop-selector {
+  --spotlight-x: 50%;
+  --spotlight-y: 40%;
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  width: min(100%, 1120px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 48px) 20px;
+  place-items: center;
+  isolation: isolate;
+}
+
+.workshop-selector::before,
+.workshop-selector::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+}
+
+.workshop-selector::before {
+  background:
+    radial-gradient(circle at var(--spotlight-x) var(--spotlight-y), rgba(71, 191, 255, 0.16), transparent 18rem),
+    radial-gradient(circle at 18% 74%, rgba(255, 255, 255, 0.055), transparent 14rem);
+  opacity: 0.84;
+  transition: opacity 0.2s ease;
+}
+
+.workshop-selector::after {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at 50% 42%, black, transparent 66%);
+  opacity: 0.12;
+  animation: workshop-grid-drift 18s linear infinite;
+}
+
+.workshop-heading {
+  text-align: center;
+}
+
+.workshop-kicker {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--color-accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.workshop-heading h1 {
+  margin: 0;
+  font-size: clamp(30px, 6vw, 56px);
+  line-height: 1;
+  font-weight: 800;
+}
+
+.workshop-orbit {
+  display: grid;
+  grid-template-areas:
+    "boucles art appliques"
+    ". vaso .";
+  grid-template-columns: minmax(190px, 240px) minmax(240px, 320px) minmax(190px, 240px);
+  gap: clamp(14px, 2.2vw, 22px);
+  width: min(94vw, 860px);
+  align-self: center;
+  justify-self: center;
+  align-items: center;
+  animation: workshop-arrive 0.62s ease-out both;
+}
+
+.workshop-orbit::before {
+  display: none;
+}
+
+.workshop-center {
+  grid-area: art;
+  display: grid;
+  width: min(40vw, 280px);
+  aspect-ratio: 1;
+  justify-self: center;
+  place-items: center;
+  pointer-events: none;
+}
+
+.workshop-logo-ring {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, #47bfff 24%, transparent);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(71, 191, 255, 0.13), transparent 62%),
+    #000000;
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.36),
+    0 0 56px rgba(71, 191, 255, 0.1);
+  overflow: hidden;
+  animation: workshop-center-breathe 5.8s ease-in-out infinite;
+}
+
+.workshop-logo-ring img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition:
+    opacity 0.18s ease,
+    transform 0.32s ease;
+}
+
+.workshop-node {
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  gap: 10px;
+  width: min(100%, 168px);
+  min-height: 158px;
+  padding: 14px 12px 12px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--color-fg);
+  cursor: pointer;
+  box-shadow: none;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.workshop-node:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 58%, transparent);
+  background:
+    radial-gradient(circle at 50% 32%, rgba(71, 191, 255, 0.14), transparent 58%),
+    rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 16px 42px rgba(0, 0, 0, 0.22),
+    0 0 34px rgba(71, 191, 255, 0.16);
+  transform: translateY(-2px);
+}
+
+.workshop-node:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+}
+
+.workshop-node-vaso {
+  grid-area: vaso;
+  justify-self: center;
+}
+
+.workshop-node-appliques {
+  grid-area: appliques;
+  justify-self: center;
+}
+
+.workshop-node-boucles {
+  grid-area: boucles;
+  justify-self: center;
+}
+
+.workshop-node-disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+}
+
+.workshop-node-disabled:hover {
+  border-color: color-mix(in srgb, var(--color-fg) 18%, transparent);
+  background:
+    radial-gradient(circle at 50% 32%, rgba(255, 255, 255, 0.08), transparent 58%),
+    rgba(255, 255, 255, 0.025);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+  transform: none;
+}
+
+@keyframes workshop-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes workshop-center-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 28px 80px rgba(0, 0, 0, 0.36),
+      0 0 48px rgba(71, 191, 255, 0.09);
+    transform: translateY(0);
+  }
+
+  50% {
+    box-shadow:
+      0 34px 92px rgba(0, 0, 0, 0.42),
+      0 0 72px rgba(71, 191, 255, 0.16);
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes workshop-grid-drift {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: 72px 72px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workshop-selector::after,
+  .workshop-orbit,
+  .workshop-logo-ring {
+    animation: none;
+  }
+}
+
+.workshop-node-icon {
+  display: grid;
+  width: 92px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 50%;
+  background: #000000;
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  transition:
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.workshop-node-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.workshop-node-icon-photo {
+  overflow: hidden;
+  background: #000000;
+}
+
+.workshop-node-icon-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.workshop-node:hover .workshop-node-icon {
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.36),
+    0 0 0 1px rgba(71, 191, 255, 0.24),
+    0 0 30px rgba(71, 191, 255, 0.12);
+  transform: scale(1.03);
+}
+
+.workshop-node-icon-lines,
+.workshop-node-icon-loops {
+  position: relative;
+}
+
+.workshop-node-icon-lines span {
+  position: absolute;
+  width: 8px;
+  height: 22px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-fg) 70%, transparent);
+}
+
+.workshop-node-icon-lines span:first-child {
+  rotate: 28deg;
+  translate: -6px 0;
+}
+
+.workshop-node-icon-lines span:last-child {
+  rotate: -28deg;
+  translate: 6px 0;
+}
+
+.workshop-node-icon-loops span {
+  width: 14px;
+  aspect-ratio: 1;
+  border: 3px solid color-mix(in srgb, var(--color-fg) 70%, transparent);
+  border-radius: 50%;
+}
+
+.workshop-node-icon-loops {
+  grid-template-columns: repeat(2, auto);
+  gap: 2px;
+}
+
+.workshop-node-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  align-items: center;
+  text-align: center;
+}
+
+.workshop-node-text strong {
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.workshop-node-active .workshop-node-text strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.workshop-node-text span {
+  color: color-mix(in srgb, var(--color-fg) 68%, transparent);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.earring-app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(100%, 1180px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 18px 20px 24px;
+  gap: 18px;
+}
+
+.earring-topbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 42px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-fg) 10%, transparent);
+}
+
+.earring-topbar h1 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--color-accent);
+}
+
+.earring-body {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 18px;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.earring-preview {
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 0;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, #47bfff 22%, transparent);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(71, 191, 255, 0.14), transparent 28rem),
+    color-mix(in srgb, var(--color-panel) 86%, #000000);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.earring-preview canvas {
+  cursor: grab;
+}
+
+.earring-preview canvas:active {
+  cursor: grabbing;
+}
+
+.earring-panel {
+  display: grid;
+  grid-column: 1;
+  grid-row: 1;
+  align-content: start;
+  gap: 10px;
+  max-height: calc(100dvh - 158px);
+  overflow-y: auto;
+  padding: 14px 14px 22px;
+  border: 1px solid color-mix(in srgb, var(--color-fg) 11%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-panel) 92%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.earring-toolbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-fg) 10%, transparent);
+  flex-shrink: 0;
+}
+
+.earring-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+}
+
+.earring-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  color: color-mix(in srgb, var(--color-fg) 78%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.earring-check input {
+  accent-color: var(--color-accent);
+}
+
+.earring-color-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+}
+
+.earring-color-control label {
+  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.earring-color-control input[type="color"] {
+  width: 42px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--color-fg) 20%, transparent);
+  border-radius: 5px;
+  background: var(--color-field);
+  cursor: pointer;
+}
+
+.earring-control label {
+  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.earring-control select {
+  min-width: 136px;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-fg) 20%, transparent);
+  border-radius: 5px;
+  background: var(--color-field);
+  color: var(--color-field-fg);
+  font-size: 12px;
+}
+
+.earring-control select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.earring-control select:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.earring-param {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-field) 54%, transparent);
+}
+
+.earring-param span {
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  font-size: 12px;
+}
+
+.earring-param strong {
+  font-size: 14px;
+  text-align: right;
+}
+
+.earring-param-wide {
+  display: flex;
+  align-items: start;
+}
+
+.earring-param-wide strong {
+  line-height: 1.35;
+  max-width: 150px;
+  overflow-wrap: anywhere;
+}
+
 .app {
   display: flex;
   flex-direction: column;
@@ -592,6 +1126,77 @@ kbd {
    ══════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
+  .workshop-shell {
+    overflow-y: auto;
+  }
+
+  .workshop-selector {
+    grid-template-rows: auto auto;
+    min-height: 100dvh;
+    padding: 28px 16px;
+    gap: 24px;
+  }
+
+  .workshop-orbit {
+    display: grid;
+    grid-template-areas:
+      "art"
+      "vaso"
+      "boucles"
+      "appliques";
+    grid-template-columns: 1fr;
+    width: min(100%, 420px);
+    aspect-ratio: auto;
+    gap: 12px;
+  }
+
+  .workshop-orbit::before {
+    display: none;
+  }
+
+  .workshop-center {
+    width: min(78vw, 260px);
+    justify-self: center;
+  }
+
+  .workshop-node {
+    width: 100%;
+  }
+
+  .earring-app {
+    height: auto;
+    min-height: 100dvh;
+    padding: 14px 12px 18px;
+  }
+
+  .earring-topbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .earring-topbar .btn-small {
+    width: 100%;
+  }
+
+  .earring-body {
+    grid-template-columns: 1fr;
+  }
+
+  .earring-panel,
+  .earring-preview {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .earring-panel {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .earring-preview {
+    min-height: 360px;
+  }
+
   .app {
     height: auto;
     min-height: 100dvh;

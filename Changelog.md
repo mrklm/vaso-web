@@ -7,6 +7,18 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.65] - 2026-08-17
+
+### 🎨 Ajouté
+ - Ajoute la page d'accueil des ateliers avec les entrées Vaso, Boucle et Applique.
+ - Ajoute l'atelier Boucle avec générateur paramétrique, réglages, historique et barre d'actions.
+ - Ajoute une vue 3D orbitable pour visualiser la paire de boucles en volume sur un plateau quadrillé.
+
+### 🎨 Modifié
+ - Réorganise l'application par ateliers pour préparer les futures sections.
+ - Ajoute le retour au menu des ateliers depuis Vaso et Boucle.
+ - Améliore la page d'accueil avec fond noir, icônes d'ateliers, animations discrètes et aperçu dynamique.
+
 ## [1.0.64] - 2026-08-14
 
 ### 🎨 Modifié

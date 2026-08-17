@@ -1,99 +1,68 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Toaster } from "react-hot-toast";
-import { Sidebar } from "./components/layout/Sidebar";
-import { Toolbar } from "./components/layout/Toolbar";
-import { VaseViewer3D } from "./components/viewer/VaseViewer3D";
-import { ProfileView2D } from "./components/viewer/ProfileView2D";
-import { TopView2D } from "./components/viewer/TopView2D";
-import { InsertView2D } from "./components/viewer/InsertView2D";
-import { useVaseStore } from "./store/vase-store";
-import { useUIStore } from "./store/ui-store";
-import { useUrlShare } from "./hooks/useUrlShare";
+import { EarringWorkshop } from "./workshops/earrings/EarringWorkshop";
+import { WorkshopSelector } from "./workshops/selector/WorkshopSelector";
+import type { Workshop } from "./workshops/types";
+import { VasoWorkshop } from "./workshops/vaso/VasoWorkshop";
 import "./App.css";
 
 function App() {
-  const randomize = useVaseStore((s) => s.randomize);
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [currentWorkshop, setCurrentWorkshop] = useState<Workshop>(() =>
+    window.location.hash ? "vaso" : "selector",
+  );
 
-  // Load params from URL hash on mount
-  useUrlShare();
+  const toaster = (
+    <Toaster
+      position="bottom-center"
+      toastOptions={{
+        style: {
+          background: "var(--color-panel)",
+          color: "var(--color-fg)",
+          border: "1px solid var(--color-accent)",
+          fontSize: "13px",
+        },
+      }}
+    />
+  );
 
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+  if (currentWorkshop === "selector") {
+    return (
+      <div className="workshop-shell workshop-home-shell">
+        {toaster}
+        <WorkshopSelector
+          onOpenVaso={() => setCurrentWorkshop("vaso")}
+          onOpenBoucles={() => setCurrentWorkshop("boucles")}
+        />
+      </div>
+    );
+  }
 
-      if (e.code === "Space") {
-        e.preventDefault();
-        randomize();
-      }
+  if (currentWorkshop === "boucles") {
+    return (
+      <div className="workshop-shell">
+        {toaster}
+        <EarringWorkshop onBack={() => setCurrentWorkshop("selector")} />
+      </div>
+    );
+  }
 
-      // Ctrl+Z / Cmd+Z = undo
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        useVaseStore.temporal.getState().undo();
-      }
-
-      // Ctrl+Y / Cmd+Shift+Z = redo
-      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
-        e.preventDefault();
-        useVaseStore.temporal.getState().redo();
-      }
-
-      // P = toggle play/stop rotation
-      if (e.key === "p" || e.key === "P") {
-        const ui = useUIStore.getState();
-        ui.setAutoRotate(!ui.autoRotate);
-      }
-    };
-
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [randomize]);
+  if (currentWorkshop === "applique") {
+    return (
+      <div className="workshop-shell workshop-home-shell">
+        {toaster}
+        <WorkshopSelector
+          onOpenVaso={() => setCurrentWorkshop("vaso")}
+          onOpenBoucles={() => setCurrentWorkshop("boucles")}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="app">
-      <Toaster
-        position="bottom-center"
-        toastOptions={{
-          style: {
-            background: "var(--color-panel)",
-            color: "var(--color-fg)",
-            border: "1px solid var(--color-accent)",
-            fontSize: "13px",
-          },
-        }}
-      />
-
-      <header className="app-header">
-        <h1>Vaso</h1>
-        <span className="version">Web Edition v{__APP_VERSION__}</span>
-        <button className="mobile-menu-btn" onClick={() => setPanelOpen(!panelOpen)} aria-label="Menu">
-          {panelOpen ? "\u2715" : "\u2630"}
-        </button>
-      </header>
-
-      <div className="app-body">
-        <div className={`sidebar-wrapper ${panelOpen ? "open" : ""}`}>
-          <Sidebar />
-        </div>
-
-        {panelOpen && <div className="mobile-overlay" aria-hidden="true" />}
-
-        <main className="main-content">
-          <div className="viewer-area">
-            <VaseViewer3D />
-          </div>
-          <Toolbar />
-        </main>
-
-        <aside className="right-panel">
-          <ProfileView2D />
-          <TopView2D />
-          <InsertView2D />
-        </aside>
-      </div>
-    </div>
+    <>
+      {toaster}
+      <VasoWorkshop onBack={() => setCurrentWorkshop("selector")} />
+    </>
   );
 }
 
