@@ -59,6 +59,13 @@ coverage/
 Thumbs.db
 
 # ─────────────────────────────────────────────
+# Local exchange / reference assets
+# ─────────────────────────────────────────────
+pj/
+Atelier Vaso.png
+public/workshops/Capture d’écran .png
+
+# ─────────────────────────────────────────────
 # TypeScript
 # ─────────────────────────────────────────────
 *.tsbuildinfo
