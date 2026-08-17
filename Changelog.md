@@ -7,6 +7,19 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.66] - 2026-08-17
+
+### 🎨 Ajouté
+ - Ajoute des réglages avancés dans l'atelier Boucle pour choisir les formes, motifs, textures, nombre de perforations et taille des motifs.
+ - Ajoute l'option "Pas de motif" et augmente le nombre maximal de motifs à 25.
+
+### 🎨 Modifié
+ - Améliore la génération des motifs de boucles avec une répartition concentrique plus homogène.
+ - Calcule la taille maximale des motifs avec une marge imprimable de 2 mm selon la vraie silhouette de la boucle.
+ - Permet aux motifs de percer proprement la zone d'accroche extérieure.
+ - Pose les boucles à plat sur le plateau dans l'aperçu 3D.
+ - Harmonise l'interface de l'atelier Boucle avec l'atelier Vaso, avec panneau de réglages à gauche et vues schématiques à droite.
+
 ## [1.0.65] - 2026-08-17
 
 ### 🎨 Ajouté
