@@ -7,6 +7,13 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.67] - 2026-08-17
+
+### 🎨 Modifié
+ - Affine l'accroche spécifique de la forme Coeur avec un raccord plus arrondi sous l'anneau.
+ - Simplifie les courbes de l'accroche Coeur pour mieux préserver la lecture du creux central.
+ - Masque les arêtes parasites de la transition d'accroche dans l'aperçu 3D.
+
 ## [1.0.66] - 2026-08-17
 
 ### 🎨 Ajouté

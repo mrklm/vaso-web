@@ -404,20 +404,34 @@ function getHookLayout(design: EarringDesign) {
   const bodyHoleY = 42 - design.height / 2 + 5;
   const topY = 42 - design.height / 2;
   const hookX = 35;
-  const hookY = design.exteriorHook ? topY - 3 : bodyHoleY;
-  const hookOuterRadius = design.exteriorHook ? 3 : 1;
+  const hookY = design.exteriorHook ? topY - (design.shape === "coeur" ? 4.4 : 3) : bodyHoleY;
+  const hookOuterRadius = design.exteriorHook ? design.shape === "coeur" ? 3.25 : 3 : 1;
   const hookNeckTop = hookY + hookOuterRadius * 0.42;
   const hookShoulderY = topY + Math.min(9, Math.max(5.6, design.height * 0.16));
   const hookShoulderHalfWidth = Math.max(3.2, getBodyHalfWidthAtOffset(design, hookShoulderY - topY));
   const hookNeckHalfWidth = 2.15;
-  const hookTransitionPath = [
-    `M ${hookX - hookNeckHalfWidth} ${hookNeckTop}`,
-    `C ${hookX - hookNeckHalfWidth} ${topY - 0.8}, ${hookX - hookShoulderHalfWidth * 0.52} ${topY + 2.2}, ${hookX - hookShoulderHalfWidth} ${hookShoulderY}`,
-    `L ${hookX + hookShoulderHalfWidth} ${hookShoulderY}`,
-    `C ${hookX + hookShoulderHalfWidth * 0.52} ${topY + 2.2}, ${hookX + hookNeckHalfWidth} ${topY - 0.8}, ${hookX + hookNeckHalfWidth} ${hookNeckTop}`,
-    `Q ${hookX} ${hookNeckTop + 1.25} ${hookX - hookNeckHalfWidth} ${hookNeckTop}`,
-    "Z",
-  ].join(" ");
+  const hookTransitionPath = design.shape === "coeur"
+    ? [
+        `M ${hookX - hookNeckHalfWidth} ${hookNeckTop}`,
+        `C ${hookX - 3.15} ${topY + 0.3}, ${hookX - design.width * 0.1} ${topY + 1.9}, ${hookX - design.width * 0.14} ${topY + design.height * 0.18}`,
+        `C ${hookX - design.width * 0.1} ${topY + design.height * 0.16}, ${hookX - 3.05} ${topY + design.height * 0.24}, ${hookX - 1.28} ${topY + design.height * 0.45}`,
+        `C ${hookX - 1.1} ${topY + design.height * 0.33}, ${hookX - 1.02} ${topY + design.height * 0.15}, ${hookX - 0.48} ${topY + design.height * 0.07}`,
+        `C ${hookX - 0.74} ${hookNeckTop + 1.22}, ${hookX - 0.34} ${hookNeckTop + 1.58}, ${hookX} ${hookNeckTop + 1.66}`,
+        `C ${hookX + 0.34} ${hookNeckTop + 1.58}, ${hookX + 0.74} ${hookNeckTop + 1.22}, ${hookX + 0.48} ${topY + design.height * 0.07}`,
+        `C ${hookX + 1.02} ${topY + design.height * 0.15}, ${hookX + 1.1} ${topY + design.height * 0.33}, ${hookX + 1.28} ${topY + design.height * 0.45}`,
+        `C ${hookX + 3.05} ${topY + design.height * 0.24}, ${hookX + design.width * 0.1} ${topY + design.height * 0.16}, ${hookX + design.width * 0.14} ${topY + design.height * 0.18}`,
+        `C ${hookX + design.width * 0.1} ${topY + 1.9}, ${hookX + 3.15} ${topY + 0.3}, ${hookX + hookNeckHalfWidth} ${hookNeckTop}`,
+        `Q ${hookX} ${hookNeckTop + 0.92} ${hookX - hookNeckHalfWidth} ${hookNeckTop}`,
+        "Z",
+      ].join(" ")
+    : [
+        `M ${hookX - hookNeckHalfWidth} ${hookNeckTop}`,
+        `C ${hookX - hookNeckHalfWidth} ${topY - 0.8}, ${hookX - hookShoulderHalfWidth * 0.52} ${topY + 2.2}, ${hookX - hookShoulderHalfWidth} ${hookShoulderY}`,
+        `L ${hookX + hookShoulderHalfWidth} ${hookShoulderY}`,
+        `C ${hookX + hookShoulderHalfWidth * 0.52} ${topY + 2.2}, ${hookX + hookNeckHalfWidth} ${topY - 0.8}, ${hookX + hookNeckHalfWidth} ${hookNeckTop}`,
+        `Q ${hookX} ${hookNeckTop + 1.25} ${hookX - hookNeckHalfWidth} ${hookNeckTop}`,
+        "Z",
+      ].join(" ");
 
   return {
     bodyHoleY,
@@ -672,7 +686,6 @@ function EarringPair3D({
       <mesh geometry={geometries.body} material={material} castShadow receiveShadow />
       <lineSegments geometry={new THREE.EdgesGeometry(geometries.body, 28)} material={edgeMaterial} />
       {geometries.transition && <mesh geometry={geometries.transition} material={material} castShadow receiveShadow />}
-      {geometries.transition && <lineSegments geometry={new THREE.EdgesGeometry(geometries.transition, 28)} material={edgeMaterial} />}
       {geometries.ring && <mesh geometry={geometries.ring} material={material} castShadow receiveShadow />}
       {geometries.ring && <lineSegments geometry={new THREE.EdgesGeometry(geometries.ring, 28)} material={edgeMaterial} />}
     </group>
