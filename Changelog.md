@@ -7,6 +7,16 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.68] - 2026-08-17
+
+### 🎨 Ajouté
+ - Ajoute les familles de formes et de motifs issues des répertoires de silhouettes pour l'atelier Boucle.
+
+### 🎨 Modifié
+ - Trace les silhouettes importées pour conserver davantage de détails dans les formes et motifs de boucles.
+ - Renomme le choix de silhouette en "Motif" et ajoute l'option "Aucun".
+ - Désactive l'accès public à l'atelier Boucle en production tout en le conservant disponible sur le serveur local de développement.
+
 ## [1.0.67] - 2026-08-17
 
 ### 🎨 Modifié

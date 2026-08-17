@@ -6,6 +6,8 @@ import type { Workshop } from "./workshops/types";
 import { VasoWorkshop } from "./workshops/vaso/VasoWorkshop";
 import "./App.css";
 
+const isEarringWorkshopPublic = import.meta.env.DEV;
+
 function App() {
   const [currentWorkshop, setCurrentWorkshop] = useState<Workshop>(() =>
     window.location.hash ? "vaso" : "selector",
@@ -37,7 +39,7 @@ function App() {
     );
   }
 
-  if (currentWorkshop === "boucles") {
+  if (currentWorkshop === "boucles" && isEarringWorkshopPublic) {
     return (
       <div className="workshop-shell">
         {toaster}

@@ -13,6 +13,7 @@ const workshopPreviews = {
 } as const;
 
 type WorkshopPreview = keyof typeof workshopPreviews;
+const isEarringWorkshopPublic = import.meta.env.DEV;
 
 export function WorkshopSelector({ onOpenVaso, onOpenBoucles }: WorkshopSelectorProps) {
   const [preview, setPreview] = useState<WorkshopPreview>("default");
@@ -60,8 +61,9 @@ export function WorkshopSelector({ onOpenVaso, onOpenBoucles }: WorkshopSelector
         </button>
 
         <button
-          className="workshop-node workshop-node-active workshop-node-boucles"
+          className={`workshop-node workshop-node-boucles ${isEarringWorkshopPublic ? "workshop-node-active" : "workshop-node-disabled"}`}
           type="button"
+          disabled={!isEarringWorkshopPublic}
           onClick={onOpenBoucles}
           onBlur={() => setPreview("default")}
           onFocus={() => setPreview("boucle")}
@@ -73,6 +75,7 @@ export function WorkshopSelector({ onOpenVaso, onOpenBoucles }: WorkshopSelector
           </span>
           <span className="workshop-node-text">
             <strong>Boucle</strong>
+            {!isEarringWorkshopPublic && <span>Bientôt accessible</span>}
           </span>
         </button>
       </section>

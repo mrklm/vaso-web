@@ -1,18 +1,27 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import toast from "react-hot-toast";
 import * as THREE from "three";
 import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
+import {
+  buildSymbolPath,
+  EARRING_SYMBOL_FAMILIES,
+  EARRING_SYMBOLS_BY_FAMILY,
+  GEOMETRIC_BODY_SYMBOL_IDS,
+  getDefaultSymbolForFamily,
+  getSymbolDefinition,
+  isSquareSymbol,
+  type EarringSymbolFamilyId,
+} from "./silhouetteLibrary";
 
 type EarringBaseShape = "carre" | "triangle" | "rond" | "hexagone" | "polygone" | "coeur";
-type EarringHoleShape = "rond" | "carre" | "triangle" | "coeur" | "etoile" | "sourire" | "goutte";
-type EarringMotif = "aucun" | EarringHoleShape;
+type EarringMotif = "aucun" | string;
 type EarringTexture = "lisse" | "facettes" | "pixel" | "courbes" | "rainures";
 
 type EarringHole = {
-  shape: EarringHoleShape;
+  shape: string;
   x: number;
   y: number;
   size: number;
@@ -20,7 +29,10 @@ type EarringHole = {
 };
 
 type EarringSettings = {
+  shapeFamily: EarringSymbolFamilyId;
+  shapeSymbol: string;
   shape: EarringBaseShape;
+  motifFamily: EarringSymbolFamilyId;
   motif: EarringMotif;
   motifCount: number;
   motifScale: number;
@@ -30,6 +42,8 @@ type EarringSettings = {
 };
 
 type EarringDesign = {
+  shapeFamily: EarringSymbolFamilyId;
+  shapeSymbol: string;
   shape: EarringBaseShape;
   width: number;
   height: number;
@@ -41,7 +55,10 @@ type EarringDesign = {
 };
 
 const DEFAULT_EARRING_SETTINGS: EarringSettings = {
+  shapeFamily: "geometriques",
+  shapeSymbol: "rond",
   shape: "rond",
+  motifFamily: "geometriques",
   motif: "rond",
   motifCount: 1,
   motifScale: 100,
@@ -53,33 +70,65 @@ const DEFAULT_EARRING_SETTINGS: EarringSettings = {
 const DEFAULT_EARRING_COLOR = "#f6f6f2";
 const MOTIF_EDGE_MARGIN_MM = 2;
 const MAX_MOTIF_COUNT = 25;
+const SYMBOL_TRACE_SIZE = 192;
+
+type TracedSymbolPoint = {
+  x: number;
+  y: number;
+};
+
+type TracedSymbolPaths = Record<string, TracedSymbolPoint[]>;
+
+type TraceEdge = {
+  from: string;
+  to: string;
+};
 
 function randomBetween(min: number, max: number): number {
   return Math.round(min + Math.random() * (max - min));
 }
 
+function isBaseShapeSymbol(symbolId: string): symbolId is EarringBaseShape {
+  return GEOMETRIC_BODY_SYMBOL_IDS.includes(symbolId as EarringBaseShape);
+}
+
 function randomEarringDesign(settings: EarringSettings): EarringDesign {
-  const randomShapes: EarringBaseShape[] = ["carre", "triangle", "rond", "hexagone", "polygone", "coeur"];
-  const randomMotifs: EarringMotif[] = ["aucun", "rond", "carre", "triangle", "coeur", "etoile", "sourire", "goutte"];
+  const randomShapes = [...GEOMETRIC_BODY_SYMBOL_IDS];
+  const randomFamilies = EARRING_SYMBOL_FAMILIES.map((family) => family.id);
   const randomTextures: EarringTexture[] = ["lisse", "facettes", "pixel", "courbes", "rainures"];
-  const randomMotif = randomMotifs[randomBetween(0, randomMotifs.length - 1)];
+  const randomShapeFamily = randomFamilies[randomBetween(0, randomFamilies.length - 1)];
+  const randomShapeSymbols = randomShapeFamily === "geometriques"
+    ? randomShapes.map((shape) => ({ id: shape }))
+    : EARRING_SYMBOLS_BY_FAMILY[randomShapeFamily];
+  const randomShapeSymbol = randomShapeSymbols[randomBetween(0, randomShapeSymbols.length - 1)]?.id ?? "rond";
+  const randomFamily = randomFamilies[randomBetween(0, randomFamilies.length - 1)];
+  const randomSymbols = EARRING_SYMBOLS_BY_FAMILY[randomFamily];
+  const randomMotif = Math.random() < 0.08 ? "aucun" : randomSymbols[randomBetween(0, randomSymbols.length - 1)]?.id ?? "rond";
   const generatedSettings = settings.randomMode
     ? {
         ...settings,
-        shape: randomShapes[randomBetween(0, randomShapes.length - 1)],
+        shapeFamily: randomShapeFamily,
+        shapeSymbol: randomShapeSymbol,
+        shape: isBaseShapeSymbol(randomShapeSymbol) ? randomShapeSymbol : "rond",
+        motifFamily: randomFamily,
         motif: randomMotif,
         motifCount: randomMotif === "aucun" ? 0 : 1,
         motifScale: randomBetween(72, 100),
         texture: randomTextures[randomBetween(0, randomTextures.length - 1)],
       }
     : settings;
-  const shape = generatedSettings.shape;
+  const shape = generatedSettings.shapeFamily === "geometriques" && isBaseShapeSymbol(generatedSettings.shapeSymbol)
+    ? generatedSettings.shapeSymbol
+    : generatedSettings.shape;
   const sides = shape === "hexagone" ? 6 : randomBetween(5, 9);
-  const width = shape === "coeur" ? randomBetween(38, 48) : randomBetween(26, 46);
-  const height = shape === "coeur" ? randomBetween(34, 44) : randomBetween(32, 56);
+  const isSilhouetteBody = generatedSettings.shapeFamily !== "geometriques";
+  const width = shape === "coeur" ? randomBetween(38, 48) : isSilhouetteBody ? randomBetween(34, 46) : randomBetween(26, 46);
+  const height = shape === "coeur" ? randomBetween(34, 44) : isSilhouetteBody ? randomBetween(34, 46) : randomBetween(32, 56);
   const rotation = randomBetween(-12, 12);
 
   return {
+    shapeFamily: generatedSettings.shapeFamily,
+    shapeSymbol: generatedSettings.shapeSymbol,
     shape,
     width,
     height,
@@ -102,29 +151,8 @@ function getShapeLabel(shape: EarringBaseShape): string {
   }[shape];
 }
 
-function getHoleLabel(shape: EarringHoleShape): string {
-  return {
-    rond: "ronds",
-    carre: "carres",
-    triangle: "triangles",
-    coeur: "coeurs",
-    etoile: "etoiles",
-    sourire: "sourires",
-    goutte: "gouttes",
-  }[shape];
-}
-
-function getMotifLabel(shape: EarringMotif): string {
-  return {
-    aucun: "Pas de motif",
-    rond: "Rond",
-    carre: "Carre",
-    triangle: "Triangle",
-    coeur: "Coeur",
-    etoile: "Etoile",
-    sourire: "Sourire",
-    goutte: "Goutte",
-  }[shape];
+function getHoleLabel(shape: string): string {
+  return getSymbolDefinition(shape).pluralLabel;
 }
 
 function getTextureLabel(texture: EarringTexture): string {
@@ -135,6 +163,201 @@ function getTextureLabel(texture: EarringTexture): string {
     courbes: "Courbes",
     rainures: "Rainures",
   }[texture];
+}
+
+function loadSilhouetteImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`Impossible de charger la silhouette ${src}`));
+    image.src = src;
+  });
+}
+
+function getPixelLuminance(data: Uint8ClampedArray, index: number): number {
+  return data[index] * 0.2126 + data[index + 1] * 0.7152 + data[index + 2] * 0.0722;
+}
+
+function tracePointKey(x: number, y: number): string {
+  return `${x},${y}`;
+}
+
+function parseTracePoint(key: string): TracedSymbolPoint {
+  const [x, y] = key.split(",").map(Number);
+  return { x, y };
+}
+
+function simplifyOrthogonalTrace(points: TracedSymbolPoint[]): TracedSymbolPoint[] {
+  if (points.length < 3) return points;
+
+  const simplified: TracedSymbolPoint[] = [];
+  for (let index = 0; index < points.length; index += 1) {
+    const previous = points[(index + points.length - 1) % points.length];
+    const current = points[index];
+    const next = points[(index + 1) % points.length];
+    const sameHorizontal = previous.y === current.y && current.y === next.y;
+    const sameVertical = previous.x === current.x && current.x === next.x;
+    if (!sameHorizontal && !sameVertical) simplified.push(current);
+  }
+
+  return simplified;
+}
+
+function traceMaskToPoints(mask: Uint8Array, width: number, height: number): TracedSymbolPoint[] {
+  const visited = new Uint8Array(width * height);
+  let bestComponent: number[] = [];
+
+  for (let start = 0; start < mask.length; start += 1) {
+    if (!mask[start] || visited[start]) continue;
+
+    const component: number[] = [];
+    const queue = [start];
+    visited[start] = 1;
+
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const index = queue[cursor];
+      component.push(index);
+      const x = index % width;
+      const y = Math.floor(index / width);
+      const neighbors = [
+        x > 0 ? index - 1 : -1,
+        x < width - 1 ? index + 1 : -1,
+        y > 0 ? index - width : -1,
+        y < height - 1 ? index + width : -1,
+      ];
+
+      neighbors.forEach((neighbor) => {
+        if (neighbor >= 0 && mask[neighbor] && !visited[neighbor]) {
+          visited[neighbor] = 1;
+          queue.push(neighbor);
+        }
+      });
+    }
+
+    if (component.length > bestComponent.length) bestComponent = component;
+  }
+
+  if (bestComponent.length < 12) return [];
+
+  const componentSet = new Set(bestComponent);
+  const edges: TraceEdge[] = [];
+  bestComponent.forEach((index) => {
+    const x = index % width;
+    const y = Math.floor(index / width);
+    const top = y === 0 || !componentSet.has(index - width);
+    const right = x === width - 1 || !componentSet.has(index + 1);
+    const bottom = y === height - 1 || !componentSet.has(index + width);
+    const left = x === 0 || !componentSet.has(index - 1);
+
+    if (top) edges.push({ from: tracePointKey(x, y), to: tracePointKey(x + 1, y) });
+    if (right) edges.push({ from: tracePointKey(x + 1, y), to: tracePointKey(x + 1, y + 1) });
+    if (bottom) edges.push({ from: tracePointKey(x + 1, y + 1), to: tracePointKey(x, y + 1) });
+    if (left) edges.push({ from: tracePointKey(x, y + 1), to: tracePointKey(x, y) });
+  });
+
+  const edgeMap = new Map<string, string[]>();
+  edges.forEach((edge) => {
+    edgeMap.set(edge.from, [...(edgeMap.get(edge.from) ?? []), edge.to]);
+  });
+
+  const start = [...edgeMap.keys()]
+    .map(parseTracePoint)
+    .sort((a, b) => a.y - b.y || a.x - b.x)[0];
+  if (!start) return [];
+
+  const startKey = tracePointKey(start.x, start.y);
+  const outline: TracedSymbolPoint[] = [];
+  const usedEdges = new Set<string>();
+  let currentKey = startKey;
+
+  for (let guard = 0; guard < edges.length + 4; guard += 1) {
+    outline.push(parseTracePoint(currentKey));
+    const nextCandidates = edgeMap.get(currentKey) ?? [];
+    const nextKey = nextCandidates.find((candidate) => !usedEdges.has(`${currentKey}->${candidate}`));
+    if (!nextKey) break;
+
+    usedEdges.add(`${currentKey}->${nextKey}`);
+    currentKey = nextKey;
+    if (currentKey === startKey) break;
+  }
+
+  if (outline.length < 12) return [];
+  const simplifiedOutline = simplifyOrthogonalTrace(outline);
+  const minX = Math.min(...simplifiedOutline.map((point) => point.x));
+  const maxX = Math.max(...simplifiedOutline.map((point) => point.x));
+  const minY = Math.min(...simplifiedOutline.map((point) => point.y));
+  const maxY = Math.max(...simplifiedOutline.map((point) => point.y));
+  const scale = Math.max(maxX - minX, maxY - minY, 1);
+  const normalizedCenter = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+
+  return simplifiedOutline.map((point) => ({
+    x: Number(((point.x - normalizedCenter.x) / scale).toFixed(4)),
+    y: Number(((point.y - normalizedCenter.y) / scale).toFixed(4)),
+  }));
+}
+
+async function traceSilhouetteSource(source: string): Promise<TracedSymbolPoint[]> {
+  const image = await loadSilhouetteImage(`${import.meta.env.BASE_URL}${source}`);
+  const canvas = document.createElement("canvas");
+  canvas.width = SYMBOL_TRACE_SIZE;
+  canvas.height = SYMBOL_TRACE_SIZE;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return [];
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, SYMBOL_TRACE_SIZE, SYMBOL_TRACE_SIZE);
+  const ratio = Math.min(SYMBOL_TRACE_SIZE / image.naturalWidth, SYMBOL_TRACE_SIZE / image.naturalHeight) * 0.92;
+  const drawWidth = image.naturalWidth * ratio;
+  const drawHeight = image.naturalHeight * ratio;
+  context.drawImage(image, (SYMBOL_TRACE_SIZE - drawWidth) / 2, (SYMBOL_TRACE_SIZE - drawHeight) / 2, drawWidth, drawHeight);
+
+  const imageData = context.getImageData(0, 0, SYMBOL_TRACE_SIZE, SYMBOL_TRACE_SIZE);
+  const data = imageData.data;
+  const cornerIndexes = [0, SYMBOL_TRACE_SIZE - 1, SYMBOL_TRACE_SIZE * (SYMBOL_TRACE_SIZE - 1), SYMBOL_TRACE_SIZE * SYMBOL_TRACE_SIZE - 1].map((index) => index * 4);
+  const background = cornerIndexes.reduce((sum, index) => sum + getPixelLuminance(data, index), 0) / cornerIndexes.length;
+  const mask = new Uint8Array(SYMBOL_TRACE_SIZE * SYMBOL_TRACE_SIZE);
+  let foregroundCount = 0;
+
+  for (let pixel = 0; pixel < mask.length; pixel += 1) {
+    const index = pixel * 4;
+    const alpha = data[index + 3];
+    const luminance = getPixelLuminance(data, index);
+    const differsFromBackground = Math.abs(luminance - background) > 20;
+    const darkOnLight = background > 128 && luminance < background - 14;
+    const lightOnDark = background <= 128 && luminance > background + 14;
+    if (alpha > 24 && (alpha < 248 || differsFromBackground || darkOnLight || lightOnDark)) {
+      mask[pixel] = 1;
+      foregroundCount += 1;
+    }
+  }
+
+  if (foregroundCount < 20) {
+    for (let pixel = 0; pixel < mask.length; pixel += 1) {
+      const index = pixel * 4;
+      mask[pixel] = data[index + 3] > 48 && getPixelLuminance(data, index) < 245 ? 1 : 0;
+    }
+  }
+
+  return traceMaskToPoints(mask, SYMBOL_TRACE_SIZE, SYMBOL_TRACE_SIZE);
+}
+
+function buildTracedSymbolPath(points: TracedSymbolPoint[], cx: number, cy: number, size: number, rotation = 0): string {
+  const angle = (rotation * Math.PI) / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const pathPoints = points.map((point) => {
+    const x = point.x * size;
+    const y = point.y * size;
+    return `${(cx + x * cos - y * sin).toFixed(2)} ${(cy + x * sin + y * cos).toFixed(2)}`;
+  });
+  return `M ${pathPoints.join(" L ")} Z`;
+}
+
+function buildSymbolOrTracePath(symbolId: string, cx: number, cy: number, size: number, rotation: number, tracedSymbolPaths: TracedSymbolPaths): string {
+  const tracedPath = tracedSymbolPaths[symbolId];
+  if (tracedPath?.length) return buildTracedSymbolPath(tracedPath, cx, cy, size, rotation);
+  return buildSymbolPath(symbolId, cx, cy, size, rotation);
 }
 
 function getSafeCenteredMotif(width: number, height: number, shape: EarringBaseShape) {
@@ -190,7 +413,7 @@ function getMaxPrintableMotifSize(
   shape: EarringBaseShape,
   sides: number,
   rotation: number,
-  motif: EarringHoleShape,
+  motif: string,
   x: number,
   y: number,
 ): number {
@@ -204,7 +427,7 @@ function getMaxPrintableMotifSize(
       x,
       y,
       size: candidate,
-      rotation: motif === "carre" ? 45 : 0,
+      rotation: isSquareSymbol(motif) ? 45 : 0,
     };
     if (
       isMotifPrintablePosition(shape, width, height, x, y, candidate)
@@ -244,7 +467,7 @@ function buildConcentricMotifs(
   shape: EarringBaseShape,
   sides: number,
   rotation: number,
-  motif: EarringHoleShape,
+  motif: string,
   size: number,
 ): Array<{ x: number; y: number }> {
   if (count === 1) return [{ x: 35, y: 43 }];
@@ -278,7 +501,7 @@ function buildConcentricMotifs(
         x: candidate.x,
         y: candidate.y,
         size,
-        rotation: motif === "carre" ? 45 : 0,
+        rotation: isSquareSymbol(motif) ? 45 : 0,
       };
       return (
         isMotifPrintablePosition(shape, width, height, candidate.x, candidate.y, size)
@@ -313,7 +536,7 @@ function buildEarringHoles(
       x: centeredMotif.x,
       y: centeredMotif.y,
       size,
-      rotation: motif === "carre" ? 45 : 0,
+      rotation: isSquareSymbol(motif) ? 45 : 0,
     }];
   }
 
@@ -328,7 +551,7 @@ function buildEarringHoles(
     x: position.x,
     y: position.y,
     size,
-    rotation: motif === "carre" ? 45 : index % 2 === 0 ? 0 : 18,
+    rotation: isSquareSymbol(motif) ? 45 : index % 2 === 0 ? 0 : 18,
   }));
 }
 
@@ -366,9 +589,14 @@ function buildBaseHeartPath(cx: number, cy: number, width: number, height: numbe
   return `M ${points.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(" L ")} Z`;
 }
 
-function buildEarringPath(design: EarringDesign): string {
+function buildEarringPath(design: EarringDesign, tracedSymbolPaths: TracedSymbolPaths = {}): string {
   const cx = 35;
   const cy = 42;
+  if (design.shapeFamily !== "geometriques") {
+    const size = Math.min(design.width, design.height);
+    return buildSymbolOrTracePath(design.shapeSymbol, cx, cy, size, design.rotation, tracedSymbolPaths);
+  }
+
   const halfWidth = design.width / 2;
   const halfHeight = design.height / 2;
   const left = cx - halfWidth;
@@ -442,39 +670,8 @@ function getHookLayout(design: EarringDesign) {
   };
 }
 
-function buildStarPath(cx: number, cy: number, radius: number, rotation = -90): string {
-  const points = Array.from({ length: 10 }, (_, index) => {
-    const pointRadius = index % 2 === 0 ? radius : radius * 0.46;
-    const angle = (rotation + index * 36) * (Math.PI / 180);
-    return [cx + Math.cos(angle) * pointRadius, cy + Math.sin(angle) * pointRadius];
-  });
-  return `M ${points.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(" L ")} Z`;
-}
-
-function buildHeartPath(cx: number, cy: number, size: number): string {
-  const s = size / 4;
-  return [`M ${cx} ${cy + s * 1.5}`, `C ${cx - s * 4} ${cy - s * 0.8}, ${cx - s * 2.4} ${cy - s * 4}, ${cx} ${cy - s * 1.8}`, `C ${cx + s * 2.4} ${cy - s * 4}, ${cx + s * 4} ${cy - s * 0.8}, ${cx} ${cy + s * 1.5}`, "Z"].join(" ");
-}
-
-function buildDropPath(cx: number, cy: number, size: number): string {
-  const r = size / 2;
-  return [`M ${cx} ${cy - r * 1.25}`, `C ${cx + r * 1.45} ${cy}, ${cx + r * 0.72} ${cy + r * 1.45}, ${cx} ${cy + r * 1.45}`, `C ${cx - r * 0.72} ${cy + r * 1.45}, ${cx - r * 1.45} ${cy}, ${cx} ${cy - r * 1.25}`, "Z"].join(" ");
-}
-
-function buildHolePath(hole: EarringHole): string {
-  const half = hole.size / 2;
-  if (hole.shape === "rond" || hole.shape === "sourire") return [`M ${hole.x} ${hole.y - half}`, `A ${half} ${half} 0 1 1 ${hole.x} ${hole.y + half}`, `A ${half} ${half} 0 1 1 ${hole.x} ${hole.y - half}`, "Z"].join(" ");
-  if (hole.shape === "carre") return `M ${hole.x - half} ${hole.y - half} L ${hole.x + half} ${hole.y - half} L ${hole.x + half} ${hole.y + half} L ${hole.x - half} ${hole.y + half} Z`;
-  if (hole.shape === "triangle") {
-    const points = Array.from({ length: 3 }, (_, index) => {
-      const angle = (-90 + hole.rotation + index * 120) * (Math.PI / 180);
-      return [hole.x + Math.cos(angle) * half, hole.y + Math.sin(angle) * half];
-    });
-    return `M ${points.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(" L ")} Z`;
-  }
-  if (hole.shape === "coeur") return buildHeartPath(hole.x, hole.y, hole.size);
-  if (hole.shape === "etoile") return buildStarPath(hole.x, hole.y, half, -90 + hole.rotation);
-  return buildDropPath(hole.x, hole.y, hole.size);
+function buildHolePath(hole: EarringHole, tracedSymbolPaths: TracedSymbolPaths = {}): string {
+  return buildSymbolOrTracePath(hole.shape, hole.x, hole.y, hole.size, hole.rotation, tracedSymbolPaths);
 }
 
 function parseSvgShapes(path: string): THREE.Shape[] {
@@ -518,6 +715,8 @@ function isHolePrintableInShape(
   hole: EarringHole,
 ): boolean {
   const baseDesign: EarringDesign = {
+    shapeFamily: "geometriques",
+    shapeSymbol: shape,
     shape,
     width,
     height,
@@ -545,23 +744,8 @@ function prepareEarringGeometry(geometry: THREE.BufferGeometry) {
 }
 
 function createExtrudedGeometry(path: string, holePaths: string[], thickness: number) {
-  const shapes = parseSvgShapes(path);
-  const holes = holePaths.flatMap(parseSvgShapes);
-  shapes.forEach((shape) => {
-    holes.forEach((hole) => {
-      shape.holes.push(hole);
-    });
-  });
-
-  return prepareEarringGeometry(new THREE.ExtrudeGeometry(shapes, {
-    depth: thickness,
-    bevelEnabled: true,
-    bevelSegments: 1,
-    bevelSize: 0.18,
-    bevelThickness: 0.18,
-    curveSegments: 28,
-    steps: 1,
-  }));
+  const geometry = createSolidExtrudedGeometry(path, thickness);
+  return subtractHolePathsFromGeometry(geometry, holePaths, thickness);
 }
 
 function createSolidExtrudedGeometry(path: string, thickness: number, bevelSize = 0.18) {
@@ -761,6 +945,7 @@ function EarringSchematicView({ title, children }: EarringSchematicViewProps) {
 function EarringSilhouetteView({
   bodyHoleY,
   design,
+  holePaths,
   hookOuterRadius,
   hookTransitionPath,
   hookX,
@@ -769,6 +954,7 @@ function EarringSilhouetteView({
 }: {
   bodyHoleY: number;
   design: EarringDesign;
+  holePaths: string[];
   hookOuterRadius: number;
   hookTransitionPath: string;
   hookX: number;
@@ -782,7 +968,7 @@ function EarringSilhouetteView({
           <mask id="earring-silhouette-mask">
             <rect x="-8" y="-12" width="86" height="108" fill="#ffffff" />
             {!design.exteriorHook && <circle cx="35" cy={bodyHoleY} r="1" fill="#000000" />}
-            {design.holes.map((hole, index) => <path key={index} d={buildHolePath(hole)} fill="#000000" />)}
+            {holePaths.map((holePath, index) => <path key={index} d={holePath} fill="#000000" />)}
           </mask>
         </defs>
         {design.exteriorHook && (
@@ -837,7 +1023,20 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
   const [pastDesigns, setPastDesigns] = useState<EarringDesign[]>([]);
   const [futureDesigns, setFutureDesigns] = useState<EarringDesign[]>([]);
   const [earringColor, setEarringColor] = useState(DEFAULT_EARRING_COLOR);
-  const shapePath = buildEarringPath(design);
+  const [tracedSymbolPaths, setTracedSymbolPaths] = useState<TracedSymbolPaths>({});
+  const shapePath = useMemo(() => buildEarringPath(design, tracedSymbolPaths), [design, tracedSymbolPaths]);
+  const holePaths = useMemo(() => design.holes.map((hole) => buildHolePath(hole, tracedSymbolPaths)), [design.holes, tracedSymbolPaths]);
+  const missingTraceIds = useMemo(() => {
+    const symbolIds = [
+      design.shapeFamily !== "geometriques" ? design.shapeSymbol : null,
+      ...design.holes.map((hole) => hole.shape),
+    ].filter((symbolId): symbolId is string => Boolean(symbolId));
+
+    return Array.from(new Set(symbolIds.filter((symbolId) => {
+      const definition = getSymbolDefinition(symbolId);
+      return Boolean(definition.source) && !tracedSymbolPaths[symbolId];
+    })));
+  }, [design.holes, design.shapeFamily, design.shapeSymbol, tracedSymbolPaths]);
   const holeRadius = 1;
   const holeDiameter = holeRadius * 2;
   const thickness = 2;
@@ -851,9 +1050,40 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
   const holeSummary = design.holes.length === 0
     ? "aucun"
     : Array.from(new Set(design.holes.map((hole) => getHoleLabel(hole.shape)))).join(", ");
-  const baseShapes: EarringBaseShape[] = ["rond", "carre", "triangle", "hexagone", "polygone", "coeur"];
-  const motifShapes: EarringMotif[] = ["aucun", "rond", "carre", "triangle", "coeur", "etoile", "sourire", "goutte"];
+  const shapeFamilies = EARRING_SYMBOL_FAMILIES;
+  const motifFamilies = EARRING_SYMBOL_FAMILIES;
+  const selectedShapeOptions = settings.shapeFamily === "geometriques"
+    ? GEOMETRIC_BODY_SYMBOL_IDS.map((shape) => ({ id: shape, label: getShapeLabel(shape) }))
+    : EARRING_SYMBOLS_BY_FAMILY[settings.shapeFamily];
+  const selectedMotifOptions = EARRING_SYMBOLS_BY_FAMILY[settings.motifFamily];
   const textures: EarringTexture[] = ["lisse", "facettes", "pixel", "courbes", "rainures"];
+
+  useEffect(() => {
+    if (missingTraceIds.length === 0) return;
+
+    let cancelled = false;
+    Promise.all(missingTraceIds.map(async (symbolId) => {
+      const definition = getSymbolDefinition(symbolId);
+      if (!definition.source) return null;
+      const points = await traceSilhouetteSource(definition.source);
+      return points.length > 0 ? [symbolId, points] as const : null;
+    })).then((entries) => {
+      if (cancelled) return;
+      setTracedSymbolPaths((current) => {
+        const next = { ...current };
+        entries.forEach((entry) => {
+          if (entry) next[entry[0]] = entry[1];
+        });
+        return next;
+      });
+    }).catch(() => {
+      // The procedural symbol remains available if a reference image cannot be traced.
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [missingTraceIds]);
 
   const pushDesign = (nextDesign: EarringDesign) => {
     setPastDesigns((past) => [...past, design]);
@@ -928,9 +1158,62 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
           </div>
 
           <div className="earring-control">
+            <label htmlFor="earring-shape-family">Famille forme</label>
+            <select
+              id="earring-shape-family"
+              value={settings.shapeFamily}
+              disabled={settings.randomMode}
+              onChange={(event) => {
+                const shapeFamily = event.target.value as EarringSymbolFamilyId;
+                const shapeSymbol = shapeFamily === "geometriques" ? "rond" : getDefaultSymbolForFamily(shapeFamily);
+                updateStructuralSettings({
+                  ...settings,
+                  shapeFamily,
+                  shapeSymbol,
+                  shape: isBaseShapeSymbol(shapeSymbol) ? shapeSymbol : "rond",
+                });
+              }}
+            >
+              {shapeFamilies.map((family) => <option key={family.id} value={family.id}>{family.label}</option>)}
+            </select>
+          </div>
+
+          <div className="earring-control">
             <label htmlFor="earring-shape">Forme</label>
-            <select id="earring-shape" value={settings.shape} disabled={settings.randomMode} onChange={(event) => updateStructuralSettings({ ...settings, shape: event.target.value as EarringBaseShape })}>
-              {baseShapes.map((shape) => <option key={shape} value={shape}>{getShapeLabel(shape)}</option>)}
+            <select
+              id="earring-shape"
+              value={settings.shapeSymbol}
+              disabled={settings.randomMode}
+              onChange={(event) => {
+                const shapeSymbol = event.target.value;
+                updateStructuralSettings({
+                  ...settings,
+                  shapeSymbol,
+                  shape: isBaseShapeSymbol(shapeSymbol) ? shapeSymbol : "rond",
+                });
+              }}
+            >
+              {selectedShapeOptions.map((shape) => <option key={shape.id} value={shape.id}>{shape.label}</option>)}
+            </select>
+          </div>
+
+          <div className="earring-control">
+            <label htmlFor="earring-motif-family">Famille motif</label>
+            <select
+              id="earring-motif-family"
+              value={settings.motifFamily}
+              disabled={settings.randomMode}
+              onChange={(event) => {
+                const motifFamily = event.target.value as EarringSymbolFamilyId;
+                updateDetailSettings({
+                  ...settings,
+                  motifFamily,
+                  motif: getDefaultSymbolForFamily(motifFamily),
+                  motifCount: Math.max(1, settings.motifCount),
+                });
+              }}
+            >
+              {motifFamilies.map((family) => <option key={family.id} value={family.id}>{family.label}</option>)}
             </select>
           </div>
 
@@ -945,7 +1228,8 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
                 updateDetailSettings({ ...settings, motif, motifCount: motif === "aucun" ? 0 : Math.max(1, settings.motifCount) });
               }}
             >
-              {motifShapes.map((motif) => <option key={motif} value={motif}>{getMotifLabel(motif)}</option>)}
+              <option value="aucun">Aucun</option>
+              {selectedMotifOptions.map((motif) => <option key={motif.id} value={motif.id}>{motif.label}</option>)}
             </select>
           </div>
 
@@ -1005,7 +1289,7 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
               color={earringColor}
               design={design}
               shapePath={shapePath}
-              holePaths={design.holes.map(buildHolePath)}
+              holePaths={holePaths}
               bodyHoleY={bodyHoleY}
               hookTransitionPath={hookTransitionPath}
               hookX={hookX}
@@ -1031,6 +1315,7 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
           <EarringSilhouetteView
             bodyHoleY={bodyHoleY}
             design={design}
+            holePaths={holePaths}
             hookOuterRadius={hookOuterRadius}
             hookTransitionPath={hookTransitionPath}
             hookX={hookX}
