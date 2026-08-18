@@ -7,6 +7,14 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.69] - 2026-08-18
+
+### 🎨 Modifié
+ - Remplace les quatre listes de choix de l'atelier Boucle par des potentiomètres horizontaux.
+ - Empêche l'ajout de motifs quand la forme de boucle est issue d'une famille objet, et réserve les motifs aux formes géométriques.
+ - Ajoute la hauteur dans l'indication dimensionnelle de la vue de haut des boucles.
+ - Conserve l'atelier Boucle accessible uniquement sur le serveur local de développement.
+
 ## [1.0.68] - 2026-08-17
 
 ### 🎨 Ajouté

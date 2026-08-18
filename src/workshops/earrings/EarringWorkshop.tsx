@@ -84,12 +84,29 @@ type TraceEdge = {
   to: string;
 };
 
+type ChoiceSliderOption<T extends string> = {
+  id: T;
+  label: string;
+};
+
 function randomBetween(min: number, max: number): number {
   return Math.round(min + Math.random() * (max - min));
 }
 
 function isBaseShapeSymbol(symbolId: string): symbolId is EarringBaseShape {
   return GEOMETRIC_BODY_SYMBOL_IDS.includes(symbolId as EarringBaseShape);
+}
+
+function normalizeMotifAvailability(settings: EarringSettings): EarringSettings {
+  if (settings.shapeFamily !== "geometriques") {
+    return {
+      ...settings,
+      motif: "aucun",
+      motifCount: 0,
+    };
+  }
+
+  return settings;
 }
 
 function randomEarringDesign(settings: EarringSettings): EarringDesign {
@@ -101,9 +118,10 @@ function randomEarringDesign(settings: EarringSettings): EarringDesign {
     ? randomShapes.map((shape) => ({ id: shape }))
     : EARRING_SYMBOLS_BY_FAMILY[randomShapeFamily];
   const randomShapeSymbol = randomShapeSymbols[randomBetween(0, randomShapeSymbols.length - 1)]?.id ?? "rond";
+  const canUseMotifs = randomShapeFamily === "geometriques";
   const randomFamily = randomFamilies[randomBetween(0, randomFamilies.length - 1)];
   const randomSymbols = EARRING_SYMBOLS_BY_FAMILY[randomFamily];
-  const randomMotif = Math.random() < 0.08 ? "aucun" : randomSymbols[randomBetween(0, randomSymbols.length - 1)]?.id ?? "rond";
+  const randomMotif = !canUseMotifs || Math.random() < 0.08 ? "aucun" : randomSymbols[randomBetween(0, randomSymbols.length - 1)]?.id ?? "rond";
   const generatedSettings = settings.randomMode
     ? {
         ...settings,
@@ -117,26 +135,27 @@ function randomEarringDesign(settings: EarringSettings): EarringDesign {
         texture: randomTextures[randomBetween(0, randomTextures.length - 1)],
       }
     : settings;
-  const shape = generatedSettings.shapeFamily === "geometriques" && isBaseShapeSymbol(generatedSettings.shapeSymbol)
-    ? generatedSettings.shapeSymbol
-    : generatedSettings.shape;
+  const printableSettings = normalizeMotifAvailability(generatedSettings);
+  const shape = printableSettings.shapeFamily === "geometriques" && isBaseShapeSymbol(printableSettings.shapeSymbol)
+    ? printableSettings.shapeSymbol
+    : printableSettings.shape;
   const sides = shape === "hexagone" ? 6 : randomBetween(5, 9);
-  const isSilhouetteBody = generatedSettings.shapeFamily !== "geometriques";
+  const isSilhouetteBody = printableSettings.shapeFamily !== "geometriques";
   const width = shape === "coeur" ? randomBetween(38, 48) : isSilhouetteBody ? randomBetween(34, 46) : randomBetween(26, 46);
   const height = shape === "coeur" ? randomBetween(34, 44) : isSilhouetteBody ? randomBetween(34, 46) : randomBetween(32, 56);
   const rotation = randomBetween(-12, 12);
 
   return {
-    shapeFamily: generatedSettings.shapeFamily,
-    shapeSymbol: generatedSettings.shapeSymbol,
+    shapeFamily: printableSettings.shapeFamily,
+    shapeSymbol: printableSettings.shapeSymbol,
     shape,
     width,
     height,
     sides,
     rotation,
-    holes: buildEarringHoles(width, height, shape, sides, rotation, generatedSettings),
-    texture: generatedSettings.texture,
-    exteriorHook: generatedSettings.exteriorHook,
+    holes: buildEarringHoles(width, height, shape, sides, rotation, printableSettings),
+    texture: printableSettings.texture,
+    exteriorHook: printableSettings.exteriorHook,
   };
 }
 
@@ -1007,7 +1026,7 @@ function EarringTopView({ design, thickness }: { design: EarringDesign; thicknes
         <line x1={x} x2={x + viewWidth} y1={y + thickness + 6} y2={y + thickness + 6} stroke="color-mix(in srgb, var(--color-fg) 22%, transparent)" strokeWidth="0.45" />
         <line x1={x} x2={x} y1={y + thickness + 3.5} y2={y + thickness + 8.5} stroke="color-mix(in srgb, var(--color-fg) 42%, transparent)" strokeWidth="0.45" />
         <line x1={x + viewWidth} x2={x + viewWidth} y1={y + thickness + 3.5} y2={y + thickness + 8.5} stroke="color-mix(in srgb, var(--color-fg) 42%, transparent)" strokeWidth="0.45" />
-        <text x="35" y="51" textAnchor="middle">{design.width} x {thickness} mm</text>
+        <text x="35" y="51" textAnchor="middle">{design.width} x {design.height} x {thickness} mm</text>
       </svg>
     </EarringSchematicView>
   );
@@ -1016,6 +1035,47 @@ function EarringTopView({ design, thickness }: { design: EarringDesign; thicknes
 type EarringWorkshopProps = {
   onBack: () => void;
 };
+
+function ChoiceSlider<T extends string>({
+  disabled = false,
+  id,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  disabled?: boolean;
+  id: string;
+  label: string;
+  onChange: (value: T) => void;
+  options: Array<ChoiceSliderOption<T>>;
+  value: T;
+}) {
+  const currentIndex = Math.max(0, options.findIndex((option) => option.id === value));
+  const currentOption = options[currentIndex] ?? options[0];
+
+  return (
+    <div className="earring-choice-control">
+      <div className="earring-slider-header">
+        <label htmlFor={id}>{label}</label>
+        <strong>{currentOption?.label ?? "-"}</strong>
+      </div>
+      <input
+        id={id}
+        type="range"
+        min="0"
+        max={Math.max(0, options.length - 1)}
+        step="1"
+        value={currentIndex}
+        disabled={disabled || options.length <= 1}
+        onChange={(event) => {
+          const option = options[Number(event.target.value)];
+          if (option) onChange(option.id);
+        }}
+      />
+    </div>
+  );
+}
 
 export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
   const [settings, setSettings] = useState<EarringSettings>(DEFAULT_EARRING_SETTINGS);
@@ -1052,10 +1112,14 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
     : Array.from(new Set(design.holes.map((hole) => getHoleLabel(hole.shape)))).join(", ");
   const shapeFamilies = EARRING_SYMBOL_FAMILIES;
   const motifFamilies = EARRING_SYMBOL_FAMILIES;
+  const canUseMotifs = settings.shapeFamily === "geometriques";
   const selectedShapeOptions = settings.shapeFamily === "geometriques"
     ? GEOMETRIC_BODY_SYMBOL_IDS.map((shape) => ({ id: shape, label: getShapeLabel(shape) }))
     : EARRING_SYMBOLS_BY_FAMILY[settings.shapeFamily];
-  const selectedMotifOptions = EARRING_SYMBOLS_BY_FAMILY[settings.motifFamily];
+  const selectedMotifOptions: Array<ChoiceSliderOption<EarringMotif>> = [
+    { id: "aucun", label: "Aucun" },
+    ...EARRING_SYMBOLS_BY_FAMILY[settings.motifFamily],
+  ];
   const textures: EarringTexture[] = ["lisse", "facettes", "pixel", "courbes", "rainures"];
 
   useEffect(() => {
@@ -1092,17 +1156,19 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
   };
 
   const updateStructuralSettings = (nextSettings: EarringSettings) => {
-    setSettings(nextSettings);
-    pushDesign(randomEarringDesign(nextSettings));
+    const normalizedSettings = normalizeMotifAvailability(nextSettings);
+    setSettings(normalizedSettings);
+    pushDesign(randomEarringDesign(normalizedSettings));
   };
 
   const updateDetailSettings = (nextSettings: EarringSettings) => {
-    setSettings(nextSettings);
+    const normalizedSettings = normalizeMotifAvailability(nextSettings);
+    setSettings(normalizedSettings);
     pushDesign({
       ...design,
-      holes: buildEarringHoles(design.width, design.height, design.shape, design.sides, design.rotation, nextSettings),
-      texture: nextSettings.texture,
-      exteriorHook: nextSettings.exteriorHook,
+      holes: buildEarringHoles(design.width, design.height, design.shape, design.sides, design.rotation, normalizedSettings),
+      texture: normalizedSettings.texture,
+      exteriorHook: normalizedSettings.exteriorHook,
     });
   };
 
@@ -1157,14 +1223,13 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
             <input id="earring-color" type="color" value={earringColor} onChange={(event) => setEarringColor(event.target.value)} />
           </div>
 
-          <div className="earring-control">
-            <label htmlFor="earring-shape-family">Famille forme</label>
-            <select
+          <ChoiceSlider
               id="earring-shape-family"
+            label="Famille forme"
+            options={shapeFamilies}
               value={settings.shapeFamily}
               disabled={settings.randomMode}
-              onChange={(event) => {
-                const shapeFamily = event.target.value as EarringSymbolFamilyId;
+            onChange={(shapeFamily) => {
                 const shapeSymbol = shapeFamily === "geometriques" ? "rond" : getDefaultSymbolForFamily(shapeFamily);
                 updateStructuralSettings({
                   ...settings,
@@ -1173,38 +1238,30 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
                   shape: isBaseShapeSymbol(shapeSymbol) ? shapeSymbol : "rond",
                 });
               }}
-            >
-              {shapeFamilies.map((family) => <option key={family.id} value={family.id}>{family.label}</option>)}
-            </select>
-          </div>
+          />
 
-          <div className="earring-control">
-            <label htmlFor="earring-shape">Forme</label>
-            <select
+          <ChoiceSlider
               id="earring-shape"
+            label="Forme"
+            options={selectedShapeOptions}
               value={settings.shapeSymbol}
               disabled={settings.randomMode}
-              onChange={(event) => {
-                const shapeSymbol = event.target.value;
+            onChange={(shapeSymbol) => {
                 updateStructuralSettings({
                   ...settings,
                   shapeSymbol,
                   shape: isBaseShapeSymbol(shapeSymbol) ? shapeSymbol : "rond",
                 });
               }}
-            >
-              {selectedShapeOptions.map((shape) => <option key={shape.id} value={shape.id}>{shape.label}</option>)}
-            </select>
-          </div>
+          />
 
-          <div className="earring-control">
-            <label htmlFor="earring-motif-family">Famille motif</label>
-            <select
+          <ChoiceSlider
               id="earring-motif-family"
+            label="Famille motif"
+            options={motifFamilies}
               value={settings.motifFamily}
-              disabled={settings.randomMode}
-              onChange={(event) => {
-                const motifFamily = event.target.value as EarringSymbolFamilyId;
+            disabled={settings.randomMode || !canUseMotifs}
+            onChange={(motifFamily) => {
                 updateDetailSettings({
                   ...settings,
                   motifFamily,
@@ -1212,26 +1269,18 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
                   motifCount: Math.max(1, settings.motifCount),
                 });
               }}
-            >
-              {motifFamilies.map((family) => <option key={family.id} value={family.id}>{family.label}</option>)}
-            </select>
-          </div>
+          />
 
-          <div className="earring-control">
-            <label htmlFor="earring-motif">Motif</label>
-            <select
+          <ChoiceSlider
               id="earring-motif"
+            label="Motif"
+            options={selectedMotifOptions}
               value={settings.motif}
-              disabled={settings.randomMode}
-              onChange={(event) => {
-                const motif = event.target.value as EarringMotif;
+            disabled={settings.randomMode || !canUseMotifs}
+            onChange={(motif) => {
                 updateDetailSettings({ ...settings, motif, motifCount: motif === "aucun" ? 0 : Math.max(1, settings.motifCount) });
               }}
-            >
-              <option value="aucun">Aucun</option>
-              {selectedMotifOptions.map((motif) => <option key={motif.id} value={motif.id}>{motif.label}</option>)}
-            </select>
-          </div>
+          />
 
           <div className="earring-slider-control">
             <div className="earring-slider-header">
@@ -1245,7 +1294,7 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
               max={MAX_MOTIF_COUNT}
               step="1"
               value={settings.motif === "aucun" ? 0 : settings.motifCount}
-              disabled={settings.randomMode || settings.motif === "aucun"}
+              disabled={settings.randomMode || !canUseMotifs || settings.motif === "aucun"}
               onChange={(event) => updateDetailSettings({ ...settings, motifCount: Number(event.target.value) })}
             />
           </div>
@@ -1262,7 +1311,7 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
               max="100"
               step="5"
               value={settings.motif === "aucun" ? 25 : settings.motifScale}
-              disabled={settings.randomMode || settings.motif === "aucun"}
+              disabled={settings.randomMode || !canUseMotifs || settings.motif === "aucun"}
               onChange={(event) => updateDetailSettings({ ...settings, motifScale: Number(event.target.value) })}
             />
           </div>

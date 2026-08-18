@@ -35,7 +35,8 @@ test.describe('Vaso Web App', () => {
     await expect(page.getByLabel('Aleatoire')).toBeChecked();
     await expect(page.getByLabel('Trous exterieur')).toBeChecked();
     await expect(page.locator('#earring-color')).toHaveValue('#f6f6f2');
-    await expect(page.locator('.earring-control select')).toHaveCount(5);
+    await expect(page.locator('.earring-control select')).toHaveCount(1);
+    await expect(page.locator('.earring-choice-control input[type="range"]')).toHaveCount(4);
     await expect(page.locator('.earring-slider-control input[type="range"]')).toHaveCount(2);
     await expect(page.locator('.earring-preview canvas')).toBeVisible();
     await expect(page.locator('.earring-param')).toHaveCount(7);

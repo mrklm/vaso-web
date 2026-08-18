@@ -535,6 +535,32 @@
   cursor: not-allowed;
 }
 
+.earring-choice-control {
+  display: grid;
+  gap: 8px;
+  min-height: 56px;
+  padding: 6px 0;
+}
+
+.earring-choice-control input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.earring-choice-control input[type="range"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.earring-choice-control .earring-slider-header strong {
+  max-width: 150px;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .earring-slider-control {
   display: grid;
   gap: 8px;
