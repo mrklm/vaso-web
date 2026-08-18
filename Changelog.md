@@ -7,6 +7,14 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.70] - 2026-08-18
+
+### 🎨 Modifié
+ - Décoche et désactive l'option "Trous exterieur" pour les formes objet de l'atelier Boucle.
+ - Améliore le lissage des silhouettes importées avec une vectorisation plus fine et une simplification légère des micro-marches.
+ - Masque les arêtes de corps sur les formes objet pour réduire l'effet de découpe brute dans l'aperçu 3D.
+ - Conserve l'atelier Boucle accessible uniquement sur le serveur local de développement.
+
 ## [1.0.69] - 2026-08-18
 
 ### 🎨 Modifié

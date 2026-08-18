@@ -70,7 +70,7 @@ const DEFAULT_EARRING_SETTINGS: EarringSettings = {
 const DEFAULT_EARRING_COLOR = "#f6f6f2";
 const MOTIF_EDGE_MARGIN_MM = 2;
 const MAX_MOTIF_COUNT = 25;
-const SYMBOL_TRACE_SIZE = 192;
+const SYMBOL_TRACE_SIZE = 320;
 
 type TracedSymbolPoint = {
   x: number;
@@ -223,6 +223,52 @@ function simplifyOrthogonalTrace(points: TracedSymbolPoint[]): TracedSymbolPoint
   return simplified;
 }
 
+function getPointToSegmentDistance(point: TracedSymbolPoint, start: TracedSymbolPoint, end: TracedSymbolPoint): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (dx === 0 && dy === 0) return Math.hypot(point.x - start.x, point.y - start.y);
+
+  const progress = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)));
+  const x = start.x + progress * dx;
+  const y = start.y + progress * dy;
+  return Math.hypot(point.x - x, point.y - y);
+}
+
+function simplifyContour(points: TracedSymbolPoint[], tolerance: number): TracedSymbolPoint[] {
+  if (points.length <= 3) return points;
+
+  let farthestIndex = 0;
+  let farthestDistance = 0;
+  const start = points[0];
+  const end = points[points.length - 1];
+
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const distance = getPointToSegmentDistance(points[index], start, end);
+    if (distance > farthestDistance) {
+      farthestDistance = distance;
+      farthestIndex = index;
+    }
+  }
+
+  if (farthestDistance <= tolerance) return [start, end];
+
+  const before = simplifyContour(points.slice(0, farthestIndex + 1), tolerance);
+  const after = simplifyContour(points.slice(farthestIndex), tolerance);
+  return [...before.slice(0, -1), ...after];
+}
+
+function simplifyClosedContour(points: TracedSymbolPoint[], tolerance: number): TracedSymbolPoint[] {
+  if (points.length < 24) return points;
+
+  const pivotIndex = points.reduce((bestIndex, point, index) => {
+    const best = points[bestIndex];
+    return point.x < best.x || (point.x === best.x && point.y < best.y) ? index : bestIndex;
+  }, 0);
+  const rotated = [...points.slice(pivotIndex), ...points.slice(0, pivotIndex), points[pivotIndex]];
+  const simplified = simplifyContour(rotated, tolerance).slice(0, -1);
+  return simplified.length >= 24 ? simplified : points;
+}
+
 function traceMaskToPoints(mask: Uint8Array, width: number, height: number): TracedSymbolPoint[] {
   const visited = new Uint8Array(width * height);
   let bestComponent: number[] = [];
@@ -310,10 +356,11 @@ function traceMaskToPoints(mask: Uint8Array, width: number, height: number): Tra
   const scale = Math.max(maxX - minX, maxY - minY, 1);
   const normalizedCenter = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
 
-  return simplifiedOutline.map((point) => ({
+  const normalizedPoints = simplifiedOutline.map((point) => ({
     x: Number(((point.x - normalizedCenter.x) / scale).toFixed(4)),
     y: Number(((point.y - normalizedCenter.y) / scale).toFixed(4)),
   }));
+  return simplifyClosedContour(normalizedPoints, 0.006);
 }
 
 async function traceSilhouetteSource(source: string): Promise<TracedSymbolPoint[]> {
@@ -368,9 +415,28 @@ function buildTracedSymbolPath(points: TracedSymbolPoint[], cx: number, cy: numb
   const pathPoints = points.map((point) => {
     const x = point.x * size;
     const y = point.y * size;
-    return `${(cx + x * cos - y * sin).toFixed(2)} ${(cy + x * sin + y * cos).toFixed(2)}`;
+    return {
+      x: cx + x * cos - y * sin,
+      y: cy + x * sin + y * cos,
+    };
   });
-  return `M ${pathPoints.join(" L ")} Z`;
+  if (pathPoints.length < 3) return `M ${pathPoints.map((point) => `${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" L ")} Z`;
+
+  const midpoint = (a: TracedSymbolPoint, b: TracedSymbolPoint) => ({
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+  });
+  const first = midpoint(pathPoints[0], pathPoints[1]);
+  const commands = [`M ${first.x.toFixed(2)} ${first.y.toFixed(2)}`];
+
+  for (let index = 1; index <= pathPoints.length; index += 1) {
+    const control = pathPoints[index % pathPoints.length];
+    const next = pathPoints[(index + 1) % pathPoints.length];
+    const end = midpoint(control, next);
+    commands.push(`Q ${control.x.toFixed(2)} ${control.y.toFixed(2)} ${end.x.toFixed(2)} ${end.y.toFixed(2)}`);
+  }
+
+  return `${commands.join(" ")} Z`;
 }
 
 function buildSymbolOrTracePath(symbolId: string, cx: number, cy: number, size: number, rotation: number, tracedSymbolPaths: TracedSymbolPaths): string {
@@ -647,15 +713,42 @@ function getBodyHalfWidthAtOffset(design: EarringDesign, offsetFromTop: number):
   return Math.max(3, halfWidth * 0.42);
 }
 
-function getHookLayout(design: EarringDesign) {
-  const bodyHoleY = 42 - design.height / 2 + 5;
+function buildCirclePath(cx: number, cy: number, radius: number): string {
+  return [`M ${cx} ${cy - radius}`, `A ${radius} ${radius} 0 1 1 ${cx} ${cy + radius}`, `A ${radius} ${radius} 0 1 1 ${cx} ${cy - radius}`, "Z"].join(" ");
+}
+
+function findCenteredInteriorHookY(design: EarringDesign, shapePath: string): number | null {
+  if (design.shapeFamily === "geometriques") return null;
+
   const topY = 42 - design.height / 2;
+  const searchStart = topY + 3.4;
+  const searchEnd = topY + design.height * 0.46;
+  const safetyRadius = 3;
+
+  for (let y = searchStart; y <= searchEnd; y += 0.7) {
+    const center = new THREE.Vector2(35, y);
+    if (isHolePathInsideBasePath(shapePath, buildCirclePath(35, y, safetyRadius), center)) {
+      return Number(y.toFixed(2));
+    }
+  }
+
+  return null;
+}
+
+function getHookLayout(design: EarringDesign, shapePath: string) {
+  const topY = 42 - design.height / 2;
+  const centeredInteriorHookY = findCenteredInteriorHookY(design, shapePath);
+  const usesExteriorHook = design.shapeFamily !== "geometriques"
+    ? centeredInteriorHookY === null
+    : design.exteriorHook;
+  const bodyHoleY = centeredInteriorHookY ?? topY + 5;
   const hookX = 35;
-  const hookY = design.exteriorHook ? topY - (design.shape === "coeur" ? 4.4 : 3) : bodyHoleY;
-  const hookOuterRadius = design.exteriorHook ? design.shape === "coeur" ? 3.25 : 3 : 1;
+  const hookY = usesExteriorHook ? topY - (design.shape === "coeur" ? 4.4 : 3) : bodyHoleY;
+  const hookOuterRadius = usesExteriorHook ? design.shape === "coeur" ? 3.25 : 3 : 1;
   const hookNeckTop = hookY + hookOuterRadius * 0.42;
-  const hookShoulderY = topY + Math.min(9, Math.max(5.6, design.height * 0.16));
-  const hookShoulderHalfWidth = Math.max(3.2, getBodyHalfWidthAtOffset(design, hookShoulderY - topY));
+  const objectExteriorHook = design.shapeFamily !== "geometriques" && usesExteriorHook;
+  const hookShoulderY = objectExteriorHook ? topY + 2.8 : topY + Math.min(9, Math.max(5.6, design.height * 0.16));
+  const hookShoulderHalfWidth = objectExteriorHook ? 2.8 : Math.max(3.2, getBodyHalfWidthAtOffset(design, hookShoulderY - topY));
   const hookNeckHalfWidth = 2.15;
   const hookTransitionPath = design.shape === "coeur"
     ? [
@@ -686,6 +779,7 @@ function getHookLayout(design: EarringDesign) {
     hookTransitionPath,
     hookX,
     hookY,
+    usesExteriorHook,
   };
 }
 
@@ -832,7 +926,7 @@ function createHookRingGeometry(x: number, y: number, outerRadius: number, inner
 
 type EarringViewer3DProps = {
   color: string;
-  design: EarringDesign;
+  showBodyEdges: boolean;
   shapePath: string;
   holePaths: string[];
   bodyHoleY: number;
@@ -841,11 +935,12 @@ type EarringViewer3DProps = {
   hookY: number;
   hookOuterRadius: number;
   thickness: number;
+  usesExteriorHook: boolean;
 };
 
 function EarringPair3D({
   color,
-  design,
+  showBodyEdges,
   shapePath,
   holePaths,
   bodyHoleY,
@@ -854,18 +949,19 @@ function EarringPair3D({
   hookY,
   hookOuterRadius,
   thickness,
+  usesExteriorHook,
 }: EarringViewer3DProps) {
   const geometries = useMemo(() => {
-    const bodyHolePaths = design.exteriorHook
+    const bodyHolePaths = usesExteriorHook
       ? holePaths
-      : [...holePaths, [`M 35 ${bodyHoleY - 1}`, `A 1 1 0 1 1 35 ${bodyHoleY + 1}`, `A 1 1 0 1 1 35 ${bodyHoleY - 1}`, "Z"].join(" ")];
+      : [...holePaths, buildCirclePath(35, bodyHoleY, 1)];
 
     return {
       body: createExtrudedGeometry(shapePath, bodyHolePaths, thickness),
-      transition: design.exteriorHook ? createHookTransitionGeometry(hookTransitionPath, holePaths, thickness) : null,
-      ring: design.exteriorHook ? createHookRingGeometry(hookX, hookY, hookOuterRadius, 1, thickness) : null,
+      transition: usesExteriorHook ? createHookTransitionGeometry(hookTransitionPath, holePaths, thickness) : null,
+      ring: usesExteriorHook ? createHookRingGeometry(hookX, hookY, hookOuterRadius, 1, thickness) : null,
     };
-  }, [bodyHoleY, design.exteriorHook, holePaths, hookOuterRadius, hookTransitionPath, hookX, hookY, shapePath, thickness]);
+  }, [bodyHoleY, holePaths, hookOuterRadius, hookTransitionPath, hookX, hookY, shapePath, thickness, usesExteriorHook]);
 
   const material = useMemo(() => new THREE.MeshStandardMaterial({
     color,
@@ -887,7 +983,7 @@ function EarringPair3D({
       rotation={[0, mirror ? -0.08 : 0.08, 0]}
     >
       <mesh geometry={geometries.body} material={material} castShadow receiveShadow />
-      <lineSegments geometry={new THREE.EdgesGeometry(geometries.body, 28)} material={edgeMaterial} />
+      {showBodyEdges && <lineSegments geometry={new THREE.EdgesGeometry(geometries.body, 28)} material={edgeMaterial} />}
       {geometries.transition && <mesh geometry={geometries.transition} material={material} castShadow receiveShadow />}
       {geometries.ring && <mesh geometry={geometries.ring} material={material} castShadow receiveShadow />}
       {geometries.ring && <lineSegments geometry={new THREE.EdgesGeometry(geometries.ring, 28)} material={edgeMaterial} />}
@@ -963,22 +1059,22 @@ function EarringSchematicView({ title, children }: EarringSchematicViewProps) {
 
 function EarringSilhouetteView({
   bodyHoleY,
-  design,
   holePaths,
   hookOuterRadius,
   hookTransitionPath,
   hookX,
   hookY,
   shapePath,
+  usesExteriorHook,
 }: {
   bodyHoleY: number;
-  design: EarringDesign;
   holePaths: string[];
   hookOuterRadius: number;
   hookTransitionPath: string;
   hookX: number;
   hookY: number;
   shapePath: string;
+  usesExteriorHook: boolean;
 }) {
   return (
     <EarringSchematicView title="Silhouette">
@@ -986,11 +1082,11 @@ function EarringSilhouetteView({
         <defs>
           <mask id="earring-silhouette-mask">
             <rect x="-8" y="-12" width="86" height="108" fill="#ffffff" />
-            {!design.exteriorHook && <circle cx="35" cy={bodyHoleY} r="1" fill="#000000" />}
+            {!usesExteriorHook && <circle cx="35" cy={bodyHoleY} r="1" fill="#000000" />}
             {holePaths.map((holePath, index) => <path key={index} d={holePath} fill="#000000" />)}
           </mask>
         </defs>
-        {design.exteriorHook && (
+        {usesExteriorHook && (
           <>
             <path d={hookTransitionPath} fill="color-mix(in srgb, var(--color-accent) 18%, var(--color-field))" mask="url(#earring-silhouette-mask)" stroke="var(--color-accent)" strokeWidth="0.35" />
             <circle cx={hookX} cy={hookY} r={hookOuterRadius} fill="color-mix(in srgb, var(--color-accent) 18%, var(--color-field))" stroke="var(--color-accent)" strokeWidth="0.45" />
@@ -1106,7 +1202,8 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
     hookTransitionPath,
     hookX,
     hookY,
-  } = getHookLayout(design);
+    usesExteriorHook,
+  } = getHookLayout(design, shapePath);
   const holeSummary = design.holes.length === 0
     ? "aucun"
     : Array.from(new Set(design.holes.map((hole) => getHoleLabel(hole.shape)))).join(", ");
@@ -1214,7 +1311,12 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
           </label>
 
           <label className="earring-check">
-            <input type="checkbox" checked={settings.exteriorHook} onChange={(event) => updateDetailSettings({ ...settings, exteriorHook: event.target.checked })} />
+            <input
+              type="checkbox"
+              checked={settings.shapeFamily === "geometriques" ? settings.exteriorHook : false}
+              disabled={settings.shapeFamily !== "geometriques"}
+              onChange={(event) => updateDetailSettings({ ...settings, exteriorHook: event.target.checked })}
+            />
             <span>Trous exterieur</span>
           </label>
 
@@ -1336,7 +1438,7 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
           <section className="earring-preview" aria-label="Apercu de la boucle d'oreille">
             <EarringViewer3D
               color={earringColor}
-              design={design}
+              showBodyEdges={design.shapeFamily === "geometriques"}
               shapePath={shapePath}
               holePaths={holePaths}
               bodyHoleY={bodyHoleY}
@@ -1345,6 +1447,7 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
               hookY={hookY}
               hookOuterRadius={hookOuterRadius}
               thickness={thickness}
+              usesExteriorHook={usesExteriorHook}
             />
           </section>
 
@@ -1363,13 +1466,13 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
         <aside className="earring-right-panel" aria-label="Vues schematiques de la boucle">
           <EarringSilhouetteView
             bodyHoleY={bodyHoleY}
-            design={design}
             holePaths={holePaths}
             hookOuterRadius={hookOuterRadius}
             hookTransitionPath={hookTransitionPath}
             hookX={hookX}
             hookY={hookY}
             shapePath={shapePath}
+            usesExteriorHook={usesExteriorHook}
           />
           <EarringTopView design={design} thickness={thickness} />
         </aside>
