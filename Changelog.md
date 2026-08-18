@@ -7,6 +7,16 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.71] - 2026-08-18
+
+### 🎨 Ajouté
+ - Ajoute le bouton "Accroche Alternative" dans l'atelier Boucle pour proposer plusieurs placements d'accroche sans régénérer le modèle.
+
+### 🎨 Modifié
+ - Améliore la recherche des accroches intérieures pour les familles objet, notamment les pylônes.
+ - Contraint les accroches extérieures à chercher une vraie zone de contact avec le corps de la boucle.
+ - Conserve l'atelier Boucle accessible uniquement sur le serveur local de développement.
+
 ## [1.0.70] - 2026-08-18
 
 ### 🎨 Modifié

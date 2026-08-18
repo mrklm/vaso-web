@@ -52,6 +52,7 @@ type EarringDesign = {
   holes: EarringHole[];
   texture: EarringTexture;
   exteriorHook: boolean;
+  hookVariant: number;
 };
 
 const DEFAULT_EARRING_SETTINGS: EarringSettings = {
@@ -156,6 +157,7 @@ function randomEarringDesign(settings: EarringSettings): EarringDesign {
     holes: buildEarringHoles(width, height, shape, sides, rotation, printableSettings),
     texture: printableSettings.texture,
     exteriorHook: printableSettings.exteriorHook,
+    hookVariant: 0,
   };
 }
 
@@ -717,19 +719,123 @@ function buildCirclePath(cx: number, cy: number, radius: number): string {
   return [`M ${cx} ${cy - radius}`, `A ${radius} ${radius} 0 1 1 ${cx} ${cy + radius}`, `A ${radius} ${radius} 0 1 1 ${cx} ${cy - radius}`, "Z"].join(" ");
 }
 
-function findCenteredInteriorHookY(design: EarringDesign, shapePath: string): number | null {
+type HookPlacement = {
+  x: number;
+  y: number;
+};
+
+type BodySpan = {
+  minX: number;
+  maxX: number;
+  y: number;
+};
+
+function getBodySpanAtY(shapePath: string, y: number, preferredX: number): BodySpan | null {
+  const spans = parseSvgShapes(shapePath).flatMap((shape) => {
+    const points = shape.getPoints(96);
+    const intersections: number[] = [];
+
+    for (let index = 0; index < points.length; index += 1) {
+      const start = points[index];
+      const end = points[(index + 1) % points.length];
+      const crossesY = (start.y <= y && end.y > y) || (end.y <= y && start.y > y);
+      if (!crossesY) continue;
+
+      const progress = (y - start.y) / (end.y - start.y);
+      intersections.push(start.x + progress * (end.x - start.x));
+    }
+
+    intersections.sort((a, b) => a - b);
+    const shapeSpans: BodySpan[] = [];
+    for (let index = 0; index < intersections.length - 1; index += 2) {
+      shapeSpans.push({
+        minX: intersections[index],
+        maxX: intersections[index + 1],
+        y,
+      });
+    }
+
+    return shapeSpans;
+  });
+
+  if (spans.length === 0) return null;
+
+  return spans
+    .filter((span) => span.maxX - span.minX >= 3.8)
+    .sort((a, b) => {
+      const aDistance = preferredX < a.minX ? a.minX - preferredX : preferredX > a.maxX ? preferredX - a.maxX : 0;
+      const bDistance = preferredX < b.minX ? b.minX - preferredX : preferredX > b.maxX ? preferredX - b.maxX : 0;
+      return aDistance - bDistance;
+    })[0] ?? null;
+}
+
+function findExteriorHookPlacement(design: EarringDesign, shapePath: string, preferredX: number): { x: number; shoulderY: number; shoulderHalfWidth: number } {
+  const topY = 42 - design.height / 2;
+  const startY = topY + (design.shape === "coeur" ? design.height * 0.18 : 2.4);
+  const endY = topY + Math.min(design.height * 0.34, 13);
+
+  for (let y = startY; y <= endY; y += 0.8) {
+    const span = getBodySpanAtY(shapePath, y, preferredX);
+    if (!span) continue;
+
+    const availableHalfWidth = Math.max(1.9, (span.maxX - span.minX) / 2 - 0.4);
+    const shoulderHalfWidth = Math.min(3.3, availableHalfWidth);
+    const x = Math.max(span.minX + shoulderHalfWidth, Math.min(span.maxX - shoulderHalfWidth, preferredX));
+    return {
+      x: Number(x.toFixed(2)),
+      shoulderY: Number(y.toFixed(2)),
+      shoulderHalfWidth: Number(shoulderHalfWidth.toFixed(2)),
+    };
+  }
+
+  return {
+    x: 35,
+    shoulderY: Number((topY + Math.min(9, Math.max(5.6, design.height * 0.16))).toFixed(2)),
+    shoulderHalfWidth: Math.max(3.2, getBodyHalfWidthAtOffset(design, Math.min(9, Math.max(5.6, design.height * 0.16)))),
+  };
+}
+
+function findInteriorHookPlacement(design: EarringDesign, shapePath: string): HookPlacement | null {
   if (design.shapeFamily === "geometriques") return null;
 
   const topY = 42 - design.height / 2;
-  const searchStart = topY + 3.4;
-  const searchEnd = topY + design.height * 0.46;
+  const variant = Math.abs(design.hookVariant ?? 0) % 7;
+  if (variant === 6) return null;
+
+  const searchStart = topY + 3.4 + (variant === 1 ? design.height * 0.08 : 0);
+  const searchEnd = topY + design.height * (design.shapeFamily === "pylonnes" ? 0.74 : 0.48);
   const safetyRadius = 3;
+  const centeredX = 35;
+  const offset = Math.min(5.8, design.width * 0.16);
+  const xOptions = [
+    centeredX,
+    centeredX - offset,
+    centeredX + offset,
+    centeredX - offset * 0.55,
+    centeredX + offset * 0.55,
+  ];
+  const orderedXOptions = [
+    ...xOptions.slice(variant % xOptions.length),
+    ...xOptions.slice(0, variant % xOptions.length),
+  ];
 
   for (let y = searchStart; y <= searchEnd; y += 0.7) {
-    const center = new THREE.Vector2(35, y);
-    if (isHolePathInsideBasePath(shapePath, buildCirclePath(35, y, safetyRadius), center)) {
-      return Number(y.toFixed(2));
+    for (const x of orderedXOptions) {
+      const center = new THREE.Vector2(x, y);
+      if (isHolePathInsideBasePath(shapePath, buildCirclePath(x, y, safetyRadius), center)) {
+        return {
+          x: Number(x.toFixed(2)),
+          y: Number(y.toFixed(2)),
+        };
+      }
     }
+  }
+
+  if (design.shapeFamily === "pylonnes") {
+    return {
+      x: Number(orderedXOptions[0].toFixed(2)),
+      y: Number((topY + design.height * 0.24).toFixed(2)),
+    };
   }
 
   return null;
@@ -737,18 +843,26 @@ function findCenteredInteriorHookY(design: EarringDesign, shapePath: string): nu
 
 function getHookLayout(design: EarringDesign, shapePath: string) {
   const topY = 42 - design.height / 2;
-  const centeredInteriorHookY = findCenteredInteriorHookY(design, shapePath);
+  const interiorHookPlacement = findInteriorHookPlacement(design, shapePath);
+  const variant = Math.abs(design.hookVariant ?? 0) % 7;
   const usesExteriorHook = design.shapeFamily !== "geometriques"
-    ? centeredInteriorHookY === null
+    ? interiorHookPlacement === null
     : design.exteriorHook;
-  const bodyHoleY = centeredInteriorHookY ?? topY + 5;
-  const hookX = 35;
+  const bodyHoleX = interiorHookPlacement?.x ?? 35;
+  const bodyHoleY = interiorHookPlacement?.y ?? topY + 5;
+  const exteriorOffset = usesExteriorHook && variant > 0 && design.shape !== "coeur"
+    ? [0, -0.1, 0.1, -0.16, 0.16, 0, 0][variant] * design.width
+    : 0;
+  const exteriorHookPlacement = usesExteriorHook
+    ? findExteriorHookPlacement(design, shapePath, 35 + exteriorOffset)
+    : null;
+  const hookX = exteriorHookPlacement?.x ?? Number((35 + exteriorOffset).toFixed(2));
   const hookY = usesExteriorHook ? topY - (design.shape === "coeur" ? 4.4 : 3) : bodyHoleY;
   const hookOuterRadius = usesExteriorHook ? design.shape === "coeur" ? 3.25 : 3 : 1;
   const hookNeckTop = hookY + hookOuterRadius * 0.42;
   const objectExteriorHook = design.shapeFamily !== "geometriques" && usesExteriorHook;
-  const hookShoulderY = objectExteriorHook ? topY + 2.8 : topY + Math.min(9, Math.max(5.6, design.height * 0.16));
-  const hookShoulderHalfWidth = objectExteriorHook ? 2.8 : Math.max(3.2, getBodyHalfWidthAtOffset(design, hookShoulderY - topY));
+  const hookShoulderY = exteriorHookPlacement?.shoulderY ?? (objectExteriorHook ? topY + 2.8 : topY + Math.min(9, Math.max(5.6, design.height * 0.16)));
+  const hookShoulderHalfWidth = exteriorHookPlacement?.shoulderHalfWidth ?? (objectExteriorHook ? 2.8 : Math.max(3.2, getBodyHalfWidthAtOffset(design, hookShoulderY - topY)));
   const hookNeckHalfWidth = 2.15;
   const hookTransitionPath = design.shape === "coeur"
     ? [
@@ -774,6 +888,7 @@ function getHookLayout(design: EarringDesign, shapePath: string) {
       ].join(" ");
 
   return {
+    bodyHoleX,
     bodyHoleY,
     hookOuterRadius,
     hookTransitionPath,
@@ -838,6 +953,7 @@ function isHolePrintableInShape(
     holes: [],
     texture: "lisse",
     exteriorHook: true,
+    hookVariant: 0,
   };
   const expandedHole: EarringHole = {
     ...hole,
@@ -929,6 +1045,7 @@ type EarringViewer3DProps = {
   showBodyEdges: boolean;
   shapePath: string;
   holePaths: string[];
+  bodyHoleX: number;
   bodyHoleY: number;
   hookTransitionPath: string;
   hookX: number;
@@ -943,6 +1060,7 @@ function EarringPair3D({
   showBodyEdges,
   shapePath,
   holePaths,
+  bodyHoleX,
   bodyHoleY,
   hookTransitionPath,
   hookX,
@@ -954,14 +1072,14 @@ function EarringPair3D({
   const geometries = useMemo(() => {
     const bodyHolePaths = usesExteriorHook
       ? holePaths
-      : [...holePaths, buildCirclePath(35, bodyHoleY, 1)];
+      : [...holePaths, buildCirclePath(bodyHoleX, bodyHoleY, 1)];
 
     return {
       body: createExtrudedGeometry(shapePath, bodyHolePaths, thickness),
       transition: usesExteriorHook ? createHookTransitionGeometry(hookTransitionPath, holePaths, thickness) : null,
       ring: usesExteriorHook ? createHookRingGeometry(hookX, hookY, hookOuterRadius, 1, thickness) : null,
     };
-  }, [bodyHoleY, holePaths, hookOuterRadius, hookTransitionPath, hookX, hookY, shapePath, thickness, usesExteriorHook]);
+  }, [bodyHoleX, bodyHoleY, holePaths, hookOuterRadius, hookTransitionPath, hookX, hookY, shapePath, thickness, usesExteriorHook]);
 
   const material = useMemo(() => new THREE.MeshStandardMaterial({
     color,
@@ -1058,6 +1176,7 @@ function EarringSchematicView({ title, children }: EarringSchematicViewProps) {
 }
 
 function EarringSilhouetteView({
+  bodyHoleX,
   bodyHoleY,
   holePaths,
   hookOuterRadius,
@@ -1067,6 +1186,7 @@ function EarringSilhouetteView({
   shapePath,
   usesExteriorHook,
 }: {
+  bodyHoleX: number;
   bodyHoleY: number;
   holePaths: string[];
   hookOuterRadius: number;
@@ -1082,7 +1202,7 @@ function EarringSilhouetteView({
         <defs>
           <mask id="earring-silhouette-mask">
             <rect x="-8" y="-12" width="86" height="108" fill="#ffffff" />
-            {!usesExteriorHook && <circle cx="35" cy={bodyHoleY} r="1" fill="#000000" />}
+            {!usesExteriorHook && <circle cx={bodyHoleX} cy={bodyHoleY} r="1" fill="#000000" />}
             {holePaths.map((holePath, index) => <path key={index} d={holePath} fill="#000000" />)}
           </mask>
         </defs>
@@ -1197,6 +1317,7 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
   const holeDiameter = holeRadius * 2;
   const thickness = 2;
   const {
+    bodyHoleX,
     bodyHoleY,
     hookOuterRadius,
     hookTransitionPath,
@@ -1286,6 +1407,13 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
       setPastDesigns((past) => [...past, design]);
       setDesign(next);
       return future.slice(1);
+    });
+  };
+
+  const proposeAlternativeHook = () => {
+    pushDesign({
+      ...design,
+      hookVariant: (design.hookVariant ?? 0) + 1,
     });
   };
 
@@ -1441,6 +1569,7 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
               showBodyEdges={design.shapeFamily === "geometriques"}
               shapePath={shapePath}
               holePaths={holePaths}
+              bodyHoleX={bodyHoleX}
               bodyHoleY={bodyHoleY}
               hookTransitionPath={hookTransitionPath}
               hookX={hookX}
@@ -1458,6 +1587,7 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
             </div>
             <div className="toolbar-group">
               <button className="btn btn-primary" type="button" onClick={() => pushDesign(randomEarringDesign(settings))}>Aleatoire</button>
+              <button className="btn btn-secondary" type="button" onClick={proposeAlternativeHook}>Accroche Alternative</button>
               <button className="btn btn-secondary" type="button" onClick={exportEarringSTL}>Exporter STL</button>
             </div>
           </div>
@@ -1465,6 +1595,7 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
 
         <aside className="earring-right-panel" aria-label="Vues schematiques de la boucle">
           <EarringSilhouetteView
+            bodyHoleX={bodyHoleX}
             bodyHoleY={bodyHoleY}
             holePaths={holePaths}
             hookOuterRadius={hookOuterRadius}
