@@ -7,6 +7,14 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.77] - 2026-08-29
+
+### 🐛 Corrigé
+ - Corrige la saisie manuelle des valeurs dans les profils du vase, qui pouvait être remplacée par une valeur limite pendant la frappe.
+
+### ✅ Tests
+ - Ajuste le délai du test de génération aléatoire des vases compatibles pour éviter les faux échecs liés au temps d'exécution.
+
 ## [1.0.76] - 2026-08-29
 
 ### 🐛 Corrigé

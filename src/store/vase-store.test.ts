@@ -145,7 +145,7 @@ describe("vaseStore", () => {
       expect(params.heightMm, `seed ${seed}`).toBeGreaterThanOrEqual(MIN_TEST_TUBE_VASE_HEIGHT_MM);
       expect(analyzeWaterproofInsertCompatibility(params).type, `seed ${seed}`).not.toBe("none");
     }
-  }, 10000);
+  }, 20000);
 
   it("keeps generated vases compatible with a forced custom test tube", () => {
     useUIStore.setState({

@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from "react";
 import { useVaseStore } from "../../store/vase-store";
 import { useUIStore } from "../../store/ui-store";
 
@@ -20,6 +21,37 @@ function ProfileSlider({
   step = 1,
   disabled = false,
 }: ProfileSliderProps) {
+  const [local, setLocal] = useState(String(value));
+
+  useEffect(() => {
+    setLocal(String(value));
+  }, [value]);
+
+  const clamp = useCallback(
+    (nextValue: number) => Math.max(min, Math.min(max, nextValue)),
+    [max, min],
+  );
+
+  const commitText = useCallback(() => {
+    const parsed = parseFloat(local);
+    if (!Number.isFinite(parsed)) {
+      setLocal(String(value));
+      return;
+    }
+    const nextValue = clamp(parsed);
+    setLocal(String(nextValue));
+    onChange(nextValue);
+  }, [clamp, local, onChange, value]);
+
+  const handleSlider = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const nextValue = parseFloat(event.target.value);
+      setLocal(String(nextValue));
+      onChange(nextValue);
+    },
+    [onChange],
+  );
+
   return (
     <div className="profile-slider">
       <div className="profile-slider-header">
@@ -27,10 +59,11 @@ function ProfileSlider({
         <input
           type="number"
           className="profile-slider-number"
-          value={value}
-          onChange={(e) => {
-            const v = Math.max(min, Math.min(max, parseFloat(e.target.value) || min));
-            onChange(v);
+          value={local}
+          onChange={(e) => setLocal(e.target.value)}
+          onBlur={commitText}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitText();
           }}
           min={min}
           max={max}
@@ -42,7 +75,7 @@ function ProfileSlider({
         type="range"
         className="profile-slider-range"
         value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
+        onChange={handleSlider}
         min={min}
         max={max}
         step={step}
