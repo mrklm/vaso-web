@@ -5,6 +5,7 @@ import { exportSTL } from "../../engine/exporter";
 import { generateVaseMeshWithEngraving } from "../../engine/mesh-builder";
 import { validateParamsAgainstBuildVolume } from "../../engine/printer-volume";
 import { formatSeedLabel, SEED_DIGITS } from "../../engine/engraving-text";
+import { createCustomTestTubePreset } from "../../engine/insert-compatibility";
 import { getShareUrl } from "../../hooks/useUrlShare";
 
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
@@ -69,6 +70,9 @@ export function Toolbar() {
   const captureViewerImage = useUIStore((s) => s.captureViewerImage);
   const generateTestTubeSupport = useUIStore((s) => s.generateTestTubeSupport);
   const forceTestTubeSupport = useUIStore((s) => s.forceTestTubeSupport);
+  const forceCustomTestTubeSize = useUIStore((s) => s.forceCustomTestTubeSize);
+  const customTestTubeDiameterMm = useUIStore((s) => s.customTestTubeDiameterMm);
+  const customTestTubeHeightMm = useUIStore((s) => s.customTestTubeHeightMm);
   const { undo, redo, pastStates, futureStates } = useVaseStore.temporal.getState();
   const showSeedModified = isSeedModified;
 
@@ -83,6 +87,13 @@ export function Toolbar() {
       const mesh = await generateVaseMeshWithEngraving(params, seed, showSeedModified, {
         includeTestTubeSupport: generateTestTubeSupport,
         forceTestTubeSupport,
+        customTestTubePreset:
+          generateTestTubeSupport && forceTestTubeSupport && forceCustomTestTubeSize
+            ? createCustomTestTubePreset(
+                Math.min(customTestTubeHeightMm, Math.max(50, (activePrinter?.height ?? 250) - 20)),
+                customTestTubeDiameterMm,
+              )
+            : undefined,
       });
       await exportSTL(mesh, buildStlFilename(seed, showSeedModified));
       toast.success("STL exporte !");

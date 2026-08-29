@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   analyzeWaterproofInsertCompatibility,
+  createCustomTestTubePreset,
   enforceMinimumTestTubeCompatibility,
   MIN_TEST_TUBE_VASE_HEIGHT_MM,
 } from "./insert-compatibility";
@@ -119,5 +120,18 @@ describe("analyzeWaterproofInsertCompatibility", () => {
 
     expect(safeParams.heightMm).toBe(MIN_TEST_TUBE_VASE_HEIGHT_MM);
     expect(compatibility.type).toBe("test_tube");
+  });
+
+  it("supports a custom forced test tube size", () => {
+    const customTube = createCustomTestTubePreset(150, 35);
+    const safeParams = enforceMinimumTestTubeCompatibility(
+      createTwoProfileVase(120, 24, 24),
+      customTube,
+    );
+    const compatibility = analyzeWaterproofInsertCompatibility(safeParams, customTube);
+
+    expect(safeParams.heightMm).toBeGreaterThanOrEqual(170);
+    expect(compatibility.type).toBe("test_tube");
+    expect(compatibility.label).toBe("Tube à essai 150 × 35 mm");
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   analyzeWaterproofInsertCompatibility,
+  createCustomTestTubePreset,
   MIN_TEST_TUBE_VASE_HEIGHT_MM,
 } from "../engine/insert-compatibility";
 import { useVaseStore } from "./vase-store";
@@ -145,4 +146,21 @@ describe("vaseStore", () => {
       expect(analyzeWaterproofInsertCompatibility(params).type, `seed ${seed}`).not.toBe("none");
     }
   }, 10000);
+
+  it("keeps generated vases compatible with a forced custom test tube", () => {
+    useUIStore.setState({
+      enforcePrinterVolume: true,
+      forceTestTubeSupport: true,
+      forceCustomTestTubeSize: true,
+      customTestTubeDiameterMm: 35,
+      customTestTubeHeightMm: 150,
+    });
+
+    useVaseStore.getState().randomize();
+    const { params } = useVaseStore.getState();
+    const customTube = createCustomTestTubePreset(150, 35);
+
+    expect(params.heightMm).toBeGreaterThanOrEqual(170);
+    expect(analyzeWaterproofInsertCompatibility(params, customTube).type).toBe("test_tube");
+  });
 });

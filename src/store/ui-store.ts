@@ -21,6 +21,9 @@ interface UIState {
   showCompatibleInsert: boolean;
   generateTestTubeSupport: boolean;
   forceTestTubeSupport: boolean;
+  forceCustomTestTubeSize: boolean;
+  customTestTubeDiameterMm: number;
+  customTestTubeHeightMm: number;
   rotationMode: "camera" | "vase";
   rotationSpeed: number;
   clippingHeight: number; // 0-100 percent
@@ -44,6 +47,9 @@ interface UIState {
   setShowCompatibleInsert: (v: boolean) => void;
   setGenerateTestTubeSupport: (v: boolean) => void;
   setForceTestTubeSupport: (v: boolean) => void;
+  setForceCustomTestTubeSize: (v: boolean) => void;
+  setCustomTestTubeDiameterMm: (v: number) => void;
+  setCustomTestTubeHeightMm: (v: number) => void;
   setRotationMode: (mode: "camera" | "vase") => void;
   setRotationSpeed: (v: number) => void;
   setClippingHeight: (v: number) => void;
@@ -154,6 +160,30 @@ function loadSavedBoolean(key: string, fallback: boolean): boolean {
   return fallback;
 }
 
+function loadSavedNumber(key: string, fallback: number): number {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved === null) return fallback;
+    const value = Number(saved);
+    return Number.isFinite(value) ? value : fallback;
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
+function getCustomTestTubeHeightLimit(profile?: PrinterProfile): number {
+  return Math.max(50, (profile?.height ?? 250) - 20);
+}
+
+function clampCustomTestTubeDiameter(value: number): number {
+  return Math.max(10, Math.min(40, value));
+}
+
+function clampCustomTestTubeHeight(value: number, profile?: PrinterProfile): number {
+  return Math.max(50, Math.min(getCustomTestTubeHeightLimit(profile), value));
+}
+
 const initialTheme = loadSavedTheme();
 applyThemeToCSS(initialTheme);
 
@@ -162,6 +192,14 @@ const initialAdvancedStlUnlock = loadSavedAdvancedStlUnlock();
 const initialShowCompatibleInsert = loadSavedBoolean("vaso-show-compatible-insert", true);
 const initialGenerateTestTubeSupport = loadSavedBoolean("vaso-generate-test-tube-support", true);
 const initialForceTestTubeSupport = loadSavedBoolean("vaso-force-test-tube-support", false);
+const initialForceCustomTestTubeSize = loadSavedBoolean("vaso-force-custom-test-tube-size", false);
+const initialCustomTestTubeDiameterMm = clampCustomTestTubeDiameter(
+  loadSavedNumber("vaso-custom-test-tube-diameter-mm", 20),
+);
+const initialCustomTestTubeHeightMm = clampCustomTestTubeHeight(
+  loadSavedNumber("vaso-custom-test-tube-height-mm", 100),
+  initialPrinter.profiles.find((profile) => profile.name === initialPrinter.active) ?? initialPrinter.profiles[0],
+);
 
 export const useUIStore = create<UIState>((set, get) => ({
   theme: initialTheme,
@@ -176,6 +214,9 @@ export const useUIStore = create<UIState>((set, get) => ({
   showCompatibleInsert: initialShowCompatibleInsert,
   generateTestTubeSupport: initialGenerateTestTubeSupport,
   forceTestTubeSupport: initialForceTestTubeSupport,
+  forceCustomTestTubeSize: initialForceCustomTestTubeSize,
+  customTestTubeDiameterMm: initialCustomTestTubeDiameterMm,
+  customTestTubeHeightMm: initialCustomTestTubeHeightMm,
   rotationMode: "camera",
   rotationSpeed: 0.5,
   clippingHeight: 50,
@@ -227,6 +268,33 @@ export const useUIStore = create<UIState>((set, get) => ({
     }
     set({ forceTestTubeSupport: v });
   },
+  setForceCustomTestTubeSize: (v) => {
+    try {
+      localStorage.setItem("vaso-force-custom-test-tube-size", String(v));
+    } catch {
+      /* ignore */
+    }
+    set({ forceCustomTestTubeSize: v });
+  },
+  setCustomTestTubeDiameterMm: (v) => {
+    const value = clampCustomTestTubeDiameter(v);
+    try {
+      localStorage.setItem("vaso-custom-test-tube-diameter-mm", String(value));
+    } catch {
+      /* ignore */
+    }
+    set({ customTestTubeDiameterMm: value });
+  },
+  setCustomTestTubeHeightMm: (v) => {
+    const activeProfile = get().printerProfiles.find((profile) => profile.name === get().activePrinterProfile) ?? get().printerProfiles[0];
+    const value = clampCustomTestTubeHeight(v, activeProfile);
+    try {
+      localStorage.setItem("vaso-custom-test-tube-height-mm", String(value));
+    } catch {
+      /* ignore */
+    }
+    set({ customTestTubeHeightMm: value });
+  },
   setRotationMode: (mode) => set({ rotationMode: mode }),
   setRotationSpeed: (v) => set({ rotationSpeed: v }),
   setClippingHeight: (v) => set({ clippingHeight: v }),
@@ -245,7 +313,14 @@ export const useUIStore = create<UIState>((set, get) => ({
     savePrinterProfiles(get().printerProfiles, get().activePrinterProfile, enabled);
   },
   setActivePrinterProfile: (name) => {
-    set({ activePrinterProfile: name });
+    const activeProfile = get().printerProfiles.find((profile) => profile.name === name) ?? get().printerProfiles[0];
+    const customTestTubeHeightMm = clampCustomTestTubeHeight(get().customTestTubeHeightMm, activeProfile);
+    set({ activePrinterProfile: name, customTestTubeHeightMm });
+    try {
+      localStorage.setItem("vaso-custom-test-tube-height-mm", String(customTestTubeHeightMm));
+    } catch {
+      /* ignore */
+    }
     savePrinterProfiles(get().printerProfiles, name, get().enforcePrinterVolume);
   },
   addPrinterProfile: (profile) => {
@@ -274,6 +349,9 @@ export const useUIStore = create<UIState>((set, get) => ({
       localStorage.removeItem("vaso-show-compatible-insert");
       localStorage.removeItem("vaso-generate-test-tube-support");
       localStorage.removeItem("vaso-force-test-tube-support");
+      localStorage.removeItem("vaso-force-custom-test-tube-size");
+      localStorage.removeItem("vaso-custom-test-tube-diameter-mm");
+      localStorage.removeItem("vaso-custom-test-tube-height-mm");
     } catch {
       /* ignore */
     }
@@ -291,6 +369,9 @@ export const useUIStore = create<UIState>((set, get) => ({
       showCompatibleInsert: true,
       generateTestTubeSupport: true,
       forceTestTubeSupport: false,
+      forceCustomTestTubeSize: false,
+      customTestTubeDiameterMm: 20,
+      customTestTubeHeightMm: 100,
       rotationMode: "camera",
       rotationSpeed: 0.5,
       clippingHeight: 50,

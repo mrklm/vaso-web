@@ -29,6 +29,12 @@ export function SettingsPanel() {
     setGenerateTestTubeSupport,
     forceTestTubeSupport,
     setForceTestTubeSupport,
+    forceCustomTestTubeSize,
+    setForceCustomTestTubeSize,
+    customTestTubeDiameterMm,
+    setCustomTestTubeDiameterMm,
+    customTestTubeHeightMm,
+    setCustomTestTubeHeightMm,
     clippingHeight,
     setClippingHeight,
     unlockAdvancedStlParams,
@@ -57,6 +63,7 @@ export function SettingsPanel() {
   const activeProfile =
     printerProfiles.find((p) => p.name === activePrinterProfile) ?? printerProfiles[0];
   const defaultParams = defaultVaseParameters();
+  const maxCustomTestTubeHeight = Math.max(50, (activeProfile?.height ?? 250) - 20);
 
   const [editWidth, setEditWidth] = useState(String(activeProfile?.width ?? 220));
   const [editDepth, setEditDepth] = useState(String(activeProfile?.depth ?? 220));
@@ -84,6 +91,7 @@ export function SettingsPanel() {
       height: parseFloat(editHeight) || 250,
     };
     updatePrinterProfile(activeProfile.name, updatedProfile);
+    setCustomTestTubeHeightMm(customTestTubeHeightMm);
     if (enforcePrinterVolume) {
       setParams(clampParamsToBuildVolume(useVaseStore.getState().params, updatedProfile));
     }
@@ -184,6 +192,44 @@ export function SettingsPanel() {
           Forcer Tube à Essais
         </label>
       </div>
+      {forceTestTubeSupport && (
+        <>
+          <div className="checkbox-row">
+            <label>
+              <input
+                type="checkbox"
+                checked={forceCustomTestTubeSize}
+                disabled={!generateTestTubeSupport}
+                onChange={(e) => setForceCustomTestTubeSize(e.target.checked)}
+              />
+              Forcer une taille de tube à essai
+            </label>
+          </div>
+          {forceCustomTestTubeSize && (
+            <div className="advanced-stl-panel">
+              <NumberInput
+                label="Largeur tube (mm)"
+                value={customTestTubeDiameterMm}
+                onChange={setCustomTestTubeDiameterMm}
+                min={10}
+                max={40}
+                step={0.5}
+                disabled={!generateTestTubeSupport}
+              />
+              <NumberInput
+                label="Hauteur tube (mm)"
+                value={customTestTubeHeightMm}
+                onChange={setCustomTestTubeHeightMm}
+                min={50}
+                max={maxCustomTestTubeHeight}
+                step={1}
+                integer
+                disabled={!generateTestTubeSupport}
+              />
+            </div>
+          )}
+        </>
+      )}
 
       <div className="separator" />
       <h3>Apparence</h3>

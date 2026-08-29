@@ -7,6 +7,18 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.75] - 2026-08-29
+
+### 🎨 Ajouté
+ - Ajoute une option pour forcer une taille personnalisée de tube à essai dans Options > Contenants.
+ - Ajoute les champs Largeur tube et Hauteur tube, avec valeurs par défaut 20 mm et 100 mm.
+
+### 🎨 Modifié
+ - Contraint la génération, l'aperçu du contenant, l'aperçu 3D et l'export STL à utiliser le tube personnalisé lorsqu'il est activé.
+
+### ✅ Tests
+ - Ajoute des tests pour la compatibilité des tubes à essai personnalisés et la génération contrainte.
+
 ## [1.0.74] - 2026-08-29
 
 ### 🎨 Modifié

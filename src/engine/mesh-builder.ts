@@ -29,6 +29,7 @@ import {
   getInsertPresetById,
   getPreferredTestTubePreset,
   getTestTubePlacement,
+  type InsertPreset,
 } from "./insert-compatibility";
 
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
@@ -49,6 +50,7 @@ const TEST_TUBE_PEDESTAL_BAR_THICKNESS_MM = 2.4;
 interface GenerateVaseMeshOptions {
   includeTestTubeSupport?: boolean;
   forceTestTubeSupport?: boolean;
+  customTestTubePreset?: InsertPreset;
 }
 
 function hasActiveTexture(params: VaseParameters): boolean {
@@ -533,11 +535,13 @@ function addTestTubeSupportIfNeeded(
     return;
   }
   const preset = options.forceTestTubeSupport
-    ? getPreferredTestTubePreset(params.heightMm)
+    ? (options.customTestTubePreset ?? getPreferredTestTubePreset(params.heightMm))
     : getInsertPresetById(compatibility.presetId);
   if (!preset) {
     return;
   }
+  const supportInnerRadius = Math.max(5, preset.topDiameterMm / 2 + preset.clearanceMm);
+  const supportOuterRadius = supportInnerRadius + TEST_TUBE_SUPPORT_THICKNESS_MM;
 
   const placement = getTestTubePlacement(params, preset);
   const supportBottomZ = placement.supportBottomZ;
@@ -553,14 +557,14 @@ function addTestTubeSupportIfNeeded(
     supportBottomZ + (supportTopZ - supportBottomZ) * 0.66,
     supportTopZ,
   ];
-  if (!canFitCenteredTestTubeSupport(params, fitSamples, TEST_TUBE_SUPPORT_OUTER_RADIUS_MM)) {
+  if (!canFitCenteredTestTubeSupport(params, fitSamples, supportOuterRadius)) {
     return;
   }
 
   addCrossPedestal(
     verts,
     faces,
-    TEST_TUBE_SUPPORT_OUTER_RADIUS_MM,
+    supportOuterRadius,
     placement.pedestalBottomZ,
     placement.pedestalTopZ,
   );
@@ -568,8 +572,8 @@ function addTestTubeSupportIfNeeded(
   addSegmentedTubeSupport(
     verts,
     faces,
-    TEST_TUBE_SUPPORT_INNER_RADIUS_MM,
-    TEST_TUBE_SUPPORT_OUTER_RADIUS_MM,
+    supportInnerRadius,
+    supportOuterRadius,
     supportBottomZ,
     supportTopZ,
     TEST_TUBE_SUPPORT_SLOT_COUNT,
@@ -751,6 +755,9 @@ export async function generateVaseMeshWithEngraving(
       options.includeTestTubeSupport !== false &&
       (options.forceTestTubeSupport ||
         analyzeWaterproofInsertCompatibility(params).type === "test_tube");
+    const supportOuterRadius = options.customTestTubePreset
+      ? options.customTestTubePreset.topDiameterMm / 2 + options.customTestTubePreset.clearanceMm + TEST_TUBE_SUPPORT_THICKNESS_MM
+      : TEST_TUBE_SUPPORT_OUTER_RADIUS_MM;
     const engravedMesh = await engraveBaseText(
       mesh,
       params,
@@ -758,7 +765,7 @@ export async function generateVaseMeshWithEngraving(
       seed,
       isSeedModified,
       shouldReserveSupportCenter
-        ? TEST_TUBE_SUPPORT_OUTER_RADIUS_MM + TEST_TUBE_SUPPORT_ENGRAVING_CLEARANCE_MM
+        ? supportOuterRadius + TEST_TUBE_SUPPORT_ENGRAVING_CLEARANCE_MM
         : 0,
     );
     const difference = getMeshDifferenceDiagnostics(mesh, engravedMesh);

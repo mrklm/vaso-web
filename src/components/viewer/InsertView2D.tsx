@@ -3,6 +3,7 @@ import { useVaseStore } from "../../store/vase-store";
 import { useUIStore } from "../../store/ui-store";
 import {
   analyzeWaterproofInsertCompatibility,
+  createCustomTestTubePreset,
   getInsertPresetById,
   getTestTubePlacement,
 } from "../../engine/insert-compatibility";
@@ -11,6 +12,11 @@ import { generateOuterProfilePoints } from "../../engine/mesh-builder";
 export function InsertView2D() {
   const params = useVaseStore((s) => s.params);
   const showCompatibleInsert = useUIStore((s) => s.showCompatibleInsert);
+  const generateTestTubeSupport = useUIStore((s) => s.generateTestTubeSupport);
+  const forceTestTubeSupport = useUIStore((s) => s.forceTestTubeSupport);
+  const forceCustomTestTubeSize = useUIStore((s) => s.forceCustomTestTubeSize);
+  const customTestTubeDiameterMm = useUIStore((s) => s.customTestTubeDiameterMm);
+  const customTestTubeHeightMm = useUIStore((s) => s.customTestTubeHeightMm);
 
   const insertData = useMemo(() => {
     try {
@@ -20,8 +26,11 @@ export function InsertView2D() {
         verticalSamples: Math.min(params.verticalSamples, 64),
       };
       const profileData = generateOuterProfilePoints(previewParams, 100);
-      const compatibility = analyzeWaterproofInsertCompatibility(previewParams);
-      const preset = getInsertPresetById(compatibility.presetId);
+      const customPreset = generateTestTubeSupport && forceTestTubeSupport && forceCustomTestTubeSize
+        ? createCustomTestTubePreset(customTestTubeHeightMm, customTestTubeDiameterMm)
+        : undefined;
+      const compatibility = analyzeWaterproofInsertCompatibility(previewParams, customPreset);
+      const preset = customPreset ?? getInsertPresetById(compatibility.presetId);
       if (!preset) {
         return null;
       }
@@ -31,7 +40,14 @@ export function InsertView2D() {
       return null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(params)]);
+  }, [
+    JSON.stringify(params),
+    customTestTubeDiameterMm,
+    customTestTubeHeightMm,
+    forceCustomTestTubeSize,
+    forceTestTubeSupport,
+    generateTestTubeSupport,
+  ]);
 
   if (!showCompatibleInsert) {
     return null;

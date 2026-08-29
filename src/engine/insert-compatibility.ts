@@ -87,6 +87,21 @@ export const INSERT_PRESETS: readonly InsertPreset[] = [
   },
 ] as const;
 
+export function createCustomTestTubePreset(heightMm: number, diameterMm: number): InsertPreset {
+  const safeHeight = Math.max(50, Math.trunc(heightMm));
+  const safeDiameter = Math.max(10, Math.min(40, diameterMm));
+  const formattedDiameter = safeDiameter.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+  return {
+    id: "custom-test-tube",
+    label: `Tube à essai ${safeHeight} × ${formattedDiameter} mm`,
+    type: "test_tube",
+    heightMm: safeHeight,
+    topDiameterMm: safeDiameter,
+    bottomDiameterMm: safeDiameter,
+    clearanceMm: 1.5,
+  };
+}
+
 export function getInsertPresetById(presetId: string): InsertPreset | null {
   return INSERT_PRESETS.find((preset) => preset.id === presetId) ?? null;
 }
@@ -106,30 +121,54 @@ export function getMinimumTestTubeProfileDiameterMm(
   profile: Pick<Profile, "sides" | "scaleX" | "scaleY">,
   wallThicknessMm: number,
   textureInsetMm = 0,
+  minimumInnerDiameterMm = MIN_TEST_TUBE_TOP_OPENING_INNER_DIAMETER_MM,
 ): number {
   const sides = Math.max(3, Math.round(profile.sides));
   const minScale = Math.max(0.1, Math.min(Math.abs(profile.scaleX), Math.abs(profile.scaleY)));
   const apothemRatio = Math.cos(Math.PI / sides);
   const requiredOuterApothemMm =
-    MIN_TEST_TUBE_TOP_OPENING_INNER_DIAMETER_MM / 2 +
+    minimumInnerDiameterMm / 2 +
     Math.max(0, textureInsetMm) +
     Math.max(0, wallThicknessMm);
 
   return (requiredOuterApothemMm / apothemRatio / minScale) * 2;
 }
 
-export function enforceMinimumTestTubeCompatibility(params: VaseParameters): VaseParameters {
+function getMinimumTestTubeVaseHeightMm(preset?: InsertPreset): number {
+  if (!preset) return MIN_TEST_TUBE_VASE_HEIGHT_MM;
+  return Math.max(MIN_TEST_TUBE_VASE_HEIGHT_MM, preset.heightMm + TEST_TUBE_TOP_CLEARANCE_MM);
+}
+
+function getMinimumTestTubeInnerDiameterMm(preset?: InsertPreset): number {
+  if (!preset) return MIN_TEST_TUBE_TOP_OPENING_INNER_DIAMETER_MM;
+  return Math.max(
+    MIN_TEST_TUBE_TOP_OPENING_INNER_DIAMETER_MM,
+    preset.topDiameterMm + preset.clearanceMm * 2 + 0.6,
+  );
+}
+
+export function enforceMinimumTestTubeCompatibility(
+  params: VaseParameters,
+  preset?: InsertPreset,
+): VaseParameters {
   const wallThicknessMm = Math.max(0, params.wallThicknessMm);
   const textureInsetMm = getMaxInwardTextureOffsetMm(params);
+  const minimumVaseHeightMm = getMinimumTestTubeVaseHeightMm(preset);
+  const minimumInnerDiameterMm = getMinimumTestTubeInnerDiameterMm(preset);
 
   return {
     ...params,
-    heightMm: Math.max(MIN_TEST_TUBE_VASE_HEIGHT_MM, params.heightMm),
+    heightMm: Math.max(minimumVaseHeightMm, params.heightMm),
     profiles: params.profiles.map((profile) => ({
       ...profile,
       diameter: Math.max(
         profile.diameter,
-        getMinimumTestTubeProfileDiameterMm(profile, wallThicknessMm, textureInsetMm),
+        getMinimumTestTubeProfileDiameterMm(
+          profile,
+          wallThicknessMm,
+          textureInsetMm,
+          minimumInnerDiameterMm,
+        ),
       ),
     })),
   };
@@ -539,8 +578,23 @@ function isPresetCompatible(
 
 export function analyzeWaterproofInsertCompatibility(
   params: VaseParameters,
+  forcedTestTubePreset?: InsertPreset,
 ): WaterproofInsertCompatibility {
   const availabilityProfile = buildInnerAvailabilityProfile(params);
+
+  if (forcedTestTubePreset) {
+    return isPresetCompatible(forcedTestTubePreset, availabilityProfile, params)
+      ? {
+          presetId: forcedTestTubePreset.id,
+          label: forcedTestTubePreset.label,
+          type: forcedTestTubePreset.type,
+        }
+      : {
+          presetId: "none",
+          label: "Aucun contenant compatible",
+          type: "none",
+        };
+  }
 
   for (const preset of INSERT_PRESETS) {
     if (preset.type === "eco_cup" && isPresetCompatible(preset, availabilityProfile, params)) {

@@ -11,7 +11,10 @@ import { useUIStore } from "../../store/ui-store";
 import { useVaseMesh } from "../../hooks/useVaseMesh";
 import { buildProfileContour } from "../../engine/geometry";
 import { formatEngravingLines, formatSeedLabel } from "../../engine/engraving-text";
-import { analyzeWaterproofInsertCompatibility } from "../../engine/insert-compatibility";
+import {
+  analyzeWaterproofInsertCompatibility,
+  createCustomTestTubePreset,
+} from "../../engine/insert-compatibility";
 import type { VaseParameters } from "../../engine/types";
 
 const ROTATE_SPEED = 0.05;
@@ -381,14 +384,31 @@ export function VaseViewer3D() {
   const clippingHeight = useUIStore((s) => s.clippingHeight);
   const rotationMode = useUIStore((s) => s.rotationMode);
   const rotationSpeed = useUIStore((s) => s.rotationSpeed);
+  const generateTestTubeSupport = useUIStore((s) => s.generateTestTubeSupport);
+  const forceTestTubeSupport = useUIStore((s) => s.forceTestTubeSupport);
+  const forceCustomTestTubeSize = useUIStore((s) => s.forceCustomTestTubeSize);
+  const customTestTubeDiameterMm = useUIStore((s) => s.customTestTubeDiameterMm);
+  const customTestTubeHeightMm = useUIStore((s) => s.customTestTubeHeightMm);
   const meshData = useVaseMesh(params, seed);
   const showSeedModified = isSeedModified;
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const lastTapRef = useRef(0);
   const paramsKey = JSON.stringify(params);
   const hasTestTubeSupport = useMemo(
-    () => analyzeWaterproofInsertCompatibility(params).type === "test_tube",
-    [params],
+    () => {
+      const customPreset = generateTestTubeSupport && forceTestTubeSupport && forceCustomTestTubeSize
+        ? createCustomTestTubePreset(customTestTubeHeightMm, customTestTubeDiameterMm)
+        : undefined;
+      return analyzeWaterproofInsertCompatibility(params, customPreset).type === "test_tube";
+    },
+    [
+      customTestTubeDiameterMm,
+      customTestTubeHeightMm,
+      forceCustomTestTubeSize,
+      forceTestTubeSupport,
+      generateTestTubeSupport,
+      params,
+    ],
   );
 
   const handleDoubleTap = useCallback(

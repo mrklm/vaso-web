@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { VaseParameters, MeshData } from "../engine/types";
 import { generateVaseMesh } from "../engine/mesh-builder";
 import { useUIStore } from "../store/ui-store";
+import { createCustomTestTubePreset, type InsertPreset } from "../engine/insert-compatibility";
 
 function isRenderableMesh(mesh: MeshData): boolean {
   if (mesh.vertices.length < 9 || mesh.indices.length < 3 || mesh.indices.length % 3 !== 0) {
@@ -28,8 +29,13 @@ function generateRenderableMesh(
   params: VaseParameters,
   includeTestTubeSupport: boolean,
   forceTestTubeSupport: boolean,
+  customTestTubePreset?: InsertPreset,
 ): MeshData | null {
-  const mesh = generateVaseMesh(params, { includeTestTubeSupport, forceTestTubeSupport });
+  const mesh = generateVaseMesh(params, {
+    includeTestTubeSupport,
+    forceTestTubeSupport,
+    customTestTubePreset,
+  });
   return isRenderableMesh(mesh) ? mesh : null;
 }
 
@@ -40,6 +46,9 @@ function generateRenderableMesh(
 export function useVaseMesh(params: VaseParameters, seed: number): MeshData | null {
   const generateTestTubeSupport = useUIStore((s) => s.generateTestTubeSupport);
   const forceTestTubeSupport = useUIStore((s) => s.forceTestTubeSupport);
+  const forceCustomTestTubeSize = useUIStore((s) => s.forceCustomTestTubeSize);
+  const customTestTubeDiameterMm = useUIStore((s) => s.customTestTubeDiameterMm);
+  const customTestTubeHeightMm = useUIStore((s) => s.customTestTubeHeightMm);
 
   return useMemo(() => {
     void seed;
@@ -48,12 +57,17 @@ export function useVaseMesh(params: VaseParameters, seed: number): MeshData | nu
       radialSamples: Math.min(params.radialSamples, 72),
       verticalSamples: Math.min(params.verticalSamples, 96),
     };
+    const customTestTubePreset =
+      generateTestTubeSupport && forceTestTubeSupport && forceCustomTestTubeSize
+        ? createCustomTestTubePreset(customTestTubeHeightMm, customTestTubeDiameterMm)
+        : undefined;
 
     try {
       const mesh = generateRenderableMesh(
         previewParams,
         generateTestTubeSupport,
         forceTestTubeSupport,
+        customTestTubePreset,
       );
       if (mesh) return mesh;
     } catch (e) {
@@ -128,5 +142,8 @@ export function useVaseMesh(params: VaseParameters, seed: number): MeshData | nu
     JSON.stringify(params.profiles),
     generateTestTubeSupport,
     forceTestTubeSupport,
+    forceCustomTestTubeSize,
+    customTestTubeDiameterMm,
+    customTestTubeHeightMm,
   ]);
 }

@@ -2,7 +2,9 @@ import { create } from "zustand";
 import { temporal } from "zundo";
 import { MAX_SEED } from "../engine/engraving-text";
 import {
+  createCustomTestTubePreset,
   enforceMinimumTestTubeCompatibility,
+  type InsertPreset,
   MIN_TEST_TUBE_VASE_HEIGHT_MM,
 } from "../engine/insert-compatibility";
 import { clampParamsToBuildVolume, type BuildVolume } from "../engine/printer-volume";
@@ -79,6 +81,7 @@ function randomizeParams(
   forceComplexity: boolean,
   forceTexture: boolean,
   currentParams: VaseParameters,
+  forcedTestTubePreset?: InsertPreset,
 ): VaseParameters {
   const rng = mulberry32(seed);
 
@@ -191,7 +194,11 @@ function randomizeParams(
       break;
   }
 
-  const safeHeightMin = Math.max(MIN_TEST_TUBE_VASE_HEIGHT_MM, heightMin);
+  const safeHeightMin = Math.max(
+    MIN_TEST_TUBE_VASE_HEIGHT_MM,
+    forcedTestTubePreset ? forcedTestTubePreset.heightMm + 20 : heightMin,
+  );
+  heightMax = Math.max(safeHeightMin, heightMax);
   const height = triangular(rng, safeHeightMin, heightMax, (safeHeightMin + heightMax) / 2);
 
   // Generate profiles
@@ -263,14 +270,30 @@ function randomizeParams(
     }
   }
 
-  return enforceMinimumTestTubeCompatibility({
-    ...currentParams,
-    heightMm: Math.round(height),
-    profiles,
-    textureMode,
-    textureType,
-    textureZoom,
-  });
+  return enforceMinimumTestTubeCompatibility(
+    {
+      ...currentParams,
+      heightMm: Math.round(height),
+      profiles,
+      textureMode,
+      textureType,
+      textureZoom,
+    },
+    forcedTestTubePreset,
+  );
+}
+
+function getActiveCustomTestTubePreset(): InsertPreset | undefined {
+  const ui = useUIStore.getState();
+  if (!ui.generateTestTubeSupport || !ui.forceTestTubeSupport || !ui.forceCustomTestTubeSize) {
+    return undefined;
+  }
+  const activeProfile = ui.printerProfiles.find((profile) => profile.name === ui.activePrinterProfile) ?? ui.printerProfiles[0];
+  const maxHeight = Math.max(50, (activeProfile?.height ?? 250) - 20);
+  return createCustomTestTubePreset(
+    Math.max(50, Math.min(maxHeight, ui.customTestTubeHeightMm)),
+    ui.customTestTubeDiameterMm,
+  );
 }
 
 function getActiveBuildVolume(): BuildVolume {
@@ -284,12 +307,14 @@ function getActiveBuildVolume(): BuildVolume {
 }
 
 function constrainToActiveBuildVolume(params: VaseParameters): VaseParameters {
-  const safeParams = enforceMinimumTestTubeCompatibility(params);
+  const forcedTestTubePreset = getActiveCustomTestTubePreset();
+  const safeParams = enforceMinimumTestTubeCompatibility(params, forcedTestTubePreset);
   if (!useUIStore.getState().enforcePrinterVolume) {
     return safeParams;
   }
   return enforceMinimumTestTubeCompatibility(
     clampParamsToBuildVolume(safeParams, getActiveBuildVolume()),
+    forcedTestTubePreset,
   );
 }
 
@@ -305,6 +330,7 @@ const INITIAL_PARAMS = randomizeParams(
   INITIAL_FORCE_COMPLEXITY,
   INITIAL_FORCE_TEXTURE,
   defaultVaseParameters(),
+  undefined,
 );
 
 export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
@@ -398,6 +424,7 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
       state.forceComplexity,
       state.forceTexture,
       state.params,
+      getActiveCustomTestTubePreset(),
     );
     set({ params: constrainToActiveBuildVolume(params), isSeedModified: false });
   },
@@ -412,6 +439,7 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
       state.forceComplexity,
       state.forceTexture,
       state.params,
+      getActiveCustomTestTubePreset(),
     );
     set({ params: constrainToActiveBuildVolume(params), seed: newSeed, isSeedModified: false });
   },
