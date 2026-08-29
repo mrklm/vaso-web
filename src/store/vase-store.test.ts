@@ -31,6 +31,13 @@ describe("vaseStore", () => {
     expect(analyzeWaterproofInsertCompatibility(params).type).not.toBe("none");
   });
 
+  it("starts with forced test tube options disabled", () => {
+    const initialState = useUIStore.getInitialState();
+
+    expect(initialState.forceTestTubeSupport).toBe(false);
+    expect(initialState.forceCustomTestTubeSize).toBe(false);
+  });
+
   it("initial seed reproduces the initial vase when reapplied", () => {
     useVaseStore.getState().applySeed();
     const first = JSON.stringify(useVaseStore.getState().params);
@@ -172,5 +179,15 @@ describe("vaseStore", () => {
 
     expect(useUIStore.getState().generateTestTubeSupport).toBe(true);
     expect(useUIStore.getState().forceTestTubeSupport).toBe(true);
+  });
+
+  it("keeps test tube forcing enabled when forcing a custom test tube size", () => {
+    useUIStore.getState().setGenerateTestTubeSupport(false);
+
+    useUIStore.getState().setForceCustomTestTubeSize(true);
+
+    expect(useUIStore.getState().generateTestTubeSupport).toBe(true);
+    expect(useUIStore.getState().forceTestTubeSupport).toBe(true);
+    expect(useUIStore.getState().forceCustomTestTubeSize).toBe(true);
   });
 });

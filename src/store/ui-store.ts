@@ -191,8 +191,6 @@ const initialPrinter = loadPrinterProfiles();
 const initialAdvancedStlUnlock = loadSavedAdvancedStlUnlock();
 const initialShowCompatibleInsert = loadSavedBoolean("vaso-show-compatible-insert", true);
 const initialGenerateTestTubeSupport = loadSavedBoolean("vaso-generate-test-tube-support", true);
-const initialForceTestTubeSupport = loadSavedBoolean("vaso-force-test-tube-support", false);
-const initialForceCustomTestTubeSize = loadSavedBoolean("vaso-force-custom-test-tube-size", false);
 const initialCustomTestTubeDiameterMm = clampCustomTestTubeDiameter(
   loadSavedNumber("vaso-custom-test-tube-diameter-mm", 20),
 );
@@ -200,6 +198,13 @@ const initialCustomTestTubeHeightMm = clampCustomTestTubeHeight(
   loadSavedNumber("vaso-custom-test-tube-height-mm", 100),
   initialPrinter.profiles.find((profile) => profile.name === initialPrinter.active) ?? initialPrinter.profiles[0],
 );
+
+try {
+  localStorage.removeItem("vaso-force-test-tube-support");
+  localStorage.removeItem("vaso-force-custom-test-tube-size");
+} catch {
+  /* ignore */
+}
 
 export const useUIStore = create<UIState>((set, get) => ({
   theme: initialTheme,
@@ -213,8 +218,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   showClipping: false,
   showCompatibleInsert: initialShowCompatibleInsert,
   generateTestTubeSupport: initialGenerateTestTubeSupport,
-  forceTestTubeSupport: initialForceTestTubeSupport,
-  forceCustomTestTubeSize: initialForceCustomTestTubeSize,
+  forceTestTubeSupport: false,
+  forceCustomTestTubeSize: false,
   customTestTubeDiameterMm: initialCustomTestTubeDiameterMm,
   customTestTubeHeightMm: initialCustomTestTubeHeightMm,
   rotationMode: "camera",
@@ -256,8 +261,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     try {
       localStorage.setItem("vaso-generate-test-tube-support", String(v));
       if (!v) {
-        localStorage.setItem("vaso-force-test-tube-support", "false");
-        localStorage.setItem("vaso-force-custom-test-tube-size", "false");
+        localStorage.removeItem("vaso-force-test-tube-support");
+        localStorage.removeItem("vaso-force-custom-test-tube-size");
       }
     } catch {
       /* ignore */
@@ -274,11 +279,10 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
   setForceTestTubeSupport: (v) => {
     try {
-      localStorage.setItem("vaso-force-test-tube-support", String(v));
       if (v) {
         localStorage.setItem("vaso-generate-test-tube-support", "true");
       } else {
-        localStorage.setItem("vaso-force-custom-test-tube-size", "false");
+        localStorage.removeItem("vaso-force-custom-test-tube-size");
       }
     } catch {
       /* ignore */
@@ -291,11 +295,20 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
   setForceCustomTestTubeSize: (v) => {
     try {
-      localStorage.setItem("vaso-force-custom-test-tube-size", String(v));
+      if (v) {
+        localStorage.setItem("vaso-generate-test-tube-support", "true");
+      }
+      if (!v) {
+        localStorage.removeItem("vaso-force-custom-test-tube-size");
+      }
     } catch {
       /* ignore */
     }
-    set({ forceCustomTestTubeSize: v });
+    set(
+      v
+        ? { generateTestTubeSupport: true, forceTestTubeSupport: true, forceCustomTestTubeSize: true }
+        : { forceCustomTestTubeSize: false },
+    );
   },
   setCustomTestTubeDiameterMm: (v) => {
     const value = clampCustomTestTubeDiameter(v);

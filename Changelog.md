@@ -7,6 +7,16 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.79] - 2026-08-29
+
+### 🐛 Corrigé
+ - Force les options "Forcer Tube à Essais" et "Forcer une taille de tube à essai" à démarrer décochées à l'ouverture de Vaso Web.
+ - Conserve la gravure extérieure sous la base lorsque le mode tube à essai personnalisé est activé.
+ - Nettoie les anciennes préférences locales qui pouvaient réactiver automatiquement les options de forçage.
+
+### ✅ Tests
+ - Ajoute des tests pour l'état initial des options de forçage et la cohérence du mode tube personnalisé.
+
 ## [1.0.78] - 2026-08-29
 
 ### 🐛 Corrigé
