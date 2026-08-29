@@ -7,6 +7,14 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.73] - 2026-08-29
+
+### 🎨 Ajouté
+ - Ajoute le thème sombre "Vaso", inspiré du visuel bleu cristal sur fond noir.
+
+### 🎨 Modifié
+ - Place le thème "Vaso" en tête de liste et l'utilise comme thème par défaut.
+
 ## [1.0.72] - 2026-08-29
 
 ### 🎨 Modifié

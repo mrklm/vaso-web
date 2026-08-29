@@ -131,7 +131,7 @@ function loadSavedTheme(): Theme {
   } catch {
     /* ignore */
   }
-  return THEMES[0]; // Default: Midnight Garage
+  return THEMES[0]; // Default: Vaso
 }
 
 function loadSavedAdvancedStlUnlock(): boolean {

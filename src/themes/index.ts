@@ -12,6 +12,16 @@ export interface Theme {
 export const THEMES: Theme[] = [
   // Sombres
   {
+    name: "[Sombre] Vaso",
+    bg: "#02070A",
+    panel: "#061524",
+    field: "#0A2D4C",
+    fg: "#EAFBFF",
+    fieldFg: "#FFFFFF",
+    accent: "#16C8FF",
+    vase: "#129FE3",
+  },
+  {
     name: "[Sombre] Midnight Garage",
     bg: "#151515",
     panel: "#1F1F1F",
