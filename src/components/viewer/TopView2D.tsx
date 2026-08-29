@@ -24,8 +24,8 @@ export function TopView2D() {
   }
 
   const n = contour.length / 2;
-  const size = 200;
-  const margin = 20;
+  const size = 180;
+  const margin = 16;
   const plotSize = size - 2 * margin;
 
   // Find bounds

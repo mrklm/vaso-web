@@ -7,6 +7,12 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.74] - 2026-08-29
+
+### 🎨 Modifié
+ - Réduit la colonne de droite de l'atelier Vaso afin de rendre les vues Silhouette, Vue du haut et Contenant visibles plus facilement sans défilement.
+ - Diminue les dimensions des aperçus 2D et resserre les espacements du panneau latéral droit.
+
 ## [1.0.73] - 2026-08-29
 
 ### 🎨 Ajouté

@@ -28,9 +28,9 @@ export function ProfileView2D() {
   const maxZ = params.heightMm;
 
   // SVG dimensions
-  const w = 200,
-    h = 260;
-  const margin = 20;
+  const w = 180,
+    h = 210;
+  const margin = 16;
   const plotW = w - 2 * margin;
   const plotH = h - 2 * margin;
 

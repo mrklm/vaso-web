@@ -45,9 +45,9 @@ export function InsertView2D() {
   const { zValues, radiusValues } = profileData;
   const maxR = Math.max(...Array.from(radiusValues)) * 1.1;
   const maxZ = params.heightMm;
-  const w = 200;
-  const h = 260;
-  const margin = 20;
+  const w = 180;
+  const h = 210;
+  const margin = 16;
   const plotW = w - 2 * margin;
   const plotH = h - 2 * margin;
 
