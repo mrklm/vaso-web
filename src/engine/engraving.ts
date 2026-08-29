@@ -2,8 +2,8 @@ import * as THREE from "three";
 import { FontLoader, type Font } from "three/examples/jsm/loaders/FontLoader.js";
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { MeshData, VaseParameters } from "./types";
-import { appendPipelineTrace } from "./pipeline-trace";
-import { formatEngravingLines } from "./engraving-text";
+import { appendPipelineTrace, getPipelineTrace } from "./pipeline-trace";
+import { formatEngravingLines, formatSeedLabel, formatSupportEngravingLines } from "./engraving-text";
 import { offsetPlanarPolygon, sanitizePlanarContour } from "./engraving-planar";
 import {
   countBoundaryEdges,
@@ -18,6 +18,7 @@ const ROBOTO_FONT_URL = "/fonts/Roboto.json";
 const FONT_LINE_HEIGHT = 11;
 const FIT_MARGIN_MM = 4;
 const TARGET_ENGRAVING_DEPTH_MM = 0.9;
+const TARGET_UNDERSIDE_ENGRAVING_DEPTH_MM = 0.65;
 const MIN_REMAINING_BOTTOM_MM = 1.2;
 const ENGRAVING_SURFACE_OVERLAP_MM = 0.02;
 const GEOMETRY_WELD_TOLERANCE_MM = 1e-3;
@@ -26,16 +27,17 @@ const BOTTOM_FINISH_PLANE_TOLERANCE_MM = 5e-4;
 const ADDITIVE_TEXT_DEGENERATE_AREA_EPSILON_MM2 = 1e-12;
 const RAW_LINE_SIZES = [8.6, 7.8, 7.2] as const;
 const TEXT_LINE_WIDTH_FACTORS = [1.9, 1.9] as const;
+const UNDERSIDE_TEXT_WIDTH_FACTOR = 1.78;
+const UNDERSIDE_TEXT_MAX_HEIGHT_FACTOR = 0.28;
+const UNDERSIDE_TEXT_OFFSET_Y_FACTOR = -0.34;
+const UNDERSIDE_PATCH_RADIAL_STEPS = 144;
+const UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS = 8;
 const TEXT_SIGNATURE_HEIGHT_FACTOR = 0.92;
 const TEXT_MAX_HEIGHT_FACTOR = 0.78;
 const TEXT_LINE_GAP_FACTOR = 1.85;
-const SUPPORT_TEXT_MAX_HEIGHT_FACTOR = 1.62;
-const SUPPORT_TEXT_LINE_GAP_FACTOR = 0.58;
 const TEXT_SIDE_MARGIN_MM = 0.8;
 const TEXT_RESERVED_CENTER_CLEARANCE_MM = 0.2;
-const TEXT_SUPPORT_BAR_HALF_WIDTH_MM = 2.1;
-const TEXT_SUPPORT_RING_INNER_OFFSET_MM = 2.4;
-const TEXT_SUPPORT_RING_TOUCH_MARGIN_MM = 0.35;
+const SUPPORT_TEXT_VERTICAL_MARGIN_MM = 0.45;
 const TEXT_CURVE_SEGMENTS = 10;
 const PLANAR_TEXT_SIMPLIFICATION_MM = 0.05;
 
@@ -239,32 +241,6 @@ function getGeometrySize(
   return { width: size.x, height: size.y };
 }
 
-function getGeometryBounds(geometry: THREE.BufferGeometry): THREE.Box3 | null {
-  geometry.computeBoundingBox();
-  return geometry.boundingBox?.clone() ?? null;
-}
-
-function boundsIntersectsSupport(bounds: THREE.Box3, supportRadius: number): boolean {
-  const centerX = (bounds.min.x + bounds.max.x) * 0.5;
-  const centerY = (bounds.min.y + bounds.max.y) * 0.5;
-  const halfX = (bounds.max.x - bounds.min.x) * 0.5;
-  const halfY = (bounds.max.y - bounds.min.y) * 0.5;
-  const centerRadius = Math.hypot(centerX, centerY);
-  const halfDiagonal = Math.hypot(halfX, halfY);
-  const radialMin = Math.max(0, centerRadius - halfDiagonal);
-  const radialMax = centerRadius + halfDiagonal;
-  const ringInnerRadius = Math.max(0, supportRadius - TEXT_SUPPORT_RING_INNER_OFFSET_MM);
-  const ringOuterRadius = supportRadius + TEXT_SUPPORT_RING_TOUCH_MARGIN_MM;
-  const overlapsRing = radialMin <= ringOuterRadius && radialMax >= ringInnerRadius;
-  const overlapsVerticalBar =
-    Math.abs(centerX) <= TEXT_SUPPORT_BAR_HALF_WIDTH_MM + halfX &&
-    Math.abs(centerY) <= supportRadius + halfY;
-  const overlapsHorizontalBar =
-    Math.abs(centerY) <= TEXT_SUPPORT_BAR_HALF_WIDTH_MM + halfY &&
-    Math.abs(centerX) <= supportRadius + halfX;
-  return overlapsRing || overlapsVerticalBar || overlapsHorizontalBar;
-}
-
 function buildSupportAwareTextGeometry(
   font: Font,
   seed: number,
@@ -274,104 +250,68 @@ function buildSupportAwareTextGeometry(
   printSafe: boolean,
   supportRadius: number,
 ): THREE.BufferGeometry | null {
-  const lines = formatEngravingLines(seed, isSeedModified);
-  const lineCharacters = lines.map((line, lineIndex) => {
+  const lines = formatSupportEngravingLines(seed, isSeedModified);
+  const safeInnerRadius = supportRadius + SUPPORT_TEXT_VERTICAL_MARGIN_MM;
+  const safeOuterRadius = fitRadius - TEXT_SIDE_MARGIN_MM;
+  const availableBandHeight = safeOuterRadius - safeInnerRadius;
+  if (availableBandHeight <= 1) return null;
+
+  const lineResults = lines.map((line, lineIndex) => {
     const rawSize = RAW_LINE_SIZES[lineIndex] ?? RAW_LINE_SIZES[RAW_LINE_SIZES.length - 1];
-    return Array.from(line).map((character) => {
-      if (character === " ") {
-        return {
-          geometry: null,
-          width: rawSize * printSafeScale * 0.38,
-          rawSize,
-        };
-      }
-
-      const result = buildPrintableLineGeometry(font, character, rawSize, printSafeScale, printSafe);
-      const geometry = result.geometry;
-      const width = geometry
-        ? getGeometrySize(geometry, rawSize).width
-        : rawSize * printSafeScale * 0.5;
-      return { geometry, width, rawSize };
-    });
+    return {
+      geometry: buildPrintableLineGeometry(font, line, rawSize, printSafeScale, printSafe).geometry,
+      rawSize,
+    };
   });
+  const rawGeometries = lineResults
+    .map((result) => result.geometry)
+    .filter((geometry): geometry is THREE.BufferGeometry => geometry !== null);
+  if (rawGeometries.length === 0) return null;
 
-  const lineWidths = lineCharacters.map((characters) =>
-    characters.reduce((sum, character) => sum + character.width, 0));
-  const lineScales = lineWidths.map((width, index) => {
-    const widthFactor = TEXT_LINE_WIDTH_FACTORS[index];
-    if (widthFactor === undefined || width <= 0) return 1;
-    return (fitRadius * widthFactor) / width;
-  });
-
-  const referenceScale = lineScales[Math.min(1, lineScales.length - 1)] ?? 1;
-  for (let index = TEXT_LINE_WIDTH_FACTORS.length; index < lineScales.length; index++) {
-    const width = lineWidths[index] ?? 0;
-    const targetLineWidth = fitRadius * TEXT_LINE_WIDTH_FACTORS[TEXT_LINE_WIDTH_FACTORS.length - 1];
-    const widthScale = width > 0 ? targetLineWidth / width : referenceScale;
-    lineScales[index] = Math.min(referenceScale * TEXT_SIGNATURE_HEIGHT_FACTOR, widthScale);
-  }
-
-  const computeLineHeights = () => lineCharacters.map((characters, index) => {
-    const scale = lineScales[index] ?? 1;
-    return characters.reduce((height, character) => {
-      if (!character.geometry) return height;
-      return Math.max(height, getGeometrySize(character.geometry, character.rawSize).height * scale);
-    }, FONT_LINE_HEIGHT * scale);
-  });
-
-  let lineHeights = computeLineHeights();
-  let maxLineHeight = lineHeights.length > 0 ? Math.max(...lineHeights) : FONT_LINE_HEIGHT;
-  let lineGap = Math.max(0.8, maxLineHeight * SUPPORT_TEXT_LINE_GAP_FACTOR);
-  let totalHeight =
-    lineHeights.reduce((sum, height) => sum + height, 0) +
-    lineGap * Math.max(0, lineHeights.length - 1);
-
-  const maxTextHeight = fitRadius * SUPPORT_TEXT_MAX_HEIGHT_FACTOR;
-  if (totalHeight > maxTextHeight && totalHeight > 0) {
-    const heightScale = maxTextHeight / totalHeight;
-    for (let index = 0; index < lineScales.length; index += 1) {
-      lineScales[index] = (lineScales[index] ?? 1) * heightScale;
+  rawGeometries.forEach((geometry, index) => {
+    const fallbackSize = lineResults[index]?.rawSize ?? FONT_LINE_HEIGHT;
+    geometry.computeBoundingBox();
+    const bounds = geometry.boundingBox;
+    if (bounds) {
+      const center = bounds.getCenter(new THREE.Vector3());
+      geometry.translate(-center.x, -center.y, 0);
     }
-    lineHeights = computeLineHeights();
-    maxLineHeight = lineHeights.length > 0 ? Math.max(...lineHeights) : FONT_LINE_HEIGHT;
-    lineGap = Math.max(0.8, maxLineHeight * SUPPORT_TEXT_LINE_GAP_FACTOR);
-    totalHeight =
-      lineHeights.reduce((sum, height) => sum + height, 0) +
-      lineGap * Math.max(0, lineHeights.length - 1);
-  }
-  let currentTop = totalHeight * 0.5;
-  const lineCenters = lineHeights.map((lineHeight) => {
-    const centerY = currentTop - lineHeight * 0.5;
-    currentTop -= lineHeight + lineGap;
-    return centerY;
-  });
+    const size = getGeometrySize(geometry, fallbackSize);
+    if (size.width <= 0 || size.height <= 0) return;
 
-  const characterGeometries: THREE.BufferGeometry[] = [];
-  lineCharacters.forEach((characters, lineIndex) => {
-    const scale = lineScales[lineIndex] ?? 1;
-    const lineWidth = (lineWidths[lineIndex] ?? 0) * scale;
-    let cursorX = -lineWidth * 0.5;
+    const widthFactor =
+      TEXT_LINE_WIDTH_FACTORS[index] ??
+      TEXT_LINE_WIDTH_FACTORS[TEXT_LINE_WIDTH_FACTORS.length - 1];
+    let scale = Math.min(
+      (fitRadius * widthFactor) / size.width,
+      availableBandHeight / size.height,
+    );
+    let scaledHeight = size.height * scale;
+    let centerY = (safeInnerRadius + safeOuterRadius) * 0.5;
 
-    characters.forEach((character) => {
-      const width = character.width * scale;
-      const centerX = cursorX + width * 0.5;
-      cursorX += width;
-      if (!character.geometry) return;
-
-      character.geometry.scale(scale, scale, 1);
-      character.geometry.translate(centerX, lineCenters[lineIndex] ?? 0, 0);
-      const bounds = getGeometryBounds(character.geometry);
-      if (bounds && boundsIntersectsSupport(bounds, supportRadius)) {
-        character.geometry.dispose();
-        return;
+    for (let pass = 0; pass < 4; pass += 1) {
+      scaledHeight = size.height * scale;
+      centerY = safeInnerRadius + scaledHeight * 0.5;
+      const yForChord = Math.min(safeOuterRadius, centerY + scaledHeight * 0.5);
+      const allowedWidth = Math.max(
+        0,
+        Math.sqrt(Math.max(0, fitRadius * fitRadius - yForChord * yForChord)) * 2 -
+          TEXT_SIDE_MARGIN_MM * 2,
+      );
+      const scaledWidth = size.width * scale;
+      if (allowedWidth > 0 && scaledWidth > allowedWidth) {
+        scale *= allowedWidth / scaledWidth;
       }
-      characterGeometries.push(character.geometry);
-    });
+    }
+
+    scaledHeight = size.height * scale;
+    centerY = safeInnerRadius + scaledHeight * 0.5;
+    geometry.scale(scale, scale, 1);
+    geometry.translate(0, index === 0 ? centerY : -centerY, 0);
   });
 
-  if (characterGeometries.length === 0) return null;
-  const merged = mergeGeometries(characterGeometries, false);
-  characterGeometries.forEach((geometry) => geometry.dispose());
+  const merged = mergeGeometries(rawGeometries, false);
+  rawGeometries.forEach((geometry) => geometry.dispose());
   if (!merged) return null;
 
   appendPipelineTrace(
@@ -563,7 +503,9 @@ function combineMeshDataParts(parts: MeshData[]): MeshData {
   let vertexOffset = 0;
 
   for (const part of parts) {
-    vertices.push(...part.vertices);
+    for (const vertex of part.vertices) {
+      vertices.push(vertex);
+    }
     for (const index of part.indices) {
       indices.push(index + vertexOffset);
     }
@@ -574,6 +516,356 @@ function combineMeshDataParts(parts: MeshData[]): MeshData {
     vertices: new Float32Array(vertices),
     indices: new Uint32Array(indices),
   };
+}
+
+interface PlanarTextPolygon {
+  contour: THREE.Vector2[];
+  holes: THREE.Vector2[][];
+}
+
+function buildMirroredUndersideTextPolygons(
+  font: Font,
+  params: VaseParameters,
+  seed: number,
+  isSeedModified: boolean,
+  fitRadius: number,
+): PlanarTextPolygon[] {
+  void font;
+  void params;
+  const line = formatSeedLabel(seed, isSeedModified);
+  const digitWidth = 3.35;
+  const digitHeight = 6;
+  const segmentThickness = 0.9;
+  const digitGap = 1;
+  const activeSegmentsByDigit: Record<string, string[]> = {
+    "0": ["a", "b", "c", "d", "e", "f"],
+    "1": ["b", "c"],
+    "2": ["a", "b", "g", "e", "d"],
+    "3": ["a", "b", "g", "c", "d"],
+    "4": ["f", "g", "b", "c"],
+    "5": ["a", "f", "g", "c", "d"],
+    "6": ["a", "f", "g", "e", "c", "d"],
+    "7": ["a", "b", "c"],
+    "8": ["a", "b", "c", "d", "e", "f", "g"],
+    "9": ["a", "b", "c", "d", "f", "g"],
+  };
+  const horizontalWidth = digitWidth - segmentThickness * 0.65;
+  const verticalHeight = (digitHeight - segmentThickness * 1.15) * 0.5;
+  const upperVerticalY = digitHeight * 0.25;
+  const lowerVerticalY = -digitHeight * 0.25;
+  const segmentRects: Record<string, [number, number, number, number]> = {
+    a: [0, digitHeight * 0.5 - segmentThickness * 0.5, horizontalWidth, segmentThickness],
+    g: [0, 0, horizontalWidth, segmentThickness],
+    d: [0, -digitHeight * 0.5 + segmentThickness * 0.5, horizontalWidth, segmentThickness],
+    f: [-digitWidth * 0.5 + segmentThickness * 0.5, upperVerticalY, segmentThickness, verticalHeight],
+    b: [digitWidth * 0.5 - segmentThickness * 0.5, upperVerticalY, segmentThickness, verticalHeight],
+    e: [-digitWidth * 0.5 + segmentThickness * 0.5, lowerVerticalY, segmentThickness, verticalHeight],
+    c: [digitWidth * 0.5 - segmentThickness * 0.5, lowerVerticalY, segmentThickness, verticalHeight],
+  };
+  const polygons: PlanarTextPolygon[] = [];
+  const totalWidth = line.length * digitWidth + Math.max(0, line.length - 1) * digitGap;
+  const targetWidth = fitRadius * UNDERSIDE_TEXT_WIDTH_FACTOR - TEXT_SIDE_MARGIN_MM * 2;
+  const targetHeight = fitRadius * UNDERSIDE_TEXT_MAX_HEIGHT_FACTOR;
+  const scale = Math.min(targetWidth / totalWidth, targetHeight / digitHeight);
+  if (!Number.isFinite(scale) || scale <= 0) return [];
+  const offsetY = fitRadius * UNDERSIDE_TEXT_OFFSET_Y_FACTOR;
+
+  line.split("").forEach((digit, digitIndex) => {
+    const segments = activeSegmentsByDigit[digit] ?? [];
+    const digitCenterX = -totalWidth * 0.5 + digitWidth * 0.5 + digitIndex * (digitWidth + digitGap);
+    for (const segment of segments) {
+      const rect = segmentRects[segment];
+      if (!rect) continue;
+      const [localX, localY, width, height] = rect;
+      const cx = -(digitCenterX + localX) * scale;
+      const cy = localY * scale + offsetY;
+      const halfWidth = (width * scale) * 0.5;
+      const halfHeight = (height * scale) * 0.5;
+      const q = (value: number) => Math.round(value * 10000) / 10000;
+      polygons.push({
+        contour: [
+          new THREE.Vector2(q(cx - halfWidth), q(cy - halfHeight)),
+          new THREE.Vector2(q(cx + halfWidth), q(cy - halfHeight)),
+          new THREE.Vector2(q(cx + halfWidth), q(cy + halfHeight)),
+          new THREE.Vector2(q(cx - halfWidth), q(cy + halfHeight)),
+        ],
+        holes: [],
+      });
+    }
+  });
+  appendPipelineTrace(
+    `[engraving] underside segment text=${line},width=${(totalWidth * scale).toFixed(3)}mm,height=${(digitHeight * scale).toFixed(3)}mm,segments=${polygons.length}`,
+  );
+
+  return polygons;
+}
+
+function buildUndersideEngravedBottomPatch(
+  bottomOuterContour: Float64Array,
+  textPolygons: PlanarTextPolygon[],
+  depth: number,
+): MeshData {
+  const vertices: number[] = [];
+  const indices: number[] = [];
+  const sectorCount = bottomOuterContour.length / 2;
+  const subSectorCount = sectorCount * UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS;
+  const outerRingOffset = UNDERSIDE_PATCH_RADIAL_STEPS * subSectorCount;
+  const layerStride = outerRingOffset + sectorCount;
+  const textBounds = textPolygons.map((polygon) =>
+    polygon.contour.reduce(
+      (bounds, vertex) => ({
+        minX: Math.min(bounds.minX, vertex.x),
+        maxX: Math.max(bounds.maxX, vertex.x),
+        minY: Math.min(bounds.minY, vertex.y),
+        maxY: Math.max(bounds.maxY, vertex.y),
+      }),
+      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity },
+    ));
+  const nodeIndex = (zLayer: 0 | 1, subSector: number, radialStep: number) => {
+    if (radialStep >= UNDERSIDE_PATCH_RADIAL_STEPS) {
+      return zLayer * layerStride + outerRingOffset + Math.floor(subSector / UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS);
+    }
+    return zLayer * layerStride + radialStep * subSectorCount + (subSector + subSectorCount) % subSectorCount;
+  };
+
+  const outerXYAtSubSector = (subSector: number) => {
+    const baseSector = Math.floor(subSector / UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS) % sectorCount;
+    const nextBaseSector = (baseSector + 1) % sectorCount;
+    const localT = (subSector % UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS) / UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS;
+    const ax = bottomOuterContour[baseSector * 2];
+    const ay = bottomOuterContour[baseSector * 2 + 1];
+    const bx = bottomOuterContour[nextBaseSector * 2];
+    const by = bottomOuterContour[nextBaseSector * 2 + 1];
+    return {
+      x: ax + (bx - ax) * localT,
+      y: ay + (by - ay) * localT,
+    };
+  };
+
+  const nodeXY = (subSector: number, radialStep: number) => {
+    if (radialStep >= UNDERSIDE_PATCH_RADIAL_STEPS) {
+      const baseSector = Math.floor(subSector / UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS) % sectorCount;
+      return {
+        x: bottomOuterContour[baseSector * 2],
+        y: bottomOuterContour[baseSector * 2 + 1],
+      };
+    }
+    const t = radialStep / UNDERSIDE_PATCH_RADIAL_STEPS;
+    const outer = outerXYAtSubSector(subSector);
+    return {
+      x: outer.x * t,
+      y: outer.y * t,
+    };
+  };
+
+  const getCellCorners = (subSector: number, radialStep: number) => {
+    const nextSubSector = (subSector + 1) % subSectorCount;
+    return [
+      nodeXY(subSector, radialStep),
+      nodeXY(nextSubSector, radialStep),
+      nodeXY(subSector, radialStep + 1),
+      nodeXY(nextSubSector, radialStep + 1),
+    ];
+  };
+
+  const isTextCell = (subSector: number, radialStep: number) => {
+    if (radialStep >= UNDERSIDE_PATCH_RADIAL_STEPS - 1) return false;
+    const corners = getCellCorners(subSector, radialStep);
+    const cellBounds = corners.reduce(
+      (bounds, corner) => ({
+        minX: Math.min(bounds.minX, corner.x),
+        maxX: Math.max(bounds.maxX, corner.x),
+        minY: Math.min(bounds.minY, corner.y),
+        maxY: Math.max(bounds.maxY, corner.y),
+      }),
+      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity },
+    );
+    return textBounds.some((bounds) =>
+      cellBounds.maxX >= bounds.minX &&
+      cellBounds.minX <= bounds.maxX &&
+      cellBounds.maxY >= bounds.minY &&
+      cellBounds.minY <= bounds.maxY);
+  };
+
+  const textCells = Array.from({ length: subSectorCount }, (_, subSector) =>
+    Array.from({ length: UNDERSIDE_PATCH_RADIAL_STEPS }, (_, radialStep) =>
+      isTextCell(subSector, radialStep)));
+
+  for (const z of [0, depth]) {
+    for (let radialStep = 0; radialStep < UNDERSIDE_PATCH_RADIAL_STEPS; radialStep += 1) {
+      for (let subSector = 0; subSector < subSectorCount; subSector += 1) {
+        const { x, y } = nodeXY(subSector, radialStep);
+        vertices.push(x, y, z);
+      }
+    }
+    for (let sector = 0; sector < sectorCount; sector += 1) {
+      vertices.push(bottomOuterContour[sector * 2], bottomOuterContour[sector * 2 + 1], z);
+    }
+  }
+
+  const addQuad = (a: number, b: number, c: number, d: number, flip = false) => {
+    if (flip) {
+      indices.push(a, c, b, b, c, d);
+    } else {
+      indices.push(a, b, c, b, d, c);
+    }
+  };
+
+  for (let subSector = 0; subSector < subSectorCount; subSector += 1) {
+    const nextSubSector = (subSector + 1) % subSectorCount;
+    for (let radialStep = 0; radialStep < UNDERSIDE_PATCH_RADIAL_STEPS - 1; radialStep += 1) {
+      const isPocket = textCells[subSector][radialStep];
+      const zLayer = isPocket ? 1 : 0;
+
+      addQuad(
+        nodeIndex(zLayer, subSector, radialStep),
+        nodeIndex(zLayer, nextSubSector, radialStep),
+        nodeIndex(zLayer, subSector, radialStep + 1),
+        nodeIndex(zLayer, nextSubSector, radialStep + 1),
+      );
+
+      const neighbors = [
+        {
+          differs: radialStep > 0 && textCells[subSector][radialStep - 1] !== isPocket,
+          a: nodeIndex(0, subSector, radialStep),
+          b: nodeIndex(0, nextSubSector, radialStep),
+          c: nodeIndex(1, subSector, radialStep),
+          d: nodeIndex(1, nextSubSector, radialStep),
+        },
+        {
+          differs: textCells[subSector][radialStep + 1] !== isPocket,
+          a: nodeIndex(0, subSector, radialStep + 1),
+          b: nodeIndex(0, nextSubSector, radialStep + 1),
+          c: nodeIndex(1, subSector, radialStep + 1),
+          d: nodeIndex(1, nextSubSector, radialStep + 1),
+        },
+        {
+          differs: textCells[(subSector + subSectorCount - 1) % subSectorCount][radialStep] !== isPocket,
+          a: nodeIndex(0, subSector, radialStep),
+          b: nodeIndex(0, subSector, radialStep + 1),
+          c: nodeIndex(1, subSector, radialStep),
+          d: nodeIndex(1, subSector, radialStep + 1),
+        },
+        {
+          differs: textCells[nextSubSector][radialStep] !== isPocket,
+          a: nodeIndex(0, nextSubSector, radialStep),
+          b: nodeIndex(0, nextSubSector, radialStep + 1),
+          c: nodeIndex(1, nextSubSector, radialStep),
+          d: nodeIndex(1, nextSubSector, radialStep + 1),
+        },
+      ];
+
+      if (isPocket) {
+        for (const neighbor of neighbors) {
+          if (neighbor.differs) {
+            addQuad(neighbor.a, neighbor.b, neighbor.c, neighbor.d, true);
+          }
+        }
+      }
+    }
+  }
+  for (let sector = 0; sector < sectorCount; sector += 1) {
+    const startSubSector = sector * UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS;
+    const outerA = nodeIndex(0, startSubSector, UNDERSIDE_PATCH_RADIAL_STEPS);
+    const outerB = nodeIndex(
+      0,
+      (startSubSector + UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS) % subSectorCount,
+      UNDERSIDE_PATCH_RADIAL_STEPS,
+    );
+    const innerEnd = nodeIndex(
+      0,
+      (startSubSector + UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS) % subSectorCount,
+      UNDERSIDE_PATCH_RADIAL_STEPS - 1,
+    );
+    indices.push(outerA, innerEnd, outerB);
+    for (let offset = UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS - 1; offset >= 0; offset -= 1) {
+      const innerCurrent = nodeIndex(0, startSubSector + offset, UNDERSIDE_PATCH_RADIAL_STEPS - 1);
+      const innerNext = nodeIndex(0, startSubSector + offset + 1, UNDERSIDE_PATCH_RADIAL_STEPS - 1);
+      indices.push(outerA, innerCurrent, innerNext);
+    }
+  }
+  appendPipelineTrace(`[engraving] underside radial patch:sectors=${sectorCount},subSectors=${subSectorCount},steps=${UNDERSIDE_PATCH_RADIAL_STEPS}`);
+
+  return removeDegenerateTriangles({
+    vertices: new Float32Array(vertices),
+    indices: new Uint32Array(indices),
+  }, ADDITIVE_TEXT_DEGENERATE_AREA_EPSILON_MM2);
+}
+
+function removeFlatUndersideCap(meshData: MeshData): MeshData {
+  const indices: number[] = [];
+  for (let tri = 0; tri < meshData.indices.length; tri += 3) {
+    const a = meshData.indices[tri];
+    const b = meshData.indices[tri + 1];
+    const c = meshData.indices[tri + 2];
+    const allOnUnderside =
+      Math.abs(meshData.vertices[a * 3 + 2]) <= BOTTOM_FINISH_PLANE_TOLERANCE_MM &&
+      Math.abs(meshData.vertices[b * 3 + 2]) <= BOTTOM_FINISH_PLANE_TOLERANCE_MM &&
+      Math.abs(meshData.vertices[c * 3 + 2]) <= BOTTOM_FINISH_PLANE_TOLERANCE_MM;
+    if (!allOnUnderside) {
+      indices.push(a, b, c);
+    }
+  }
+  return { vertices: meshData.vertices, indices: new Uint32Array(indices) };
+}
+
+function engraveUndersideText(
+  meshData: MeshData,
+  params: VaseParameters,
+  bottomOuterContour: Float64Array,
+  font: Font,
+  seed: number,
+  isSeedModified: boolean,
+): MeshData | null {
+  if (!params.closeBottom) return null;
+
+  const effectiveDepth = Math.min(
+    TARGET_UNDERSIDE_ENGRAVING_DEPTH_MM,
+    params.bottomThicknessMm - MIN_REMAINING_BOTTOM_MM,
+  );
+  if (effectiveDepth <= 0) {
+    appendPipelineTrace(`[engraving] underside skipped: effective depth=${effectiveDepth.toFixed(3)}mm`);
+    return null;
+  }
+
+  const fitRadius = computeContourMinRadius(bottomOuterContour) - FIT_MARGIN_MM;
+  if (fitRadius <= 8) {
+    appendPipelineTrace(`[engraving] underside skipped: fit radius too small (${fitRadius.toFixed(3)}mm)`);
+    return null;
+  }
+
+  const textPolygons = buildMirroredUndersideTextPolygons(
+    font,
+    params,
+    seed,
+    isSeedModified,
+    fitRadius,
+  );
+  if (textPolygons.length === 0) {
+    appendPipelineTrace("[engraving] underside skipped: no text polygons");
+    return null;
+  }
+
+  const engraved = removeDegenerateTriangles(
+    combineMeshDataParts([
+      removeFlatUndersideCap(meshData),
+      buildUndersideEngravedBottomPatch(bottomOuterContour, textPolygons, effectiveDepth),
+    ]),
+    ADDITIVE_TEXT_DEGENERATE_AREA_EPSILON_MM2,
+  );
+  const diagnostics = logMeshDiagnostics("[engraving] underside engraved candidate", engraved);
+  appendPipelineTrace(
+    `[engraving] underside loops:z0=${countBoundaryLoopsAtZ(engraved, 0, BOTTOM_FINISH_PLANE_TOLERANCE_MM)},zDepth=${countBoundaryLoopsAtZ(engraved, effectiveDepth, BOTTOM_FINISH_PLANE_TOLERANCE_MM)}`,
+  );
+
+  if (diagnostics.boundaryEdges > 0) {
+    appendPipelineTrace(
+      `[engraving] underside rejected: boundaryEdges=${diagnostics.boundaryEdges},boundaryLoops=${diagnostics.boundaryLoops}`,
+    );
+    return null;
+  }
+
+  return engraved;
 }
 
 function subdivideBottomCapTriangles(
@@ -743,6 +1035,25 @@ export async function engraveBaseText(
   traceMesh("[engraving] input mesh", meshData, PLANAR_PATCH_TOLERANCE_MM);
   traceMeshComparison("[engraving] compare input vs base", meshData, meshData, PLANAR_PATCH_TOLERANCE_MM, comparisonTimeline);
   const font = await loadRobotoFont();
+  if (reservedCenterRadius > 0) {
+    const undersideEngraved = engraveUndersideText(
+      meshData,
+      params,
+      bottomOuterContour,
+      font,
+      seed,
+      isSeedModified,
+    );
+    if (undersideEngraved) {
+      traceMesh("[engraving] after underside subtractive text", undersideEngraved, PLANAR_PATCH_TOLERANCE_MM);
+      traceMeshComparison("[engraving] compare underside vs base", meshData, undersideEngraved, PLANAR_PATCH_TOLERANCE_MM, comparisonTimeline);
+      summarizeComparisonTimeline(comparisonTimeline);
+      return undersideEngraved;
+    }
+
+    throw new Error(`La gravure extérieure sous la base n'a pas pu être générée. trace=${getPipelineTrace()}`);
+  }
+
   const additiveTextGeometry = buildAdditiveTextGeometry(
     font,
     params,

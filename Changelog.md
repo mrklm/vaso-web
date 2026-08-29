@@ -7,6 +7,17 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.72] - 2026-08-29
+
+### 🎨 Modifié
+ - Déplace la gravure des vases avec support tube à essai sous la face extérieure de la base, en soustraction de matière.
+ - Remplace le marquage intérieur fragmenté par un numéro extérieur lisible depuis le dessous du vase.
+ - Améliore la robustesse STL et Cura de la gravure extérieure avec un patch fermé, sur-échantillonné et orienté pour le slicing.
+ - Stabilise les chiffres fragiles avec une police à segments continus pour éviter les caractères manquants.
+
+### ✅ Tests
+ - Ajoute des tests d'export pour les seeds de régression `06964026`, `91127199`, `77777777` et `44444444`.
+
 ## [1.0.71] - 2026-08-18
 
 ### 🎨 Ajouté

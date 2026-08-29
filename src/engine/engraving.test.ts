@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ShapeUtils, Vector2 } from "three";
-import { formatEngravingLines, formatSeedLabel } from "./engraving-text";
+import { formatEngravingLines, formatSeedLabel, formatSupportEngravingLines } from "./engraving-text";
 import { offsetPlanarPolygon, sanitizePlanarContour } from "./engraving-planar";
 
 describe("engraving planar contour cleanup", () => {
@@ -100,5 +100,12 @@ describe("engraving planar contour cleanup", () => {
   it("adds an M suffix when the seed was manually modified", () => {
     expect(formatSeedLabel(1234, true)).toBe("00001234M");
     expect(formatEngravingLines(1234, true)[1]).toBe("00001234M");
+  });
+
+  it("formats support engraving without an isolated middle seed line", () => {
+    expect(formatSupportEngravingLines(11732460)).toEqual([
+      "VASO vtest",
+      "N° 11732460",
+    ]);
   });
 });
