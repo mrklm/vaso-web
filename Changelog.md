@@ -7,6 +7,15 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.78] - 2026-08-29
+
+### 🐛 Corrigé
+ - Corrige l'erreur d'export STL en production lorsque le module de gravure chargeait un ancien chunk JavaScript après déploiement.
+ - Intègre la gravure STL dans le bundle principal pour éviter les imports dynamiques périmés côté navigateur.
+
+### ✅ Tests
+ - Ajuste le délai du test d'export des gravures extérieures pour les vases tube à essai générés.
+
 ## [1.0.77] - 2026-08-29
 
 ### 🐛 Corrigé

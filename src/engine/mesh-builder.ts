@@ -31,6 +31,7 @@ import {
   getTestTubePlacement,
   type InsertPreset,
 } from "./insert-compatibility";
+import { engraveBaseText } from "./engraving";
 
 const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "test";
 const ENGRAVING_PIPELINE_MARKER = `Vaso Engraving ${APP_VERSION}`;
@@ -743,7 +744,6 @@ export async function generateVaseMeshWithEngraving(
   resetPipelineTrace();
 
   try {
-    const { engraveBaseText } = await import("./engraving");
     const zOuter = linspace(0, params.heightMm, params.verticalSamples);
     const outerContours = generateSupportSafeOuterContours(params, zOuter);
     const mesh = generateVaseMeshInternal(params, options);

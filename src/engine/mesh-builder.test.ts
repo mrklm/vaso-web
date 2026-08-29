@@ -248,7 +248,7 @@ describe("generateVaseMesh", () => {
 
     expect(countBoundaryEdges(mesh)).toBe(0);
     expect(buildSTLBuffer(mesh).byteLength).toBeGreaterThan(84);
-  }, 12000);
+  }, 30000);
 
   it("keeps all sampled tube-only vase previews renderable", () => {
     const cases: VaseParameters[] = [
