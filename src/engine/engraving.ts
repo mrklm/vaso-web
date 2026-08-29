@@ -3,7 +3,7 @@ import { FontLoader, type Font } from "three/examples/jsm/loaders/FontLoader.js"
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { MeshData, VaseParameters } from "./types";
 import { appendPipelineTrace, getPipelineTrace } from "./pipeline-trace";
-import { formatEngravingLines, formatSeedLabel, formatSupportEngravingLines } from "./engraving-text";
+import { formatEngravingLines, formatSupportEngravingLines } from "./engraving-text";
 import { offsetPlanarPolygon, sanitizePlanarContour } from "./engraving-planar";
 import {
   countBoundaryEdges,
@@ -532,7 +532,7 @@ function buildMirroredUndersideTextPolygons(
 ): PlanarTextPolygon[] {
   void font;
   void params;
-  const line = formatSeedLabel(seed, isSeedModified);
+  const numberLine = formatEngravingLines(seed, isSeedModified)[1];
   const digitWidth = 3.35;
   const digitHeight = 6;
   const segmentThickness = 0.9;
@@ -563,38 +563,46 @@ function buildMirroredUndersideTextPolygons(
     c: [digitWidth * 0.5 - segmentThickness * 0.5, lowerVerticalY, segmentThickness, verticalHeight],
   };
   const polygons: PlanarTextPolygon[] = [];
-  const totalWidth = line.length * digitWidth + Math.max(0, line.length - 1) * digitGap;
+  const numberWidth = numberLine.length * digitWidth + Math.max(0, numberLine.length - 1) * digitGap;
   const targetWidth = fitRadius * UNDERSIDE_TEXT_WIDTH_FACTOR - TEXT_SIDE_MARGIN_MM * 2;
-  const targetHeight = fitRadius * UNDERSIDE_TEXT_MAX_HEIGHT_FACTOR;
-  const scale = Math.min(targetWidth / totalWidth, targetHeight / digitHeight);
-  if (!Number.isFinite(scale) || scale <= 0) return [];
+  const numberScale = Math.min(targetWidth / numberWidth, (fitRadius * UNDERSIDE_TEXT_MAX_HEIGHT_FACTOR) / digitHeight);
+  if (!Number.isFinite(numberScale) || numberScale <= 0) return [];
   const offsetY = fitRadius * UNDERSIDE_TEXT_OFFSET_Y_FACTOR;
+  const q = (value: number) => Math.round(value * 10000) / 10000;
 
-  line.split("").forEach((digit, digitIndex) => {
+  const addRect = (centerX: number, centerY: number, width: number, height: number) => {
+    const cx = -centerX;
+    const cy = centerY;
+    const halfWidth = width * 0.5;
+    const halfHeight = height * 0.5;
+    polygons.push({
+      contour: [
+        new THREE.Vector2(q(cx - halfWidth), q(cy - halfHeight)),
+        new THREE.Vector2(q(cx + halfWidth), q(cy - halfHeight)),
+        new THREE.Vector2(q(cx + halfWidth), q(cy + halfHeight)),
+        new THREE.Vector2(q(cx - halfWidth), q(cy + halfHeight)),
+      ],
+      holes: [],
+    });
+  };
+
+  numberLine.split("").forEach((digit, digitIndex) => {
     const segments = activeSegmentsByDigit[digit] ?? [];
-    const digitCenterX = -totalWidth * 0.5 + digitWidth * 0.5 + digitIndex * (digitWidth + digitGap);
+    const digitCenterX = -numberWidth * 0.5 + digitWidth * 0.5 + digitIndex * (digitWidth + digitGap);
     for (const segment of segments) {
       const rect = segmentRects[segment];
       if (!rect) continue;
       const [localX, localY, width, height] = rect;
-      const cx = -(digitCenterX + localX) * scale;
-      const cy = localY * scale + offsetY;
-      const halfWidth = (width * scale) * 0.5;
-      const halfHeight = (height * scale) * 0.5;
-      const q = (value: number) => Math.round(value * 10000) / 10000;
-      polygons.push({
-        contour: [
-          new THREE.Vector2(q(cx - halfWidth), q(cy - halfHeight)),
-          new THREE.Vector2(q(cx + halfWidth), q(cy - halfHeight)),
-          new THREE.Vector2(q(cx + halfWidth), q(cy + halfHeight)),
-          new THREE.Vector2(q(cx - halfWidth), q(cy + halfHeight)),
-        ],
-        holes: [],
-      });
+      addRect(
+        (digitCenterX + localX) * numberScale,
+        localY * numberScale + offsetY,
+        width * numberScale,
+        height * numberScale,
+      );
     }
   });
   appendPipelineTrace(
-    `[engraving] underside segment text=${line},width=${(totalWidth * scale).toFixed(3)}mm,height=${(digitHeight * scale).toFixed(3)}mm,segments=${polygons.length}`,
+    `[engraving] underside segment text=${numberLine},width=${(numberWidth * numberScale).toFixed(3)}mm,height=${(digitHeight * numberScale).toFixed(3)}mm,offsetY=${offsetY.toFixed(3)}mm,segments=${polygons.length}`,
   );
 
   return polygons;
