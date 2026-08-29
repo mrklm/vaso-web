@@ -7,6 +7,14 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.81] - 2026-08-30
+
+### 🐛 Corrigé
+ - Renforce l'amplitude minimale de la texture LowPoly pour qu'elle reste visible avec les zooms fins.
+
+### ✅ Tests
+ - Ajoute un test vérifiant que le relief LowPoly reste mesurable en zoom Très fin.
+
 ## [1.0.80] - 2026-08-29
 
 ### 🎨 Ajouté

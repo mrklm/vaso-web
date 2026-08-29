@@ -216,7 +216,7 @@ export function applySingleTexture(
       {
         const angularCells = Math.max(4, Math.round(baseFrequency * 0.72));
         const verticalCells = Math.max(3, Math.round(baseFrequency * 0.46));
-        const facetAmplitude = amplitudeMm * 0.82;
+        const facetAmplitude = Math.min(5.6, Math.max(2.4, amplitudeMm * 0.95));
         for (let i = 0; i < n; i++) {
           offset[i] =
             facetAmplitude *

@@ -118,6 +118,16 @@ describe("applySingleTexture", () => {
 
     expect(radialSpan(result)).toBeGreaterThan(2);
   });
+
+  it("keeps low-poly relief visible with fine zooms", () => {
+    const roundProfile = createProfile({ zRatio: 0, diameter: 80, sides: 96, rotationDeg: 0 });
+    const contour = buildProfileContour(roundProfile, 96);
+    const params = defaultVaseParameters();
+
+    const result = applySingleTexture(contour, 90, "LowPoly", "Très fin", params);
+
+    expect(radialSpan(result)).toBeGreaterThan(1.5);
+  });
 });
 
 describe("applyTexture", () => {
