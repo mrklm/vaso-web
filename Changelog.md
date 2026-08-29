@@ -7,6 +7,15 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.76] - 2026-08-29
+
+### 🐛 Corrigé
+ - Corrige l'option "Forcer Tube à Essais" qui pouvait rester grisée selon les préférences locales du navigateur.
+ - Réactive automatiquement la génération du support tube à essai lorsque le forçage du tube est activé.
+
+### ✅ Tests
+ - Ajoute un test pour vérifier la cohérence entre l'option de support tube à essai et l'option de forçage.
+
 ## [1.0.75] - 2026-08-29
 
 ### 🎨 Ajouté

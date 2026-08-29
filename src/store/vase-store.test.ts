@@ -163,4 +163,14 @@ describe("vaseStore", () => {
     expect(params.heightMm).toBeGreaterThanOrEqual(170);
     expect(analyzeWaterproofInsertCompatibility(params, customTube).type).toBe("test_tube");
   });
+
+  it("reenables test tube support when forcing test tube generation", () => {
+    useUIStore.getState().setGenerateTestTubeSupport(false);
+    expect(useUIStore.getState().generateTestTubeSupport).toBe(false);
+
+    useUIStore.getState().setForceTestTubeSupport(true);
+
+    expect(useUIStore.getState().generateTestTubeSupport).toBe(true);
+    expect(useUIStore.getState().forceTestTubeSupport).toBe(true);
+  });
 });

@@ -186,7 +186,6 @@ export function SettingsPanel() {
           <input
             type="checkbox"
             checked={forceTestTubeSupport}
-            disabled={!generateTestTubeSupport}
             onChange={(e) => setForceTestTubeSupport(e.target.checked)}
           />
           Forcer Tube à Essais
@@ -199,7 +198,6 @@ export function SettingsPanel() {
               <input
                 type="checkbox"
                 checked={forceCustomTestTubeSize}
-                disabled={!generateTestTubeSupport}
                 onChange={(e) => setForceCustomTestTubeSize(e.target.checked)}
               />
               Forcer une taille de tube à essai
@@ -214,7 +212,6 @@ export function SettingsPanel() {
                 min={10}
                 max={40}
                 step={0.5}
-                disabled={!generateTestTubeSupport}
               />
               <NumberInput
                 label="Hauteur tube (mm)"
@@ -224,7 +221,6 @@ export function SettingsPanel() {
                 max={maxCustomTestTubeHeight}
                 step={1}
                 integer
-                disabled={!generateTestTubeSupport}
               />
             </div>
           )}

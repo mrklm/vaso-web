@@ -255,18 +255,39 @@ export const useUIStore = create<UIState>((set, get) => ({
   setGenerateTestTubeSupport: (v) => {
     try {
       localStorage.setItem("vaso-generate-test-tube-support", String(v));
+      if (!v) {
+        localStorage.setItem("vaso-force-test-tube-support", "false");
+        localStorage.setItem("vaso-force-custom-test-tube-size", "false");
+      }
     } catch {
       /* ignore */
     }
-    set({ generateTestTubeSupport: v });
+    set(
+      v
+        ? { generateTestTubeSupport: true }
+        : {
+            generateTestTubeSupport: false,
+            forceTestTubeSupport: false,
+            forceCustomTestTubeSize: false,
+          },
+    );
   },
   setForceTestTubeSupport: (v) => {
     try {
       localStorage.setItem("vaso-force-test-tube-support", String(v));
+      if (v) {
+        localStorage.setItem("vaso-generate-test-tube-support", "true");
+      } else {
+        localStorage.setItem("vaso-force-custom-test-tube-size", "false");
+      }
     } catch {
       /* ignore */
     }
-    set({ forceTestTubeSupport: v });
+    set(
+      v
+        ? { generateTestTubeSupport: true, forceTestTubeSupport: true }
+        : { forceTestTubeSupport: false, forceCustomTestTubeSize: false },
+    );
   },
   setForceCustomTestTubeSize: (v) => {
     try {
