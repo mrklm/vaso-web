@@ -250,6 +250,28 @@ describe("generateVaseMesh", () => {
     expect(buildSTLBuffer(mesh).byteLength).toBeGreaterThan(84);
   }, 30000);
 
+  it("keeps underside engraving watertight on low-poly test-tube vases", async () => {
+    const params = createTwoProfileVase(180, 60, 42);
+    params.radialSamples = 96;
+    params.verticalSamples = 120;
+    params.textureMode = "Texture imposée";
+    params.textureType = "LowPoly";
+    params.textureZoom = "Moyen";
+    const fontJson = JSON.parse(robotoFontJson);
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify(fontJson), { status: 200 });
+
+    let mesh: Awaited<ReturnType<typeof generateVaseMeshWithEngraving>>;
+    try {
+      mesh = await generateVaseMeshWithEngraving(params, 60774141, true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(countBoundaryEdges(mesh)).toBe(0);
+    expect(buildSTLBuffer(mesh).byteLength).toBeGreaterThan(84);
+  }, 30000);
+
   it("keeps all sampled tube-only vase previews renderable", () => {
     const cases: VaseParameters[] = [
       createTwoProfileVase(122, 50, 40),

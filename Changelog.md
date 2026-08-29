@@ -7,6 +7,19 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.80] - 2026-08-29
+
+### 🎨 Ajouté
+ - Remplace la texture LowPoly par une vraie géométrie facettée avec une maille dédiée et un rendu 3D en faces plates.
+
+### 🐛 Corrigé
+ - Préserve la finesse de la gravure extérieure sous la base sur les vases LowPoly.
+ - Corrige le raccord du patch de gravure LowPoly pour conserver un STL étanche à l'export.
+
+### ✅ Tests
+ - Ajoute un test d'export LowPoly avec support tube à essai et numéro de vase modifié.
+ - Ajoute un test de relief mesurable pour la texture LowPoly.
+
 ## [1.0.79] - 2026-08-29
 
 ### 🐛 Corrigé

@@ -34,6 +34,33 @@ export function getMaxInwardTextureOffsetMm(params: VaseParameters): number {
   return 0;
 }
 
+export function usesLowPolyTexture(params: VaseParameters): boolean {
+  if (params.textureMode === "Pas de texture") return false;
+  if (params.textureMode === "Double texture") {
+    return params.textureType === "LowPoly" || params.textureType2 === "LowPoly";
+  }
+  return params.textureType === "LowPoly";
+}
+
+export function getLowPolyMeshResolution(params: VaseParameters): {
+  radialSamples: number;
+  verticalSamples: number;
+} | null {
+  if (!usesLowPolyTexture(params)) return null;
+
+  const zoom =
+    params.textureType === "LowPoly"
+      ? params.textureZoom
+      : params.textureType2 === "LowPoly"
+        ? params.textureZoom2
+        : params.textureZoom;
+  const [, baseFrequency] = textureZoomToParams(zoom);
+  return {
+    radialSamples: Math.max(8, Math.min(params.radialSamples, Math.round(baseFrequency * 1.12))),
+    verticalSamples: Math.max(6, Math.min(params.verticalSamples, Math.round(baseFrequency * 0.84))),
+  };
+}
+
 function staggeredVerticalWave(
   angle: number,
   angularFrequency: number,
@@ -45,6 +72,53 @@ function staggeredVerticalWave(
     0.52 * Math.sin(angularFrequency * angle) +
     0.18 * Math.sin((angularFrequency * 0.5 + 1.0) * angle);
   return Math.sin(PI2 * verticalFrequency * zRatio + angularPhase);
+}
+
+function hash01(x: number, y: number, salt: number): number {
+  const value = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453123;
+  return value - Math.floor(value);
+}
+
+function lowPolyCornerOffset(cellX: number, cellY: number, angularCells: number): number {
+  const wrappedX = ((cellX % angularCells) + angularCells) % angularCells;
+  const random = hash01(wrappedX, cellY, 0.37) * 2 - 1;
+  const wave =
+    0.46 * Math.sin((wrappedX / angularCells) * Math.PI * 2 + cellY * 0.78) +
+    0.34 * Math.cos((wrappedX / angularCells) * Math.PI * 4 - cellY * 0.52) +
+    0.2 * random;
+  return Math.round(Math.max(-1, Math.min(1, wave)) * 2) / 2;
+}
+
+function lowPolyFacetOffset(
+  angle: number,
+  zRatio: number,
+  angularCells: number,
+  verticalCells: number,
+): number {
+  const PI2 = 2 * Math.PI;
+  const u = ((angle + PI2) % PI2) / PI2;
+  const v = Math.max(0, Math.min(1, zRatio));
+
+  const gridX = u * angularCells;
+  const cellX = Math.floor(gridX);
+  const localX = gridX - cellX;
+
+  const gridY = v * verticalCells;
+  const cellY = Math.min(verticalCells - 1, Math.floor(gridY));
+  const localY = cellY === verticalCells - 1 && gridY >= verticalCells ? 1 : gridY - cellY;
+
+  const bottomLeft = lowPolyCornerOffset(cellX, cellY, angularCells);
+  const bottomRight = lowPolyCornerOffset(cellX + 1, cellY, angularCells);
+  const topLeft = lowPolyCornerOffset(cellX, cellY + 1, angularCells);
+  const topRight = lowPolyCornerOffset(cellX + 1, cellY + 1, angularCells);
+
+  if (localX + localY <= 1) {
+    return bottomLeft + (bottomRight - bottomLeft) * localX + (topLeft - bottomLeft) * localY;
+  }
+
+  const inverseX = 1 - localX;
+  const inverseY = 1 - localY;
+  return topRight + (topLeft - topRight) * inverseX + (bottomRight - topRight) * inverseY;
 }
 
 /**
@@ -140,10 +214,14 @@ export function applySingleTexture(
 
     case "LowPoly":
       {
-        const step = PI2 / Math.max(6, angularCycles);
+        const angularCells = Math.max(4, Math.round(baseFrequency * 0.72));
+        const verticalCells = Math.max(3, Math.round(baseFrequency * 0.46));
+        const facetAmplitude = amplitudeMm * 0.82;
         for (let i = 0; i < n; i++) {
-          const aq = Math.round(angles[i] / step) * step;
-          offset[i] = amplitudeMm * envelope * Math.sign(Math.cos(aq * Math.max(3, angularCycles)));
+          offset[i] =
+            facetAmplitude *
+            envelope *
+            lowPolyFacetOffset(angles[i], zRatio, angularCells, verticalCells);
         }
       }
       break;

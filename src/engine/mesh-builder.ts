@@ -13,7 +13,7 @@ import {
   interpolateContours,
   regularPolygonVertices,
 } from "./geometry";
-import { applyTexture } from "./textures";
+import { applyTexture, getLowPolyMeshResolution } from "./textures";
 import {
   maxSupportlessRadialStep,
   limitContourStepFromPrevious,
@@ -625,14 +625,17 @@ function generateVaseMeshInternal(
   params: VaseParameters,
   options: GenerateVaseMeshOptions = {},
 ): MeshData {
-  validateParams(params);
+  const lowPolyResolution = getLowPolyMeshResolution(params);
+  const meshParams = lowPolyResolution ? { ...params, ...lowPolyResolution } : params;
 
-  const ringSize = params.radialSamples;
-  const layers = params.verticalSamples;
+  validateParams(meshParams);
 
-  const zOuter = linspace(0, params.heightMm, layers);
-  const zInnerBottom = Math.min(params.bottomThicknessMm, params.heightMm);
-  const outerContours = generateSupportSafeOuterContours(params, zOuter);
+  const ringSize = meshParams.radialSamples;
+  const layers = meshParams.verticalSamples;
+
+  const zOuter = linspace(0, meshParams.heightMm, layers);
+  const zInnerBottom = Math.min(meshParams.bottomThicknessMm, meshParams.heightMm);
+  const outerContours = generateSupportSafeOuterContours(meshParams, zOuter);
   const { zInner, sourceContours: innerSourceContours } = buildInnerWallSourceContours(
     outerContours,
     zOuter,
@@ -658,7 +661,7 @@ function generateVaseMeshInternal(
 
   // Inner wall vertices
   for (let layer = 0; layer < zInner.length; layer++) {
-    const innerContour = computeInnerContour(innerSourceContours[layer], params.wallThicknessMm);
+    const innerContour = computeInnerContour(innerSourceContours[layer], meshParams.wallThicknessMm);
     const ringStart = verts.length / 3;
     const z = zInner[layer];
     for (let i = 0; i < ringSize; i++) {
@@ -706,7 +709,7 @@ function generateVaseMeshInternal(
   }
 
   // Bottom cap
-  if (params.closeBottom) {
+  if (meshParams.closeBottom) {
     const outerBottom = outerRingStarts[0];
     const outerCenter = verts.length / 3;
     verts.push(0, 0, 0);
@@ -719,7 +722,7 @@ function generateVaseMeshInternal(
     // Inner bottom floor cap
     const innerBottom = innerRingStarts[0];
     addInnerBottomCap(
-      params,
+      meshParams,
       verts,
       faces,
       innerBottom,
@@ -744,8 +747,10 @@ export async function generateVaseMeshWithEngraving(
   resetPipelineTrace();
 
   try {
-    const zOuter = linspace(0, params.heightMm, params.verticalSamples);
-    const outerContours = generateSupportSafeOuterContours(params, zOuter);
+    const lowPolyResolution = getLowPolyMeshResolution(params);
+    const meshParams = lowPolyResolution ? { ...params, ...lowPolyResolution } : params;
+    const zOuter = linspace(0, meshParams.heightMm, meshParams.verticalSamples);
+    const outerContours = generateSupportSafeOuterContours(meshParams, zOuter);
     const mesh = generateVaseMeshInternal(params, options);
     logMeshDiagnostics("[mesh-builder] base mesh", mesh);
     appendPipelineTrace(

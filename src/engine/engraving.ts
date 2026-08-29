@@ -32,6 +32,7 @@ const UNDERSIDE_TEXT_MAX_HEIGHT_FACTOR = 0.28;
 const UNDERSIDE_TEXT_OFFSET_Y_FACTOR = -0.34;
 const UNDERSIDE_PATCH_RADIAL_STEPS = 144;
 const UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS = 8;
+const UNDERSIDE_PATCH_MIN_ANGULAR_SLICES = 384;
 const TEXT_SIGNATURE_HEIGHT_FACTOR = 0.92;
 const TEXT_MAX_HEIGHT_FACTOR = 0.78;
 const TEXT_LINE_GAP_FACTOR = 1.85;
@@ -616,7 +617,10 @@ function buildUndersideEngravedBottomPatch(
   const vertices: number[] = [];
   const indices: number[] = [];
   const sectorCount = bottomOuterContour.length / 2;
-  const subSectorCount = sectorCount * UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS;
+  const subSectorCount = Math.max(
+    sectorCount * UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS,
+    UNDERSIDE_PATCH_MIN_ANGULAR_SLICES,
+  );
   const outerRingOffset = UNDERSIDE_PATCH_RADIAL_STEPS * subSectorCount;
   const layerStride = outerRingOffset + sectorCount;
   const textBounds = textPolygons.map((polygon) =>
@@ -631,15 +635,18 @@ function buildUndersideEngravedBottomPatch(
     ));
   const nodeIndex = (zLayer: 0 | 1, subSector: number, radialStep: number) => {
     if (radialStep >= UNDERSIDE_PATCH_RADIAL_STEPS) {
-      return zLayer * layerStride + outerRingOffset + Math.floor(subSector / UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS);
+      const wrapped = (subSector + subSectorCount) % subSectorCount;
+      return zLayer * layerStride + outerRingOffset + Math.floor((wrapped * sectorCount) / subSectorCount);
     }
     return zLayer * layerStride + radialStep * subSectorCount + (subSector + subSectorCount) % subSectorCount;
   };
 
   const outerXYAtSubSector = (subSector: number) => {
-    const baseSector = Math.floor(subSector / UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS) % sectorCount;
+    const wrapped = (subSector + subSectorCount) % subSectorCount;
+    const scaledSector = (wrapped * sectorCount) / subSectorCount;
+    const baseSector = Math.floor(scaledSector) % sectorCount;
     const nextBaseSector = (baseSector + 1) % sectorCount;
-    const localT = (subSector % UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS) / UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS;
+    const localT = scaledSector - Math.floor(scaledSector);
     const ax = bottomOuterContour[baseSector * 2];
     const ay = bottomOuterContour[baseSector * 2 + 1];
     const bx = bottomOuterContour[nextBaseSector * 2];
@@ -652,7 +659,8 @@ function buildUndersideEngravedBottomPatch(
 
   const nodeXY = (subSector: number, radialStep: number) => {
     if (radialStep >= UNDERSIDE_PATCH_RADIAL_STEPS) {
-      const baseSector = Math.floor(subSector / UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS) % sectorCount;
+      const wrapped = (subSector + subSectorCount) % subSectorCount;
+      const baseSector = Math.floor((wrapped * sectorCount) / subSectorCount);
       return {
         x: bottomOuterContour[baseSector * 2],
         y: bottomOuterContour[baseSector * 2 + 1],
@@ -773,22 +781,23 @@ function buildUndersideEngravedBottomPatch(
     }
   }
   for (let sector = 0; sector < sectorCount; sector += 1) {
-    const startSubSector = sector * UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS;
+    const startSubSector = Math.ceil((sector * subSectorCount) / sectorCount);
+    const endSubSector = Math.ceil(((sector + 1) * subSectorCount) / sectorCount);
     const outerA = nodeIndex(0, startSubSector, UNDERSIDE_PATCH_RADIAL_STEPS);
     const outerB = nodeIndex(
       0,
-      (startSubSector + UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS) % subSectorCount,
+      endSubSector,
       UNDERSIDE_PATCH_RADIAL_STEPS,
     );
     const innerEnd = nodeIndex(
       0,
-      (startSubSector + UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS) % subSectorCount,
+      endSubSector,
       UNDERSIDE_PATCH_RADIAL_STEPS - 1,
     );
     indices.push(outerA, innerEnd, outerB);
-    for (let offset = UNDERSIDE_PATCH_ANGULAR_SUBDIVISIONS - 1; offset >= 0; offset -= 1) {
-      const innerCurrent = nodeIndex(0, startSubSector + offset, UNDERSIDE_PATCH_RADIAL_STEPS - 1);
-      const innerNext = nodeIndex(0, startSubSector + offset + 1, UNDERSIDE_PATCH_RADIAL_STEPS - 1);
+    for (let subSector = endSubSector - 1; subSector >= startSubSector; subSector -= 1) {
+      const innerCurrent = nodeIndex(0, subSector, UNDERSIDE_PATCH_RADIAL_STEPS - 1);
+      const innerNext = nodeIndex(0, subSector + 1, UNDERSIDE_PATCH_RADIAL_STEPS - 1);
       indices.push(outerA, innerCurrent, innerNext);
     }
   }

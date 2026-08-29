@@ -108,6 +108,16 @@ describe("applySingleTexture", () => {
 
     expect(Math.abs(radiusAt(result, 0) - radiusAt(result, 1))).toBeLessThan(0.25);
   });
+
+  it("creates a measurable faceted relief for low-poly texture", () => {
+    const roundProfile = createProfile({ zRatio: 0, diameter: 80, sides: 96, rotationDeg: 0 });
+    const contour = buildProfileContour(roundProfile, 96);
+    const params = defaultVaseParameters();
+
+    const result = applySingleTexture(contour, 90, "LowPoly", "Moyen", params);
+
+    expect(radialSpan(result)).toBeGreaterThan(2);
+  });
 });
 
 describe("applyTexture", () => {
