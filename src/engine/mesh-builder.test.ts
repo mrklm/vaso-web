@@ -7,6 +7,7 @@ import {
   generateTopOuterContour,
 } from "./mesh-builder";
 import {
+  createCustomTestTubePreset,
   getPreferredTestTubePreset,
   getTestTubePlacement,
 } from "./insert-compatibility";
@@ -387,6 +388,28 @@ describe("generateVaseMesh", () => {
 
     expect(hasTestTubeSupportVertices(mesh)).toBe(true);
     expect(countBoundaryEdges(mesh)).toBe(0);
+  });
+
+  it("uses 0.4 mm total bore clearance for custom test tubes", () => {
+    const params = createTwoProfileVase(125, 60, 60);
+    const customTube = createCustomTestTubePreset(100, 25);
+    const mesh = generateVaseMesh(params, {
+      forceTestTubeSupport: true,
+      customTestTubePreset: customTube,
+    });
+
+    const supportTopRadii: number[] = [];
+    for (let index = 0; index < mesh.vertices.length; index += 3) {
+      const x = mesh.vertices[index];
+      const y = mesh.vertices[index + 1];
+      const z = mesh.vertices[index + 2];
+      const radius = Math.hypot(x, y);
+      if (z > 40 && radius > 10 && radius < 20) {
+        supportTopRadii.push(radius);
+      }
+    }
+
+    expect(Math.min(...supportTopRadii) * 2).toBeCloseTo(25.4, 5);
   });
 
   it("aligns inner and outer wall layers on the same body z slices", () => {

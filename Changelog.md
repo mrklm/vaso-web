@@ -7,6 +7,14 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.82] - 2026-08-31
+
+### 🐛 Corrigé
+ - Réduit le jeu des tubes à essai personnalisés à 0,4 mm au total pour rapprocher le diamètre imprimé du diamètre saisi.
+
+### ✅ Tests
+ - Ajoute un test vérifiant qu'un tube personnalisé de 25 mm génère un alésage de 25,4 mm.
+
 ## [1.0.81] - 2026-08-30
 
 ### 🐛 Corrigé

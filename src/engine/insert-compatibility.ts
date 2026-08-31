@@ -98,7 +98,7 @@ export function createCustomTestTubePreset(heightMm: number, diameterMm: number)
     heightMm: safeHeight,
     topDiameterMm: safeDiameter,
     bottomDiameterMm: safeDiameter,
-    clearanceMm: 1.5,
+    clearanceMm: 0.2,
   };
 }
 
