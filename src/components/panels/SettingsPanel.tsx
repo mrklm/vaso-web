@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import toast from "react-hot-toast";
 import { useUIStore } from "../../store/ui-store";
 import { useVaseStore } from "../../store/vase-store";
 import { MAX_SEED } from "../../engine/engraving-text";
 import { THEMES } from "../../themes";
 import { clampParamsToBuildVolume } from "../../engine/printer-volume";
 import { defaultVaseParameters } from "../../engine/types";
+import {
+  buildProductionVaseJson,
+  downloadProductionVaseJson,
+  parseProductionVaseJson,
+} from "../../engine/production-json";
 import { NumberInput } from "../ui/NumberInput";
 
 export function SettingsPanel() {
@@ -68,6 +74,7 @@ export function SettingsPanel() {
   const [editWidth, setEditWidth] = useState(String(activeProfile?.width ?? 220));
   const [editDepth, setEditDepth] = useState(String(activeProfile?.depth ?? 220));
   const [editHeight, setEditHeight] = useState(String(activeProfile?.height ?? 250));
+  const productionJsonInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleProfileChange = (name: string) => {
     setActivePrinterProfile(name);
@@ -140,6 +147,72 @@ export function SettingsPanel() {
       radialSamples: defaultParams.radialSamples,
       verticalSamples: defaultParams.verticalSamples,
     });
+  };
+
+  const handleImportProductionJson = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const imported = parseProductionVaseJson(await file.text());
+      useVaseStore.getState().loadProductionParams(imported.params, imported.seed);
+      if (imported.suppressTestTubeSupport === true) {
+        setGenerateTestTubeSupport(false);
+      } else {
+        setGenerateTestTubeSupport(true);
+        setForceTestTubeSupport(imported.forceTestTubeSupport === true);
+      }
+      if (imported.forceCustomTestTubeSize === true) {
+        setForceCustomTestTubeSize(true);
+      } else {
+        setForceCustomTestTubeSize(false);
+      }
+      if (typeof imported.customTestTubeDiameterMm === "number") {
+        setCustomTestTubeDiameterMm(imported.customTestTubeDiameterMm);
+      }
+      if (typeof imported.customTestTubeHeightMm === "number") {
+        setCustomTestTubeHeightMm(imported.customTestTubeHeightMm);
+      }
+      if (imported.randomStyle) {
+        useVaseStore.getState().setRandomStyle(imported.randomStyle);
+      }
+      if (imported.complexity) {
+        useVaseStore.getState().setComplexity(imported.complexity);
+      }
+      if (typeof imported.forceComplexity === "boolean") {
+        useVaseStore.getState().setForceComplexity(imported.forceComplexity);
+      }
+      if (typeof imported.forceTexture === "boolean") {
+        useVaseStore.getState().setForceTexture(imported.forceTexture);
+      }
+      useVaseStore.setState({ isSeedModified: false });
+      toast.success("JSON production importe");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "JSON production invalide");
+    } finally {
+      if (productionJsonInputRef.current) {
+        productionJsonInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleExportProductionJson = () => {
+    const vaseState = useVaseStore.getState();
+    const uiState = useUIStore.getState();
+    downloadProductionVaseJson(
+      buildProductionVaseJson({
+        seed: vaseState.seed,
+        params: vaseState.params,
+        forceTestTubeSupport: uiState.forceTestTubeSupport,
+        suppressTestTubeSupport: !uiState.generateTestTubeSupport,
+        forceCustomTestTubeSize: uiState.forceCustomTestTubeSize,
+        customTestTubeDiameterMm: uiState.customTestTubeDiameterMm,
+        customTestTubeHeightMm: uiState.customTestTubeHeightMm,
+        randomStyle: vaseState.randomStyle,
+        complexity: vaseState.complexity,
+        forceComplexity: vaseState.forceComplexity,
+        forceTexture: vaseState.forceTexture,
+      }),
+    );
+    toast.success("JSON production exporte");
   };
 
   const handleResetVaso = () => {
@@ -463,6 +536,24 @@ export function SettingsPanel() {
       <div className="printer-actions">
         <button className="btn-small" onClick={handleResetAdvancedStlDefaults}>
           Valeurs par défaut
+        </button>
+      </div>
+
+      <div className="separator" />
+      <h3>Production JSON</h3>
+      <input
+        ref={productionJsonInputRef}
+        type="file"
+        accept="application/json,.json"
+        hidden
+        onChange={(event) => void handleImportProductionJson(event.target.files?.[0] ?? null)}
+      />
+      <div className="printer-actions">
+        <button className="btn-small" onClick={() => productionJsonInputRef.current?.click()}>
+          Importer JSON
+        </button>
+        <button className="btn-small" onClick={handleExportProductionJson}>
+          Exporter JSON
         </button>
       </div>
 

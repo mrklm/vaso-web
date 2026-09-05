@@ -7,6 +7,16 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.86] - 2026-09-05
+
+### Ajouté
+ - Ajoute un bloc compact `Production JSON` dans Options avec les actions `Importer JSON` et `Exporter JSON`.
+ - Permet d'importer un JSON de production Vaso pour recharger exactement les paramètres utiles à la reproduction du vase.
+ - Permet d'exporter depuis Vaso-web un JSON de production compatible avec le schéma `vaso-production-vase-v1`.
+
+### Tests
+ - Ajoute des tests de lecture/export du JSON de production et de rejet des schémas incompatibles.
+
 ## [1.0.85] - 2026-09-05
 
 ### Corrigé

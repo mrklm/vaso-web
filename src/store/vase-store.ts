@@ -50,6 +50,7 @@ interface VaseState {
   setForceComplexity: (v: boolean) => void;
   setForceTexture: (v: boolean) => void;
   setParams: (params: VaseParameters) => void;
+  loadProductionParams: (params: VaseParameters, seed: number) => void;
   randomize: () => void;
   applySeed: () => void;
 }
@@ -414,6 +415,12 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
   setForceComplexity: (v) => set({ forceComplexity: v, isSeedModified: true }),
   setForceTexture: (v) => set({ forceTexture: v, isSeedModified: true }),
   setParams: (params) => set({ params: constrainToActiveBuildVolume(params), isSeedModified: true }),
+  loadProductionParams: (params, seed) =>
+    set({
+      params,
+      seed: Math.max(0, Math.min(MAX_SEED, Math.trunc(seed))),
+      isSeedModified: false,
+    }),
 
   applySeed: () => {
     const state = get();
