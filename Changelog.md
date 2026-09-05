@@ -7,6 +7,15 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.84] - 2026-09-05
+
+### Modifié
+ - Durcit la compatibilité Eco Cup avec un contrôle de passage sur axe vertical continu.
+ - Exige une marge réelle de 0,5 mm pour annoncer un vase compatible Eco Cup.
+
+### Tests
+ - Ajoute des tests pour rejeter les vases désaxés et les profils Eco Cup trop limites.
+
 ## [1.0.83] - 2026-09-05
 
 ### Corrigé

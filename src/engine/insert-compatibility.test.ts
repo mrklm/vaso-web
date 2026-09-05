@@ -64,16 +64,39 @@ describe("analyzeWaterproofInsertCompatibility", () => {
     );
   });
 
+  it("rejects Eco-Cup compatibility when wide sections do not share a straight insertion path", () => {
+    const params = defaultVaseParameters();
+    params.heightMm = 125;
+    params.wallThicknessMm = 2.4;
+    params.bottomThicknessMm = 3;
+    params.radialSamples = 96;
+    params.profiles = [
+      createProfile({ zRatio: 0, diameter: 78, sides: 64, offsetX: -18, rotationDeg: 0 }),
+      createProfile({ zRatio: 0.5, diameter: 78, sides: 64, offsetX: 0, rotationDeg: 0 }),
+      createProfile({ zRatio: 1, diameter: 78, sides: 64, offsetX: 18, rotationDeg: 0 }),
+    ];
+
+    const compatibility = analyzeWaterproofInsertCompatibility(params);
+
+    expect(compatibility.type).toBe("test_tube");
+  });
+
   it("uses the 120 mm test tube from 140 mm vase height", () => {
     expect(analyzeWaterproofInsertCompatibility(createTwoProfileVase(140, 52, 42)).label).toBe(
       "Tube à essai 120 × 25,4 mm",
     );
   });
 
-  it("accepts a profile just above the 12,5 cl dimensions with margin", () => {
+  it("accepts a profile above the 12,5 cl dimensions with safety clearance", () => {
+    expect(
+      analyzeWaterproofInsertCompatibility(createTwoProfileVase(103, 60, 74)).label,
+    ).toBe("Eco-Cup 12,5 cl");
+  });
+
+  it("rejects a borderline Eco-Cup profile without enough rigid insertion margin", () => {
     expect(
       analyzeWaterproofInsertCompatibility(createTwoProfileVase(101.2, 57.9, 71.9)).label,
-    ).toBe("Eco-Cup 12,5 cl");
+    ).toBe("Aucun contenant compatible");
   });
 
   it("rejects an Eco-Cup 12,5 cl profile that only matches the cup dimensions without clearance", () => {
