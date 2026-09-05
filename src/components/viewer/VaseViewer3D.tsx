@@ -70,7 +70,11 @@ function PreviewEngravingOverlay(
     placement?: "bottom" | "support";
   },
 ) {
-  const lines = useMemo(() => formatEngravingLines(seed, isSeedModified), [isSeedModified, seed]);
+  const lines = useMemo(() => {
+    const engravingLines = formatEngravingLines(seed, isSeedModified);
+    const vaseNumber = engravingLines[1];
+    return engravingLines.filter((line) => line !== `N° ${vaseNumber}`);
+  }, [isSeedModified, seed]);
   const fitRadius = useMemo(() => computePreviewBottomFitRadius(params), [params]);
 
   const texture = useMemo(() => {
@@ -130,9 +134,11 @@ function PreviewEngravingOverlay(
       const targetWidth =
         canvas.width *
         PREVIEW_TEXT_LINE_WIDTH_FACTORS[PREVIEW_TEXT_LINE_WIDTH_FACTORS.length - 1];
+      const line = lines[index];
+      if (!line) continue;
       lineFontSizes[index] = Math.min(
         referenceFontSize * PREVIEW_TEXT_SIGNATURE_HEIGHT_FACTOR,
-        fitPreviewText(context, lines[index], referenceFontSize, targetWidth),
+        fitPreviewText(context, line, referenceFontSize, targetWidth),
       );
     }
     const maxHeight = canvas.height * 0.82;
@@ -168,8 +174,10 @@ function PreviewEngravingOverlay(
           (PREVIEW_TEXT_LINE_WIDTH_FACTORS[PREVIEW_TEXT_LINE_WIDTH_FACTORS.length - 1] * 0.55));
       const allowedWidth = Math.max(0, baseWidth * halfChordFactor - PREVIEW_TEXT_SIDE_MARGIN_PX * 2);
       if (allowedWidth <= 0) return fontSize;
+      const line = lines[index];
+      if (!line) return fontSize;
       context.font = `700 ${fontSize}px Arial`;
-      const measuredWidth = context.measureText(lines[index]).width;
+      const measuredWidth = context.measureText(line).width;
       if (measuredWidth <= 0 || measuredWidth <= allowedWidth) return fontSize;
       return fontSize * (allowedWidth / measuredWidth);
     });
@@ -451,12 +459,14 @@ export function VaseViewer3D() {
           />
         )}
 
-        <PreviewEngravingOverlay
-          params={params}
-          seed={seed}
-          isSeedModified={showSeedModified}
-          placement={hasTestTubeSupport ? "support" : "bottom"}
-        />
+        {hasTestTubeSupport && (
+          <PreviewEngravingOverlay
+            params={params}
+            seed={seed}
+            isSeedModified={showSeedModified}
+            placement="support"
+          />
+        )}
 
         <mesh
           rotation={[-Math.PI / 2, 0, 0]}

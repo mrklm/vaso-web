@@ -51,6 +51,7 @@ const TEST_TUBE_PEDESTAL_BAR_THICKNESS_MM = 2.4;
 interface GenerateVaseMeshOptions {
   includeTestTubeSupport?: boolean;
   forceTestTubeSupport?: boolean;
+  suppressTestTubeSupport?: boolean;
   customTestTubePreset?: InsertPreset;
 }
 
@@ -758,6 +759,7 @@ export async function generateVaseMeshWithEngraving(
     );
     const shouldReserveSupportCenter =
       options.includeTestTubeSupport !== false &&
+      !options.suppressTestTubeSupport &&
       (options.forceTestTubeSupport ||
         analyzeWaterproofInsertCompatibility(params).type === "test_tube");
     const supportOuterRadius = options.customTestTubePreset

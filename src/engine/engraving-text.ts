@@ -7,10 +7,10 @@ export function formatSeedLabel(seed: number, isSeedModified = false): string {
   return isSeedModified ? `${seedLabel}M` : seedLabel;
 }
 
-export function formatEngravingLines(seed: number, isSeedModified = false): readonly [string, string, string] {
+export function formatEngravingLines(seed: number, isSeedModified = false): readonly string[] {
   const version = `v${APP_VERSION}`;
   const vaseNumber = formatSeedLabel(seed, isSeedModified);
-  return [`VASO ${version}`, vaseNumber, `N° ${vaseNumber}`];
+  return [`VASO ${version}`, vaseNumber];
 }
 
 export function formatSupportEngravingLines(seed: number, isSeedModified = false): readonly [string, string] {

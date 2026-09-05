@@ -7,6 +7,15 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.83] - 2026-09-05
+
+### Corrigé
+ - Supprime le second N° de vase sur la gravure standard des vases sans tube à essai.
+ - Préserve la gravure extérieure sous la base pour les vases compatibles tube à essai.
+
+### Tests
+ - Met à jour les tests de gravure pour vérifier la signature à deux lignes et l'export des vases tube à essai.
+
 ## [1.0.82] - 2026-08-31
 
 ### 🐛 Corrigé
