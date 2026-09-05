@@ -22,6 +22,8 @@ export const MIN_TEST_TUBE_VASE_HEIGHT_MM = 115;
 export const TEST_TUBE_LONG_VASE_HEIGHT_MM = 140;
 export const TEST_TUBE_TOP_CLEARANCE_MM = 20;
 export const TEST_TUBE_SUPPORT_HEIGHT_MM = 40;
+const TEST_TUBE_SUPPORT_THICKNESS_MM = 2;
+const TEST_TUBE_SUPPORT_WALL_MARGIN_MM = 0.8;
 export const MIN_TEST_TUBE_TOP_OPENING_INNER_DIAMETER_MM = 29;
 
 export type InsertPreset = {
@@ -141,10 +143,20 @@ function getMinimumTestTubeVaseHeightMm(preset?: InsertPreset): number {
 }
 
 function getMinimumTestTubeInnerDiameterMm(preset?: InsertPreset): number {
-  if (!preset) return MIN_TEST_TUBE_TOP_OPENING_INNER_DIAMETER_MM;
+  const tubeDiameterMm = preset?.topDiameterMm ?? 25.4;
+  const clearanceMm = preset?.clearanceMm ?? 1.5;
+  const minimumSupportInnerDiameterMm =
+    (tubeDiameterMm / 2 +
+      clearanceMm +
+      TEST_TUBE_SUPPORT_THICKNESS_MM +
+      TEST_TUBE_SUPPORT_WALL_MARGIN_MM +
+      INSERT_DIAMETER_TOLERANCE_MM) *
+    2;
+
   return Math.max(
     MIN_TEST_TUBE_TOP_OPENING_INNER_DIAMETER_MM,
-    preset.topDiameterMm + preset.clearanceMm * 2 + 0.6,
+    tubeDiameterMm + clearanceMm * 2 + 0.6,
+    minimumSupportInnerDiameterMm,
   );
 }
 
@@ -680,6 +692,41 @@ function computeRigidEcoCupFitClearance(
   return bestCenter.clearance;
 }
 
+function canFitCenteredTestTubeSupport(
+  preset: InsertPreset,
+  availabilityProfile: ReturnType<typeof buildInnerAvailabilityProfile>,
+  params: VaseParameters,
+): boolean {
+  const placement = getTestTubePlacement(params, preset);
+  const supportInnerRadius = Math.max(5, preset.topDiameterMm / 2 + preset.clearanceMm);
+  const requiredRadius =
+    supportInnerRadius + TEST_TUBE_SUPPORT_THICKNESS_MM + TEST_TUBE_SUPPORT_WALL_MARGIN_MM;
+  const supportHeight = Math.max(0, placement.supportTopZ - placement.supportBottomZ);
+  if (supportHeight <= Number.EPSILON) {
+    return false;
+  }
+
+  const sampleZValues = [
+    placement.supportBottomZ + 0.5,
+    placement.supportBottomZ + supportHeight * 0.33,
+    placement.supportBottomZ + supportHeight * 0.66,
+    placement.supportTopZ,
+  ].filter(
+    (zMm) =>
+      zMm >= availabilityProfile.bottomZ - INSERT_DIAMETER_TOLERANCE_MM &&
+      zMm <= availabilityProfile.topZ + INSERT_DIAMETER_TOLERANCE_MM,
+  );
+
+  if (sampleZValues.length === 0) {
+    return false;
+  }
+
+  return sampleZValues.every((zMm) => {
+    const contour = getInterpolatedInnerContour(zMm, availabilityProfile);
+    return pointInPolygon(contour, 0, 0) && distanceToPolygonEdges(contour, 0, 0) >= requiredRadius;
+  });
+}
+
 function isPresetCompatible(
   preset: InsertPreset,
   availabilityProfile: ReturnType<typeof buildInnerAvailabilityProfile>,
@@ -720,7 +767,7 @@ function isPresetCompatible(
       }
     }
 
-    return true;
+    return canFitCenteredTestTubeSupport(preset, availabilityProfile, params);
   }
 
   for (let sampleIndex = 0; sampleIndex <= INSERT_FIT_SAMPLES; sampleIndex++) {

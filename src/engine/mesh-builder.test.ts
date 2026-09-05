@@ -16,6 +16,7 @@ import {
   countConnectedMeshComponents,
   countNonManifoldEdges,
 } from "./mesh-cleanup";
+import { getPipelineTraceEntries } from "./pipeline-trace";
 import { buildSTLBuffer } from "./exporter";
 import { defaultVaseParameters, createProfile, type VaseParameters } from "./types";
 
@@ -210,6 +211,26 @@ describe("generateVaseMesh", () => {
     expect(mesh.indices.length).toBeGreaterThan(baseMesh.indices.length);
     expect(countBoundaryEdges(mesh)).toBe(0);
     expect(buildSTLBuffer(mesh).byteLength).toBeGreaterThan(84);
+  }, 20000);
+
+  it("keeps test-tube vase engraving outside when support geometry is suppressed", async () => {
+    const params = createTwoProfileVase(125, 52, 42);
+    params.radialSamples = 72;
+    const fontJson = JSON.parse(robotoFontJson);
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify(fontJson), { status: 200 });
+
+    try {
+      await generateVaseMeshWithEngraving(params, 12345678, false, {
+        suppressTestTubeSupport: true,
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    const trace = getPipelineTraceEntries().join("\n");
+    expect(trace).toContain("[engraving] after underside subtractive text");
+    expect(trace).not.toContain("[engraving] after additive text merge");
   }, 20000);
 
   it.each([29036567, 91127199, 6964026, 77777777, 44444444])(

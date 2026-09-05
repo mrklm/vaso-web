@@ -528,7 +528,7 @@ function addTestTubeSupportIfNeeded(
   faces: number[],
   options: GenerateVaseMeshOptions = {},
 ) {
-  if (options.includeTestTubeSupport === false) {
+  if (options.includeTestTubeSupport === false || options.suppressTestTubeSupport) {
     return;
   }
 
@@ -757,11 +757,9 @@ export async function generateVaseMeshWithEngraving(
     appendPipelineTrace(
       `[mesh-builder] base mesh:v=${mesh.vertices.length / 3},t=${mesh.indices.length / 3}`,
     );
-    const shouldReserveSupportCenter =
-      options.includeTestTubeSupport !== false &&
-      !options.suppressTestTubeSupport &&
-      (options.forceTestTubeSupport ||
-        analyzeWaterproofInsertCompatibility(params).type === "test_tube");
+    const compatibility = analyzeWaterproofInsertCompatibility(params);
+    const shouldUseUndersideEngraving =
+      options.forceTestTubeSupport || compatibility.type === "test_tube";
     const supportOuterRadius = options.customTestTubePreset
       ? options.customTestTubePreset.topDiameterMm / 2 + options.customTestTubePreset.clearanceMm + TEST_TUBE_SUPPORT_THICKNESS_MM
       : TEST_TUBE_SUPPORT_OUTER_RADIUS_MM;
@@ -771,7 +769,7 @@ export async function generateVaseMeshWithEngraving(
       outerContours[0],
       seed,
       isSeedModified,
-      shouldReserveSupportCenter
+      shouldUseUndersideEngraving
         ? supportOuterRadius + TEST_TUBE_SUPPORT_ENGRAVING_CLEARANCE_MM
         : 0,
     );

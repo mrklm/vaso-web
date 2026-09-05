@@ -7,6 +7,16 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.85] - 2026-09-05
+
+### Corrigé
+ - Aligne la compatibilité tube à essai sur la place réellement nécessaire au support centré imprimé.
+ - Conserve la gravure extérieure sous la base pour les vases tube à essai lorsque la géométrie du support est supprimée à l'export.
+
+### Tests
+ - Ajoute un cas rejetant un vase désaxé dont le tube passe théoriquement mais pas le support.
+ - Ajoute un test de gravure extérieure avec support tube supprimé.
+
 ## [1.0.84] - 2026-09-05
 
 ### Modifié

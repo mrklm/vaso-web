@@ -81,6 +81,22 @@ describe("analyzeWaterproofInsertCompatibility", () => {
     expect(compatibility.type).toBe("test_tube");
   });
 
+  it("does not announce a test tube when the centered support would not fit", () => {
+    const params = defaultVaseParameters();
+    params.heightMm = 125;
+    params.wallThicknessMm = 2.4;
+    params.bottomThicknessMm = 3;
+    params.radialSamples = 96;
+    params.profiles = [
+      createProfile({ zRatio: 0, diameter: 52, sides: 64, offsetX: 25, rotationDeg: 0 }),
+      createProfile({ zRatio: 1, diameter: 42, sides: 64, offsetX: 25, rotationDeg: 0 }),
+    ];
+
+    const compatibility = analyzeWaterproofInsertCompatibility(params);
+
+    expect(compatibility.label).toBe("Aucun contenant compatible");
+  });
+
   it("uses the 120 mm test tube from 140 mm vase height", () => {
     expect(analyzeWaterproofInsertCompatibility(createTwoProfileVase(140, 52, 42)).label).toBe(
       "Tube à essai 120 × 25,4 mm",
