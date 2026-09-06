@@ -74,21 +74,6 @@ export function GeneralParams() {
       />
 
       <div className="separator" />
-      <h3>Gravure</h3>
-
-      <div className="checkbox-row">
-        <label>
-          <input
-            type="checkbox"
-            checked={p.printSafeEngraving}
-            onChange={(e) => store.setPrintSafeEngraving(e.target.checked)}
-            disabled={controlsLocked}
-          />
-          Gravure sécurisée pour FDM
-        </label>
-      </div>
-
-      <div className="separator" />
       <h3>Aléatoire</h3>
 
       <div className="slider-input">

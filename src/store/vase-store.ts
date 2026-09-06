@@ -464,7 +464,7 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
   setScale: (v) =>
     set((s) => ({ params: constrainToActiveBuildVolume({ ...s.params, scale: v }), isSeedModified: true })),
   setPrintSafeEngraving: (v) =>
-    set((s) => ({ params: { ...s.params, printSafeEngraving: v }, isSeedModified: true })),
+    set((s) => ({ params: { ...s.params, printSafeEngraving: true }, isSeedModified: v !== true })),
 
   setProfileCount: (count) =>
     set((s) => {
@@ -522,10 +522,14 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
   setComplexity: (level) => set({ complexity: level, isSeedModified: true }),
   setForceComplexity: (v) => set({ forceComplexity: v, isSeedModified: true }),
   setForceTexture: (v) => set({ forceTexture: v, isSeedModified: true }),
-  setParams: (params) => set({ params: constrainToActiveBuildVolume(params), isSeedModified: true }),
+  setParams: (params) =>
+    set({
+      params: constrainToActiveBuildVolume({ ...params, printSafeEngraving: true }),
+      isSeedModified: true,
+    }),
   loadProductionParams: (params, seed) =>
     set({
-      params,
+      params: { ...params, printSafeEngraving: true },
       seed: Math.max(0, Math.min(MAX_SEED, Math.trunc(seed))),
       isSeedModified: false,
     }),

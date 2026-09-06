@@ -8,6 +8,7 @@ describe("production JSON", () => {
     params.heightMm = 142;
     params.textureMode = "Texture aléatoire";
     params.textureType = "Hexagones";
+    params.printSafeEngraving = false;
 
     const payload = {
       schema: "vaso-production-vase-v1",
@@ -29,6 +30,7 @@ describe("production JSON", () => {
     expect(imported.suppressTestTubeSupport).toBe(false);
     expect(imported.params.heightMm).toBe(142);
     expect(imported.params.textureType).toBe("Hexagones");
+    expect(imported.params.printSafeEngraving).toBe(true);
     expect("customerEmail" in imported).toBe(false);
     expect("colorLabel" in imported).toBe(false);
   });

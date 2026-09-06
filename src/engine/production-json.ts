@@ -135,7 +135,7 @@ function parseParams(value: unknown): VaseParameters {
     textureType2: readEnum(value, "textureType2", TEXTURE_TYPES),
     textureZoom2: readEnum(value, "textureZoom2", TEXTURE_ZOOMS),
     scale: readNumber(value, "scale"),
-    printSafeEngraving: readBoolean(value, "printSafeEngraving"),
+    printSafeEngraving: true,
     profiles: profiles.map(parseProfile),
   };
 

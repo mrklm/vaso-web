@@ -192,7 +192,6 @@ applyThemeToCSS(initialTheme);
 const initialPrinter = loadPrinterProfiles();
 const initialAdvancedStlUnlock = loadSavedAdvancedStlUnlock();
 const initialShowCompatibleInsert = loadSavedBoolean("vaso-show-compatible-insert", true);
-const initialBoutiqueProductionMode = loadSavedBoolean("vaso-boutique-production-mode", false);
 const initialGenerateTestTubeSupport = loadSavedBoolean("vaso-generate-test-tube-support", true);
 const initialCustomTestTubeDiameterMm = clampCustomTestTubeDiameter(
   loadSavedNumber("vaso-custom-test-tube-diameter-mm", 20),
@@ -220,7 +219,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   autoRotate: true,
   showClipping: false,
   showCompatibleInsert: initialShowCompatibleInsert,
-  boutiqueProductionMode: initialBoutiqueProductionMode,
+  boutiqueProductionMode: false,
   generateTestTubeSupport: initialGenerateTestTubeSupport,
   forceTestTubeSupport: false,
   forceCustomTestTubeSize: false,
@@ -261,14 +260,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     }
     set({ showCompatibleInsert: v });
   },
-  setBoutiqueProductionMode: (v) => {
-    try {
-      localStorage.setItem("vaso-boutique-production-mode", String(v));
-    } catch {
-      /* ignore */
-    }
-    set({ boutiqueProductionMode: v });
-  },
+  setBoutiqueProductionMode: (v) => set({ boutiqueProductionMode: v }),
   setGenerateTestTubeSupport: (v) => {
     try {
       localStorage.setItem("vaso-generate-test-tube-support", String(v));

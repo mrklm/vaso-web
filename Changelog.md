@@ -7,6 +7,15 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.88] - 2026-09-06
+
+### Modifié
+ - Rend le mode production boutique non persistant afin qu'il redémarre toujours désactivé.
+ - Masque l'option `Gravure sécurisée pour FDM` et force la gravure sécurisée dans les paramètres, l'import JSON et les anciens chargements de paramètres.
+
+### Tests
+ - Ajoute une vérification garantissant qu'un JSON de production ne peut pas désactiver la gravure sécurisée.
+
 ## [1.0.87] - 2026-09-06
 
 ### Modifié
