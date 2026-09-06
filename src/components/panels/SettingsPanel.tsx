@@ -31,6 +31,8 @@ export function SettingsPanel() {
     setShowClipping,
     showCompatibleInsert,
     setShowCompatibleInsert,
+    boutiqueProductionMode,
+    setBoutiqueProductionMode,
     generateTestTubeSupport,
     setGenerateTestTubeSupport,
     forceTestTubeSupport,
@@ -75,6 +77,7 @@ export function SettingsPanel() {
   const [editDepth, setEditDepth] = useState(String(activeProfile?.depth ?? 220));
   const [editHeight, setEditHeight] = useState(String(activeProfile?.height ?? 250));
   const productionJsonInputRef = useRef<HTMLInputElement | null>(null);
+  const productionControlsLocked = boutiqueProductionMode;
 
   const handleProfileChange = (name: string) => {
     setActivePrinterProfile(name);
@@ -240,6 +243,7 @@ export function SettingsPanel() {
             type="checkbox"
             checked={showCompatibleInsert}
             onChange={(e) => setShowCompatibleInsert(e.target.checked)}
+            disabled={productionControlsLocked}
           />
           Afficher le contenant adapté
         </label>
@@ -250,6 +254,7 @@ export function SettingsPanel() {
             type="checkbox"
             checked={generateTestTubeSupport}
             onChange={(e) => setGenerateTestTubeSupport(e.target.checked)}
+            disabled={productionControlsLocked}
           />
           Générer le support tube à essai
         </label>
@@ -260,6 +265,7 @@ export function SettingsPanel() {
             type="checkbox"
             checked={forceTestTubeSupport}
             onChange={(e) => setForceTestTubeSupport(e.target.checked)}
+            disabled={productionControlsLocked}
           />
           Forcer Tube à Essais
         </label>
@@ -272,6 +278,7 @@ export function SettingsPanel() {
                 type="checkbox"
                 checked={forceCustomTestTubeSize}
                 onChange={(e) => setForceCustomTestTubeSize(e.target.checked)}
+                disabled={productionControlsLocked}
               />
               Forcer une taille de tube à essai
             </label>
@@ -285,6 +292,7 @@ export function SettingsPanel() {
                 min={10}
                 max={40}
                 step={0.5}
+                disabled={productionControlsLocked}
               />
               <NumberInput
                 label="Hauteur tube (mm)"
@@ -294,6 +302,7 @@ export function SettingsPanel() {
                 max={maxCustomTestTubeHeight}
                 step={1}
                 integer
+                disabled={productionControlsLocked}
               />
             </div>
           )}
@@ -421,14 +430,19 @@ export function SettingsPanel() {
             type="checkbox"
             checked={enforcePrinterVolume}
             onChange={(e) => handleTogglePrinterVolume(e.target.checked)}
+            disabled={productionControlsLocked}
           />
           Volume imprimante
         </label>
       </h3>
 
-      <div className="select-input" style={{ opacity: enforcePrinterVolume ? 1 : 0.65 }}>
+      <div className="select-input" style={{ opacity: enforcePrinterVolume && !productionControlsLocked ? 1 : 0.65 }}>
         <label>Profil actif</label>
-        <select value={activePrinterProfile} onChange={(e) => handleProfileChange(e.target.value)}>
+        <select
+          value={activePrinterProfile}
+          onChange={(e) => handleProfileChange(e.target.value)}
+          disabled={productionControlsLocked}
+        >
           {printerProfiles.map((p) => (
             <option key={p.name} value={p.name}>
               {p.name}
@@ -437,7 +451,7 @@ export function SettingsPanel() {
         </select>
       </div>
 
-      <div className="printer-dims" style={{ opacity: enforcePrinterVolume ? 1 : 0.65 }}>
+      <div className="printer-dims" style={{ opacity: enforcePrinterVolume && !productionControlsLocked ? 1 : 0.65 }}>
         <div className="number-input-inline">
           <label>Largeur max (mm)</label>
           <input
@@ -445,6 +459,7 @@ export function SettingsPanel() {
             value={editWidth}
             onChange={(e) => setEditWidth(e.target.value)}
             onBlur={handleSave}
+            disabled={productionControlsLocked}
           />
         </div>
         <div className="number-input-inline">
@@ -454,6 +469,7 @@ export function SettingsPanel() {
             value={editDepth}
             onChange={(e) => setEditDepth(e.target.value)}
             onBlur={handleSave}
+            disabled={productionControlsLocked}
           />
         </div>
         <div className="number-input-inline">
@@ -463,18 +479,19 @@ export function SettingsPanel() {
             value={editHeight}
             onChange={(e) => setEditHeight(e.target.value)}
             onBlur={handleSave}
+            disabled={productionControlsLocked}
           />
         </div>
       </div>
 
-      <div className="printer-actions" style={{ opacity: enforcePrinterVolume ? 1 : 0.65 }}>
-        <button className="btn-small" onClick={handleNew}>
+      <div className="printer-actions" style={{ opacity: enforcePrinterVolume && !productionControlsLocked ? 1 : 0.65 }}>
+        <button className="btn-small" onClick={handleNew} disabled={productionControlsLocked}>
           Nouveau
         </button>
         <button
           className="btn-small btn-danger"
           onClick={handleDelete}
-          disabled={printerProfiles.length <= 1}
+          disabled={productionControlsLocked || printerProfiles.length <= 1}
         >
           Supprimer
         </button>
@@ -487,12 +504,13 @@ export function SettingsPanel() {
             type="checkbox"
             checked={unlockAdvancedStlParams}
             onChange={(e) => setUnlockAdvancedStlParams(e.target.checked)}
+            disabled={productionControlsLocked}
           />
           Paramètres avancés du STL
         </label>
       </h3>
 
-      <div className="advanced-stl-panel" style={{ opacity: unlockAdvancedStlParams ? 1 : 0.65 }}>
+      <div className="advanced-stl-panel" style={{ opacity: unlockAdvancedStlParams && !productionControlsLocked ? 1 : 0.65 }}>
         <NumberInput
           label="Épaisseur coque (mm)"
           value={params.wallThicknessMm}
@@ -500,7 +518,7 @@ export function SettingsPanel() {
           min={0.4}
           max={10}
           step={0.2}
-          disabled={!unlockAdvancedStlParams}
+          disabled={productionControlsLocked || !unlockAdvancedStlParams}
         />
         <NumberInput
           label="Épaisseur fond (mm)"
@@ -509,7 +527,7 @@ export function SettingsPanel() {
           min={0}
           max={20}
           step={0.5}
-          disabled={!unlockAdvancedStlParams}
+          disabled={productionControlsLocked || !unlockAdvancedStlParams}
         />
         <NumberInput
           label="Résolution circulaire"
@@ -519,7 +537,7 @@ export function SettingsPanel() {
           max={200}
           step={4}
           integer
-          disabled={!unlockAdvancedStlParams}
+          disabled={productionControlsLocked || !unlockAdvancedStlParams}
         />
         <NumberInput
           label="Résolution verticale"
@@ -529,14 +547,31 @@ export function SettingsPanel() {
           max={300}
           step={4}
           integer
-          disabled={!unlockAdvancedStlParams}
+          disabled={productionControlsLocked || !unlockAdvancedStlParams}
         />
       </div>
 
       <div className="printer-actions">
-        <button className="btn-small" onClick={handleResetAdvancedStlDefaults}>
+        <button
+          className="btn-small"
+          onClick={handleResetAdvancedStlDefaults}
+          disabled={productionControlsLocked}
+        >
           Valeurs par défaut
         </button>
+      </div>
+
+      <div className="separator" />
+      <h3>Production boutique</h3>
+      <div className="checkbox-row">
+        <label>
+          <input
+            type="checkbox"
+            checked={boutiqueProductionMode}
+            onChange={(e) => setBoutiqueProductionMode(e.target.checked)}
+          />
+          Mode production boutique
+        </label>
       </div>
 
       <div className="separator" />

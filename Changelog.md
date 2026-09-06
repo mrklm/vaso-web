@@ -7,6 +7,16 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.87] - 2026-09-06
+
+### Modifié
+ - Ajoute le mode production boutique verrouillé dans l'onglet Options, désactivé par défaut.
+ - Verrouille les paramètres de génération, les profils, les contenants, les réglages STL, l'aléatoire et les raccourcis de modification lorsque le mode production boutique est actif.
+ - Conserve l'import/export JSON et l'export STL accessibles pour produire une commande depuis sa recette de production.
+
+### Tests
+ - Ajoute un test garantissant que la génération boutique reste indépendante des options personnelles comme le tube personnalisé et le volume imprimante.
+
 ## [1.0.86] - 2026-09-05
 
 ### Ajouté

@@ -38,6 +38,10 @@ describe("vaseStore", () => {
     expect(initialState.forceCustomTestTubeSize).toBe(false);
   });
 
+  it("starts with boutique production mode disabled", () => {
+    expect(useUIStore.getInitialState().boutiqueProductionMode).toBe(false);
+  });
+
   it("initial seed reproduces the initial vase when reapplied", () => {
     useVaseStore.getState().applySeed();
     const first = JSON.stringify(useVaseStore.getState().params);
@@ -145,7 +149,7 @@ describe("vaseStore", () => {
   });
 
   it("keeps every generated vase compatible with at least a test tube", () => {
-    useUIStore.setState({ enforcePrinterVolume: false });
+    useUIStore.setState({ boutiqueProductionMode: true, enforcePrinterVolume: false });
     for (let index = 0; index < 30; index += 1) {
       useVaseStore.getState().randomize();
       const { params, seed } = useVaseStore.getState();
@@ -156,6 +160,7 @@ describe("vaseStore", () => {
 
   it("keeps generated vases compatible with a forced custom test tube", () => {
     useUIStore.setState({
+      boutiqueProductionMode: false,
       enforcePrinterVolume: true,
       forceTestTubeSupport: true,
       forceCustomTestTubeSize: true,
@@ -169,6 +174,53 @@ describe("vaseStore", () => {
 
     expect(params.heightMm).toBeGreaterThanOrEqual(170);
     expect(analyzeWaterproofInsertCompatibility(params, customTube).type).toBe("test_tube");
+  });
+
+  it("keeps boutique generation independent from custom test tube settings", () => {
+    useUIStore.setState({
+      boutiqueProductionMode: true,
+      enforcePrinterVolume: true,
+      forceTestTubeSupport: true,
+      forceCustomTestTubeSize: true,
+      customTestTubeDiameterMm: 35,
+      customTestTubeHeightMm: 150,
+    });
+
+    useVaseStore.setState({
+      ...useVaseStore.getInitialState(),
+      seed: 67447772,
+      randomStyle: "Soft",
+      complexity: "Moyen",
+      forceComplexity: false,
+      forceTexture: false,
+    });
+    useVaseStore.getState().applySeed();
+
+    const first = {
+      seed: useVaseStore.getState().seed,
+      params: JSON.stringify(useVaseStore.getState().params),
+    };
+
+    useUIStore.setState({
+      boutiqueProductionMode: true,
+      enforcePrinterVolume: false,
+      forceTestTubeSupport: false,
+      forceCustomTestTubeSize: false,
+      customTestTubeDiameterMm: 20,
+      customTestTubeHeightMm: 100,
+    });
+    useVaseStore.setState({
+      ...useVaseStore.getInitialState(),
+      seed: 67447772,
+      randomStyle: "Soft",
+      complexity: "Moyen",
+      forceComplexity: false,
+      forceTexture: false,
+    });
+    useVaseStore.getState().applySeed();
+
+    expect(useVaseStore.getState().seed).toBe(first.seed);
+    expect(JSON.stringify(useVaseStore.getState().params)).toBe(first.params);
   });
 
   it("reenables test tube support when forcing test tube generation", () => {

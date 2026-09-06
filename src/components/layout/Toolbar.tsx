@@ -64,6 +64,7 @@ export function Toolbar() {
   const isSeedModified = useVaseStore((s) => s.isSeedModified);
   const autoRotate = useUIStore((s) => s.autoRotate);
   const setAutoRotate = useUIStore((s) => s.setAutoRotate);
+  const boutiqueProductionMode = useUIStore((s) => s.boutiqueProductionMode);
   const printerProfiles = useUIStore((s) => s.printerProfiles);
   const activePrinterProfile = useUIStore((s) => s.activePrinterProfile);
   const enforcePrinterVolume = useUIStore((s) => s.enforcePrinterVolume);
@@ -184,7 +185,7 @@ export function Toolbar() {
         <button
           className="btn btn-icon"
           onClick={() => undo()}
-          disabled={pastStates.length === 0}
+          disabled={boutiqueProductionMode || pastStates.length === 0}
           title="Annuler (Ctrl+Z)"
         >
           &#x21A9;
@@ -192,14 +193,19 @@ export function Toolbar() {
         <button
           className="btn btn-icon"
           onClick={() => redo()}
-          disabled={futureStates.length === 0}
+          disabled={boutiqueProductionMode || futureStates.length === 0}
           title="Retablir (Ctrl+Y)"
         >
           &#x21AA;
         </button>
       </div>
       <div className="toolbar-group">
-        <button className="btn btn-primary" onClick={randomize} title="Espace">
+        <button
+          className="btn btn-primary"
+          onClick={randomize}
+          title="Espace"
+          disabled={boutiqueProductionMode}
+        >
           Aleatoire
         </button>
         <button className="btn btn-secondary" onClick={handleExport}>

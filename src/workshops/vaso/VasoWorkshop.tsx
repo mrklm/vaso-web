@@ -15,6 +15,7 @@ type VasoWorkshopProps = {
 
 export function VasoWorkshop({ onBack }: VasoWorkshopProps) {
   const randomize = useVaseStore((s) => s.randomize);
+  const boutiqueProductionMode = useUIStore((s) => s.boutiqueProductionMode);
   const [panelOpen, setPanelOpen] = useState(false);
 
   useUrlShare();
@@ -24,17 +25,21 @@ export function VasoWorkshop({ onBack }: VasoWorkshopProps) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
 
-      if (e.code === "Space") {
+      if (e.code === "Space" && !boutiqueProductionMode) {
         e.preventDefault();
         randomize();
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey && !boutiqueProductionMode) {
         e.preventDefault();
         useVaseStore.temporal.getState().undo();
       }
 
-      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === "y" || (e.key === "z" && e.shiftKey)) &&
+        !boutiqueProductionMode
+      ) {
         e.preventDefault();
         useVaseStore.temporal.getState().redo();
       }
@@ -47,7 +52,7 @@ export function VasoWorkshop({ onBack }: VasoWorkshopProps) {
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [randomize]);
+  }, [boutiqueProductionMode, randomize]);
 
   return (
     <div className="app">

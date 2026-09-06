@@ -16,8 +16,10 @@ import {
 export function GeneralParams() {
   const store = useVaseStore();
   const { shading, setShading } = useUIStore();
-  const { printerProfiles, activePrinterProfile, enforcePrinterVolume } = useUIStore();
+  const { boutiqueProductionMode, printerProfiles, activePrinterProfile, enforcePrinterVolume } =
+    useUIStore();
   const p = store.params;
+  const controlsLocked = boutiqueProductionMode;
   const [seedInput, setSeedInput] = useState(String(store.seed));
   const activePrinter = printerProfiles.find((profile) => profile.name === activePrinterProfile) ?? printerProfiles[0];
   const maxPrintableHeight = enforcePrinterVolume ? (activePrinter?.height ?? 500) : 500;
@@ -49,6 +51,7 @@ export function GeneralParams() {
         min={MIN_TEST_TUBE_VASE_HEIGHT_MM}
         max={maxPrintableHeight}
         step={5}
+        disabled={controlsLocked}
       />
       <NumberInput
         label="Échelle globale"
@@ -57,6 +60,7 @@ export function GeneralParams() {
         min={0.1}
         max={2.0}
         step={0.05}
+        disabled={controlsLocked}
       />
       <NumberInput
         label="Nombre de profils"
@@ -66,6 +70,7 @@ export function GeneralParams() {
         max={10}
         step={1}
         integer
+        disabled={controlsLocked}
       />
 
       <div className="separator" />
@@ -77,6 +82,7 @@ export function GeneralParams() {
             type="checkbox"
             checked={p.printSafeEngraving}
             onChange={(e) => store.setPrintSafeEngraving(e.target.checked)}
+            disabled={controlsLocked}
           />
           Gravure sécurisée pour FDM
         </label>
@@ -104,6 +110,7 @@ export function GeneralParams() {
                 e.currentTarget.blur();
               }
             }}
+            disabled={controlsLocked}
           />
         </div>
       </div>
@@ -112,6 +119,7 @@ export function GeneralParams() {
         value={store.randomStyle}
         options={RANDOM_STYLES}
         onChange={store.setRandomStyle}
+        disabled={controlsLocked}
       />
 
       <div className="checkbox-row">
@@ -120,6 +128,7 @@ export function GeneralParams() {
             type="checkbox"
             checked={store.forceComplexity}
             onChange={(e) => store.setForceComplexity(e.target.checked)}
+            disabled={controlsLocked}
           />
           Forcer complexité
         </label>
@@ -130,6 +139,7 @@ export function GeneralParams() {
           value={store.complexity}
           options={COMPLEXITY_LEVELS}
           onChange={store.setComplexity}
+          disabled={controlsLocked}
         />
       )}
 
@@ -142,6 +152,7 @@ export function GeneralParams() {
             type="checkbox"
             checked={store.forceTexture}
             onChange={(e) => store.setForceTexture(e.target.checked)}
+            disabled={controlsLocked}
           />
           Forcer texture
         </label>
@@ -152,6 +163,7 @@ export function GeneralParams() {
         value={p.textureMode}
         options={TEXTURE_MODES}
         onChange={store.setTextureMode}
+        disabled={controlsLocked}
       />
 
       {p.textureMode !== "Pas de texture" && (
@@ -161,12 +173,14 @@ export function GeneralParams() {
             value={p.textureType}
             options={TEXTURE_TYPES}
             onChange={store.setTextureType}
+            disabled={controlsLocked}
           />
           <Select
             label="Zoom texture"
             value={p.textureZoom}
             options={TEXTURE_ZOOMS}
             onChange={store.setTextureZoom}
+            disabled={controlsLocked}
           />
         </>
       )}
@@ -178,12 +192,14 @@ export function GeneralParams() {
             value={p.textureType2}
             options={TEXTURE_TYPES}
             onChange={store.setTextureType2}
+            disabled={controlsLocked}
           />
           <Select
             label="Zoom texture 2"
             value={p.textureZoom2}
             options={TEXTURE_ZOOMS}
             onChange={store.setTextureZoom2}
+            disabled={controlsLocked}
           />
         </>
       )}

@@ -88,7 +88,8 @@ function ProfileSlider({
 export function ProfileEditor() {
   const profiles = useVaseStore((s) => s.params.profiles);
   const updateProfile = useVaseStore((s) => s.updateProfile);
-  const { printerProfiles, activePrinterProfile, enforcePrinterVolume } = useUIStore();
+  const { boutiqueProductionMode, printerProfiles, activePrinterProfile, enforcePrinterVolume } =
+    useUIStore();
   const activePrinter = printerProfiles.find((profile) => profile.name === activePrinterProfile) ?? printerProfiles[0];
   const maxPrintableDiameter = enforcePrinterVolume
     ? Math.min(activePrinter?.width ?? 300, activePrinter?.depth ?? 300)
@@ -106,7 +107,7 @@ export function ProfileEditor() {
             onChange={(v) => updateProfile(i, { zRatio: v / 100 })}
             min={0}
             max={100}
-            disabled={i === 0 || i === profiles.length - 1}
+            disabled={boutiqueProductionMode || i === 0 || i === profiles.length - 1}
           />
           <ProfileSlider
             label="Diamètre"
@@ -114,6 +115,7 @@ export function ProfileEditor() {
             onChange={(v) => updateProfile(i, { diameter: v })}
             min={5}
             max={maxPrintableDiameter}
+            disabled={boutiqueProductionMode}
           />
           <ProfileSlider
             label="Côtés"
@@ -121,6 +123,7 @@ export function ProfileEditor() {
             onChange={(v) => updateProfile(i, { sides: Math.round(v) })}
             min={3}
             max={100}
+            disabled={boutiqueProductionMode}
           />
           <ProfileSlider
             label="Rotation"
@@ -129,6 +132,7 @@ export function ProfileEditor() {
             min={0}
             max={360}
             step={5}
+            disabled={boutiqueProductionMode}
           />
         </div>
       ))}

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { temporal } from "zundo";
 import { MAX_SEED } from "../engine/engraving-text";
 import {
+  analyzeWaterproofInsertCompatibility,
   createCustomTestTubePreset,
   enforceMinimumTestTubeCompatibility,
   type InsertPreset,
@@ -19,6 +20,8 @@ import type {
 } from "../engine/types";
 import { defaultVaseParameters, createProfile } from "../engine/types";
 import { useUIStore } from "./ui-store";
+
+const MAX_COMPATIBLE_GENERATION_ATTEMPTS = 200;
 
 interface VaseState {
   params: VaseParameters;
@@ -307,10 +310,15 @@ function getActiveBuildVolume(): BuildVolume {
   };
 }
 
-function constrainToActiveBuildVolume(params: VaseParameters): VaseParameters {
-  const forcedTestTubePreset = getActiveCustomTestTubePreset();
+function constrainToActiveBuildVolume(
+  params: VaseParameters,
+  options: { useCustomTestTubePreset?: boolean; enforceBuildVolume?: boolean } = {},
+): VaseParameters {
+  const useCustomTestTubePreset = options.useCustomTestTubePreset ?? true;
+  const enforceBuildVolume = options.enforceBuildVolume ?? useUIStore.getState().enforcePrinterVolume;
+  const forcedTestTubePreset = useCustomTestTubePreset ? getActiveCustomTestTubePreset() : undefined;
   const safeParams = enforceMinimumTestTubeCompatibility(params, forcedTestTubePreset);
-  if (!useUIStore.getState().enforcePrinterVolume) {
+  if (!enforceBuildVolume) {
     return safeParams;
   }
   return enforceMinimumTestTubeCompatibility(
@@ -319,20 +327,120 @@ function constrainToActiveBuildVolume(params: VaseParameters): VaseParameters {
   );
 }
 
-const INITIAL_SEED = Math.floor(Math.random() * (MAX_SEED + 1));
+function normalizeSeed(seed: number): number {
+  if (!Number.isFinite(seed)) return 0;
+  return Math.max(0, Math.min(MAX_SEED, Math.floor(seed)));
+}
+
+function nextSeed(seed: number): number {
+  return seed >= MAX_SEED ? 0 : seed + 1;
+}
+
+function generateCreativeRandomParams(
+  seed: number,
+  style: RandomStyle,
+  complexity: ComplexityLevel,
+  forceComplexity: boolean,
+  forceTexture: boolean,
+  currentParams: VaseParameters,
+): { seed: number; params: VaseParameters } {
+  const forcedTestTubePreset = getActiveCustomTestTubePreset();
+  const params = randomizeParams(
+    seed,
+    style,
+    complexity,
+    forceComplexity,
+    forceTexture,
+    currentParams,
+    forcedTestTubePreset,
+  );
+  return { seed: normalizeSeed(seed), params: constrainToActiveBuildVolume(params) };
+}
+
+function generateBoutiqueCompatibleRandomParams(
+  seed: number,
+  style: RandomStyle,
+  complexity: ComplexityLevel,
+  forceComplexity: boolean,
+  forceTexture: boolean,
+  currentParams: VaseParameters,
+): { seed: number; params: VaseParameters } {
+  let candidateSeed = normalizeSeed(seed);
+
+  for (let attempt = 0; attempt < MAX_COMPATIBLE_GENERATION_ATTEMPTS; attempt += 1) {
+    const params = constrainToActiveBuildVolume(
+      randomizeParams(
+        candidateSeed,
+        style,
+        complexity,
+        forceComplexity,
+        forceTexture,
+        currentParams,
+        undefined,
+      ),
+      { useCustomTestTubePreset: false, enforceBuildVolume: false },
+    );
+
+    if (analyzeWaterproofInsertCompatibility(params).type !== "none") {
+      return { seed: candidateSeed, params };
+    }
+
+    candidateSeed = nextSeed(candidateSeed);
+  }
+
+  return {
+    seed: candidateSeed,
+    params: constrainToActiveBuildVolume(enforceMinimumTestTubeCompatibility(defaultVaseParameters()), {
+      useCustomTestTubePreset: false,
+      enforceBuildVolume: false,
+    }),
+  };
+}
+
+function generateRandomParamsForCurrentMode(
+  seed: number,
+  style: RandomStyle,
+  complexity: ComplexityLevel,
+  forceComplexity: boolean,
+  forceTexture: boolean,
+  currentParams: VaseParameters,
+): { seed: number; params: VaseParameters } {
+  if (useUIStore.getState().boutiqueProductionMode) {
+    return generateBoutiqueCompatibleRandomParams(
+      seed,
+      style,
+      complexity,
+      forceComplexity,
+      forceTexture,
+      currentParams,
+    );
+  }
+
+  return generateCreativeRandomParams(
+    seed,
+    style,
+    complexity,
+    forceComplexity,
+    forceTexture,
+    currentParams,
+  );
+}
+
+const REQUESTED_INITIAL_SEED = Math.floor(Math.random() * (MAX_SEED + 1));
 const INITIAL_RANDOM_STYLE: RandomStyle = "Soft";
 const INITIAL_COMPLEXITY: ComplexityLevel = "Moyen";
 const INITIAL_FORCE_COMPLEXITY = false;
 const INITIAL_FORCE_TEXTURE = false;
-const INITIAL_PARAMS = randomizeParams(
-  INITIAL_SEED,
+const INITIAL_GENERATION = generateRandomParamsForCurrentMode(
+  REQUESTED_INITIAL_SEED,
   INITIAL_RANDOM_STYLE,
   INITIAL_COMPLEXITY,
   INITIAL_FORCE_COMPLEXITY,
   INITIAL_FORCE_TEXTURE,
   defaultVaseParameters(),
-  undefined,
 );
+const INITIAL_SEED = INITIAL_GENERATION.seed;
+const INITIAL_PARAMS = INITIAL_GENERATION.params;
 
 export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
   params: INITIAL_PARAMS,
@@ -424,31 +532,28 @@ export const useVaseStore = create<VaseState>()(temporal((set, get) => ({
 
   applySeed: () => {
     const state = get();
-    const params = randomizeParams(
+    const generation = generateRandomParamsForCurrentMode(
       state.seed,
       state.randomStyle,
       state.complexity,
       state.forceComplexity,
       state.forceTexture,
       state.params,
-      getActiveCustomTestTubePreset(),
     );
-    set({ params: constrainToActiveBuildVolume(params), isSeedModified: false });
+    set({ params: generation.params, seed: generation.seed, isSeedModified: false });
   },
 
   randomize: () => {
     const state = get();
-    const newSeed = Math.floor(Math.random() * (MAX_SEED + 1));
-    const params = randomizeParams(
-      newSeed,
+    const generation = generateRandomParamsForCurrentMode(
+      Math.floor(Math.random() * (MAX_SEED + 1)),
       state.randomStyle,
       state.complexity,
       state.forceComplexity,
       state.forceTexture,
       state.params,
-      getActiveCustomTestTubePreset(),
     );
-    set({ params: constrainToActiveBuildVolume(params), seed: newSeed, isSeedModified: false });
+    set({ params: generation.params, seed: generation.seed, isSeedModified: false });
   },
 }), {
   limit: 50,

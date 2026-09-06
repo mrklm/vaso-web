@@ -19,6 +19,7 @@ interface UIState {
   autoRotate: boolean;
   showClipping: boolean;
   showCompatibleInsert: boolean;
+  boutiqueProductionMode: boolean;
   generateTestTubeSupport: boolean;
   forceTestTubeSupport: boolean;
   forceCustomTestTubeSize: boolean;
@@ -45,6 +46,7 @@ interface UIState {
   setAutoRotate: (v: boolean) => void;
   setShowClipping: (v: boolean) => void;
   setShowCompatibleInsert: (v: boolean) => void;
+  setBoutiqueProductionMode: (v: boolean) => void;
   setGenerateTestTubeSupport: (v: boolean) => void;
   setForceTestTubeSupport: (v: boolean) => void;
   setForceCustomTestTubeSize: (v: boolean) => void;
@@ -190,6 +192,7 @@ applyThemeToCSS(initialTheme);
 const initialPrinter = loadPrinterProfiles();
 const initialAdvancedStlUnlock = loadSavedAdvancedStlUnlock();
 const initialShowCompatibleInsert = loadSavedBoolean("vaso-show-compatible-insert", true);
+const initialBoutiqueProductionMode = loadSavedBoolean("vaso-boutique-production-mode", false);
 const initialGenerateTestTubeSupport = loadSavedBoolean("vaso-generate-test-tube-support", true);
 const initialCustomTestTubeDiameterMm = clampCustomTestTubeDiameter(
   loadSavedNumber("vaso-custom-test-tube-diameter-mm", 20),
@@ -217,6 +220,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   autoRotate: true,
   showClipping: false,
   showCompatibleInsert: initialShowCompatibleInsert,
+  boutiqueProductionMode: initialBoutiqueProductionMode,
   generateTestTubeSupport: initialGenerateTestTubeSupport,
   forceTestTubeSupport: false,
   forceCustomTestTubeSize: false,
@@ -256,6 +260,14 @@ export const useUIStore = create<UIState>((set, get) => ({
       /* ignore */
     }
     set({ showCompatibleInsert: v });
+  },
+  setBoutiqueProductionMode: (v) => {
+    try {
+      localStorage.setItem("vaso-boutique-production-mode", String(v));
+    } catch {
+      /* ignore */
+    }
+    set({ boutiqueProductionMode: v });
   },
   setGenerateTestTubeSupport: (v) => {
     try {
@@ -381,6 +393,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       localStorage.removeItem("vaso-theme");
       localStorage.removeItem("vaso-advanced-stl-unlocked");
       localStorage.removeItem("vaso-show-compatible-insert");
+      localStorage.removeItem("vaso-boutique-production-mode");
       localStorage.removeItem("vaso-generate-test-tube-support");
       localStorage.removeItem("vaso-force-test-tube-support");
       localStorage.removeItem("vaso-force-custom-test-tube-size");
@@ -401,6 +414,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       autoRotate: true,
       showClipping: false,
       showCompatibleInsert: true,
+      boutiqueProductionMode: false,
       generateTestTubeSupport: true,
       forceTestTubeSupport: false,
       forceCustomTestTubeSize: false,

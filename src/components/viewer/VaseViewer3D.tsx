@@ -392,6 +392,7 @@ export function VaseViewer3D() {
   const rotationSpeed = useUIStore((s) => s.rotationSpeed);
   const generateTestTubeSupport = useUIStore((s) => s.generateTestTubeSupport);
   const forceTestTubeSupport = useUIStore((s) => s.forceTestTubeSupport);
+  const boutiqueProductionMode = useUIStore((s) => s.boutiqueProductionMode);
   const meshData = useVaseMesh(params, seed);
   const showSeedModified = isSeedModified;
   const controlsRef = useRef<OrbitControlsImpl>(null);
@@ -411,13 +412,13 @@ export function VaseViewer3D() {
   const handleDoubleTap = useCallback(
     (e: React.TouchEvent) => {
       const now = Date.now();
-      if (now - lastTapRef.current < 350) {
+      if (now - lastTapRef.current < 350 && !boutiqueProductionMode) {
         e.preventDefault();
         randomize();
       }
       lastTapRef.current = now;
     },
-    [randomize],
+    [boutiqueProductionMode, randomize],
   );
 
   return (
