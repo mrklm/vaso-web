@@ -9,6 +9,7 @@ type WorkshopSelectorProps = {
 const workshopPreviews = {
   default: "Atelier Vaso.png",
   vaso: "Vaso.png",
+  applique: "Applique.png",
   boucle: "boucle.png",
 } as const;
 
@@ -50,7 +51,15 @@ export function WorkshopSelector({ onOpenVaso, onOpenBoucles }: WorkshopSelector
           </span>
         </button>
 
-        <button className="workshop-node workshop-node-appliques workshop-node-disabled" type="button" disabled>
+        <button
+          className="workshop-node workshop-node-appliques workshop-node-disabled"
+          type="button"
+          disabled
+          onBlur={() => setPreview("default")}
+          onFocus={() => setPreview("applique")}
+          onMouseEnter={() => setPreview("applique")}
+          onMouseLeave={() => setPreview("default")}
+        >
           <span className="workshop-node-icon workshop-node-icon-photo" aria-hidden="true">
             <img src={workshopAsset("Applique.png")} alt="" />
           </span>

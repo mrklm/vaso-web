@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { EarringWorkshop } from "./workshops/earrings/EarringWorkshop";
-import { WorkshopSelector } from "./workshops/selector/WorkshopSelector";
 import type { Workshop } from "./workshops/types";
 import { VasoWorkshop } from "./workshops/vaso/VasoWorkshop";
 import "./App.css";
@@ -9,9 +8,7 @@ import "./App.css";
 const isEarringWorkshopPublic = import.meta.env.DEV;
 
 function App() {
-  const [currentWorkshop, setCurrentWorkshop] = useState<Workshop>(() =>
-    window.location.hash ? "vaso" : "selector",
-  );
+  const [currentWorkshop, setCurrentWorkshop] = useState<Workshop>("vaso");
 
   const toaster = (
     <Toaster
@@ -27,43 +24,20 @@ function App() {
     />
   );
 
-  if (currentWorkshop === "selector") {
-    return (
-      <div className="workshop-shell workshop-home-shell">
-        {toaster}
-        <WorkshopSelector
-          onOpenVaso={() => setCurrentWorkshop("vaso")}
-          onOpenBoucles={() => setCurrentWorkshop("boucles")}
-        />
-      </div>
-    );
-  }
-
   if (currentWorkshop === "boucles" && isEarringWorkshopPublic) {
     return (
       <div className="workshop-shell">
         {toaster}
-        <EarringWorkshop onBack={() => setCurrentWorkshop("selector")} />
+        <EarringWorkshop onSelectWorkshop={setCurrentWorkshop} />
       </div>
     );
   }
 
-  if (currentWorkshop === "applique") {
-    return (
-      <div className="workshop-shell workshop-home-shell">
-        {toaster}
-        <WorkshopSelector
-          onOpenVaso={() => setCurrentWorkshop("vaso")}
-          onOpenBoucles={() => setCurrentWorkshop("boucles")}
-        />
-      </div>
-    );
-  }
 
   return (
     <>
       {toaster}
-      <VasoWorkshop onBack={() => setCurrentWorkshop("selector")} />
+      <VasoWorkshop onSelectWorkshop={setCurrentWorkshop} />
     </>
   );
 }

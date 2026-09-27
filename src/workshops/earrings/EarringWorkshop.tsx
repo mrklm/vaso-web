@@ -1,3 +1,5 @@
+import { WorkshopSwitcher } from "../selector/WorkshopSwitcher";
+import type { Workshop } from "../types";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
@@ -1249,7 +1251,7 @@ function EarringTopView({ design, thickness }: { design: EarringDesign; thicknes
 }
 
 type EarringWorkshopProps = {
-  onBack: () => void;
+  onSelectWorkshop: (workshop: Workshop) => void;
 };
 
 function ChoiceSlider<T extends string>({
@@ -1293,7 +1295,7 @@ function ChoiceSlider<T extends string>({
   );
 }
 
-export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
+export function EarringWorkshop({ onSelectWorkshop }: EarringWorkshopProps) {
   const [settings, setSettings] = useState<EarringSettings>(DEFAULT_EARRING_SETTINGS);
   const [design, setDesign] = useState(() => randomEarringDesign(DEFAULT_EARRING_SETTINGS));
   const [pastDesigns, setPastDesigns] = useState<EarringDesign[]>([]);
@@ -1424,10 +1426,7 @@ export function EarringWorkshop({ onBack }: EarringWorkshopProps) {
   return (
     <div className="earring-app">
       <header className="app-header earring-topbar">
-        <button className="btn-small" type="button" onClick={onBack}>
-          Ateliers
-        </button>
-        <h1>Boucle</h1>
+        <WorkshopSwitcher current="boucles" onSelect={onSelectWorkshop} />
         <span className="version">Web Edition v{__APP_VERSION__}</span>
       </header>
 

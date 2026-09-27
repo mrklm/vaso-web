@@ -7,6 +7,20 @@ et ce projet suit un versioning de type **SemVer**.
 
 ---
 
+## [1.0.90] - 2026-09-27
+
+### Modifié
+ - Ouvre directement Vaso et remplace le retour aux ateliers par un sélecteur compact avec icône.
+ - Conserve Boucle accessible uniquement en développement et Applique indisponible.
+
+## [1.0.89] - 2026-09-25
+
+### Modifié
+ - Allège les quatre images du menu de sélection des ateliers pour accélérer leur chargement.
+
+### Corrigé
+ - Affiche l'image Applique au centre du menu lors du survol de son bouton, puis rétablit l'image par défaut à la sortie.
+
 ## [1.0.88] - 2026-09-06
 
 ### Modifié

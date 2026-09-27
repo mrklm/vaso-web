@@ -1,3 +1,5 @@
+import { WorkshopSwitcher } from "../selector/WorkshopSwitcher";
+import type { Workshop } from "../types";
 import { useEffect, useState } from "react";
 import { Sidebar } from "../../components/layout/Sidebar";
 import { Toolbar } from "../../components/layout/Toolbar";
@@ -10,10 +12,10 @@ import { useUIStore } from "../../store/ui-store";
 import { useVaseStore } from "../../store/vase-store";
 
 type VasoWorkshopProps = {
-  onBack: () => void;
+  onSelectWorkshop: (workshop: Workshop) => void;
 };
 
-export function VasoWorkshop({ onBack }: VasoWorkshopProps) {
+export function VasoWorkshop({ onSelectWorkshop }: VasoWorkshopProps) {
   const randomize = useVaseStore((s) => s.randomize);
   const boutiqueProductionMode = useUIStore((s) => s.boutiqueProductionMode);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -57,10 +59,7 @@ export function VasoWorkshop({ onBack }: VasoWorkshopProps) {
   return (
     <div className="app">
       <header className="app-header">
-        <button className="btn-small" type="button" onClick={onBack}>
-          Ateliers
-        </button>
-        <h1>Vaso</h1>
+        <WorkshopSwitcher current="vaso" onSelect={onSelectWorkshop} />
         <span className="version">Web Edition v{__APP_VERSION__}</span>
         <button
           className="mobile-menu-btn"

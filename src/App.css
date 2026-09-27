@@ -1441,3 +1441,34 @@ kbd {
     height: auto;
   }
 }
+
+.workshop-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.workshop-switcher img {
+  width: 1em;
+  height: 1em;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.workshop-switcher select {
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px;
+  font: inherit;
+  color: inherit;
+  background: var(--color-panel);
+  border: 1px solid color-mix(in srgb, var(--color-fg) 20%, transparent);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.workshop-switcher select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
